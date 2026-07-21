@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Splix",
+    "slug": "splity",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#060D11"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.splity.app"
+    },
+    "android": {
+      "package": "com.splity.app"
+    }
+  }
+}
