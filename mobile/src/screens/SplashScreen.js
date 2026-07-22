@@ -1,71 +1,54 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Path } from 'react-native-svg';
 import SplixLogo from '../components/SplixLogo';
+import SplashGlow from '../assets/splash-glow.svg';
+import SplashChevrons from '../assets/splash-chevrons.svg';
+import Wordmark from '../assets/wordmark.svg';
 
 const { width, height } = Dimensions.get('window');
 
-// Large faint chevron outlines echoing the logo mark, per the Figma splash.
-const BackgroundChevrons = () => (
-  <Svg
-    width={width}
-    height={height}
-    viewBox={`0 0 ${width} ${height}`}
-    style={StyleSheet.absoluteFill}
-  >
-    <Path
-      d={`M ${width * 0.55} ${-height * 0.05}
-          L ${width * 0.12} ${height * 0.28}
-          L ${width * 0.55} ${height * 0.6}`}
-      stroke="rgba(255,255,255,0.07)"
-      strokeWidth="1.5"
-      fill="none"
-    />
-    <Path
-      d={`M ${width * 0.42} ${height * 0.3}
-          L ${width * 0.95} ${height * 0.62}
-          L ${width * 0.42} ${height * 0.95}`}
-      stroke="rgba(255,255,255,0.07)"
-      strokeWidth="1.5"
-      fill="none"
-    />
-  </Svg>
-);
+// Both assets were exported from a 402 x 874 Figma frame.
+const FRAME_W = 402;
+const CHEVRON_RATIO = 639 / FRAME_W;
 
 const SplashScreen = () => (
-  <LinearGradient
-    colors={['#0A1614', '#060D11', '#03070B']}
-    start={{ x: 0.1, y: 0 }}
-    end={{ x: 0.9, y: 1 }}
-    style={styles.container}
-  >
+  <View style={styles.container}>
     <StatusBar style="light" />
-    <BackgroundChevrons />
+    <SplashGlow
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid slice"
+      style={StyleSheet.absoluteFill}
+    />
+    <SplashChevrons
+      width={width}
+      height={width * CHEVRON_RATIO}
+      style={styles.chevrons}
+    />
     <View style={styles.brandRow}>
       <SplixLogo size={88} />
-      <Text style={styles.wordmark}>Splix</Text>
+      <Wordmark width={141} height={56} />
     </View>
-  </LinearGradient>
+  </View>
 );
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0A0A0A',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chevrons: {
+    position: 'absolute',
+    left: 0,
+    top: (height - width * CHEVRON_RATIO) / 2,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 18,
-  },
-  wordmark: {
-    color: '#FFFFFF',
-    fontSize: 56,
-    fontWeight: '800',
-    letterSpacing: 1,
   },
 });
 
