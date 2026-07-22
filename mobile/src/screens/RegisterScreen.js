@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
-import DarkTextField from '../components/DarkTextField';
+import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
-import { dark, radius, spacing } from '../theme';
+import TermsCheckbox from '../components/TermsCheckbox';
+import AuthFooter from '../components/AuthFooter';
+import { spacing } from '../theme';
 
 const RegisterScreen = ({ navigation }) => {
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
@@ -21,6 +25,17 @@ const RegisterScreen = ({ navigation }) => {
     }
     if (password.length < 8) {
       Alert.alert('Weak password', 'Password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirmPass) {
+      Alert.alert('Passwords do not match', 'Both password fields must be identical.');
+      return;
+    }
+    if (!agreed) {
+      Alert.alert(
+        'Terms required',
+        'Please agree to the Terms of Service and Privacy Policy to continue.'
+      );
       return;
     }
     setLoading(true);
@@ -33,19 +48,16 @@ const RegisterScreen = ({ navigation }) => {
     }
   };
 
-  const socialComingSoon = (provider) =>
-    Alert.alert(provider, `${provider} sign-up is coming soon.`);
-
   return (
     <AuthLayout title="Create account" subtitle="Sign up to start splitting with Splix">
-      <DarkTextField
+      <TextField
         label="Name"
         value={name}
         onChangeText={setName}
         placeholder="Your name"
         autoComplete="name"
       />
-      <DarkTextField
+      <TextField
         label="Email or Username"
         value={email}
         onChangeText={setEmail}
@@ -54,13 +66,30 @@ const RegisterScreen = ({ navigation }) => {
         autoCapitalize="none"
         autoComplete="email"
       />
-      <DarkTextField
+      <TextField
+        label="Phone Number"
+        value={phone}
+        onChangeText={setPhone}
+        placeholder="+91 "
+        keyboardType="phone-pad"
+        autoComplete="tel"
+      />
+      <TextField
         label="Password"
         value={password}
         onChangeText={setPassword}
         placeholder="••••••••"
         secure
       />
+      <TextField
+        label="Confirm Password"
+        value={confirmPass}
+        onChangeText={setConfirmPass}
+        placeholder="••••••••"
+        secure
+      />
+
+      <TermsCheckbox checked={agreed} onToggle={() => setAgreed((v) => !v)} />
 
       <GradientButton
         title="Sign Up"
@@ -69,66 +98,17 @@ const RegisterScreen = ({ navigation }) => {
         style={styles.signUp}
       />
 
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or continue with</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      <View style={styles.socialRow}>
-        <TouchableOpacity style={styles.socialButton} onPress={() => socialComingSoon('Google')}>
-          <Ionicons name="logo-google" size={20} color={dark.text} />
-          <Text style={styles.socialText}>Google</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton} onPress={() => socialComingSoon('Apple')}>
-          <Ionicons name="logo-apple" size={22} color={dark.text} />
-          <Text style={styles.socialText}>Apple</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Already have an account? </Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.footerLink}>Log In</Text>
-        </TouchableOpacity>
-      </View>
+      <AuthFooter
+        text="Already have an account?"
+        linkText="Log In"
+        onPress={() => navigation.goBack()}
+      />
     </AuthLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  signUp: { marginTop: spacing.lg },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.xl,
-    gap: spacing.md,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: dark.border },
-  dividerText: { color: dark.textMuted, fontSize: 14 },
-  socialRow: { flexDirection: 'row', gap: spacing.md },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: dark.surface,
-    borderWidth: 1,
-    borderColor: dark.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-  },
-  socialText: { color: dark.text, fontSize: 16, fontWeight: '600' },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 'auto',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  footerText: { color: dark.textMuted, fontSize: 15 },
-  footerLink: { color: dark.link, fontSize: 15, fontWeight: '700' },
+  signUp: { marginTop: spacing.md },
 });
 
 export default RegisterScreen;

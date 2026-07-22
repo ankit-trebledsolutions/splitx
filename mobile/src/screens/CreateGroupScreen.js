@@ -29,12 +29,14 @@ const CreateGroupScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <TextField
+        variant="light"
         label="Group name"
         value={name}
         onChangeText={setName}
         placeholder="Goa trip, Flat 4B, ..."
       />
       <TextField
+        variant="light"
         label="Description (optional)"
         value={description}
         onChangeText={setDescription}

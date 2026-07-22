@@ -62,12 +62,14 @@ const AddExpenseScreen = ({ route, navigation }) => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TextField
+        variant="light"
         label="Description"
         value={description}
         onChangeText={setDescription}
         placeholder="Dinner, cab, groceries..."
       />
       <TextField
+        variant="light"
         label="Amount"
         value={amount}
         onChangeText={setAmount}

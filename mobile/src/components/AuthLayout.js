@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  View,
   Text,
   StyleSheet,
   KeyboardAvoidingView,
@@ -7,20 +8,21 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import SplixLogo from './SplixLogo';
+import SplashGlow from '../assets/splash-glow.svg';
 import { dark, spacing } from '../theme';
 
-// Shared dark scaffold for the Splix auth screens: gradient background,
-// logo badge, heading + subtitle, scrollable body.
+// Shared dark scaffold for the Splix auth screens: glow background (same
+// asset as the splash screen), logo badge, heading + subtitle, scrollable body.
 const AuthLayout = ({ title, subtitle, children }) => (
-  <LinearGradient
-    colors={[dark.backgroundAlt, dark.background]}
-    start={{ x: 0.2, y: 0 }}
-    end={{ x: 0.8, y: 1 }}
-    style={styles.gradient}
-  >
+  <View style={styles.screen}>
+    <SplashGlow
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid slice"
+      style={StyleSheet.absoluteFill}
+    />
     <StatusBar style="light" />
     <SafeAreaView style={styles.flex}>
       <KeyboardAvoidingView
@@ -39,11 +41,11 @@ const AuthLayout = ({ title, subtitle, children }) => (
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  </LinearGradient>
+  </View>
 );
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 },
+  screen: { flex: 1, backgroundColor: '#0A0A0A' },
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
@@ -54,13 +56,12 @@ const styles = StyleSheet.create({
     color: dark.text,
     fontSize: 34,
     fontWeight: '800',
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   subtitle: {
     color: dark.textMuted,
     fontSize: 16,
     lineHeight: 24,
-    marginTop: spacing.xs,
     marginBottom: spacing.xl,
   },
 });

@@ -104,6 +104,7 @@ const GroupsScreen = ({ navigation }) => {
             <Button title="Create a group" onPress={() => navigation.navigate('CreateGroup')} />
             <View style={styles.joinRow}>
               <TextField
+                variant="light"
                 value={inviteCode}
                 onChangeText={setInviteCode}
                 placeholder="Invite code"

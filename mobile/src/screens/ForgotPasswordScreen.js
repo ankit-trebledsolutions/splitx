@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { forgotPasswordRequest } from '../api/auth.api';
 import AuthLayout from '../components/AuthLayout';
-import DarkTextField from '../components/DarkTextField';
+import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
+import AuthFooter from '../components/AuthFooter';
 import { spacing } from '../theme';
 
 const ForgotPasswordScreen = ({ navigation }) => {
@@ -35,7 +36,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
       title="Forgot Password"
       subtitle="Enter your email address to receive a password reset link"
     >
-      <DarkTextField
+      <TextField
         label="Email Address"
         value={email}
         onChangeText={setEmail}
@@ -46,6 +47,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
       />
       <View style={styles.spacer} />
       <GradientButton title="Send OTP" onPress={handleSendOtp} loading={loading} />
+      <AuthFooter
+        text="Remember your password?"
+        linkText="Back to Login"
+        onPress={() => navigation.goBack()}
+      />
     </AuthLayout>
   );
 };

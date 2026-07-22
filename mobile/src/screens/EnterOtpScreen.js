@@ -10,6 +10,7 @@ import {
 import { forgotPasswordRequest, verifyOtpRequest } from '../api/auth.api';
 import AuthLayout from '../components/AuthLayout';
 import GradientButton from '../components/GradientButton';
+import AuthFooter from '../components/AuthFooter';
 import { dark, radius, spacing } from '../theme';
 
 const OTP_LENGTH = 6;
@@ -105,6 +106,15 @@ const EnterOtpScreen = ({ route, navigation }) => {
 
       <View style={styles.spacer} />
       <GradientButton title="Verify" onPress={handleVerify} loading={loading} />
+      <AuthFooter
+        text="Didn't receive code?"
+        linkText="Resend"
+        onPress={() =>
+          secondsLeft > 0
+            ? Alert.alert('Please wait', `You can resend the code in ${timerLabel}.`)
+            : handleResend()
+        }
+      />
     </AuthLayout>
   );
 };
