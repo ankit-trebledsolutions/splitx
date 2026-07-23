@@ -6,16 +6,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import SplixLogo from './SplixLogo';
 import SplashGlow from '../assets/splash-glow.svg';
 import { dark, spacing } from '../theme';
 
 // Shared dark scaffold for the Splix auth screens: glow background (same
 // asset as the splash screen), logo badge, heading + subtitle, scrollable body.
-const AuthLayout = ({ title, subtitle, children }) => (
+// Pass onBack to show a back chevron above the logo.
+const AuthLayout = ({ title, subtitle, children, onBack }) => (
   <View style={styles.screen}>
     <SplashGlow
       width="100%"
@@ -34,6 +37,16 @@ const AuthLayout = ({ title, subtitle, children }) => (
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {onBack ? (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={onBack}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={22} color={dark.text} />
+            </TouchableOpacity>
+          ) : null}
           <SplixLogo size={64} />
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -51,6 +64,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
   title: {
     color: dark.text,

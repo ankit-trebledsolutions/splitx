@@ -38,14 +38,20 @@ export const AuthProvider = ({ children }) => {
     setUser(created);
   }, []);
 
+  // Local-only for now: there is no PATCH /auth/me endpoint yet, so edits live
+  // in memory and reset on the next session restore.
+  const updateProfile = useCallback((patch) => {
+    setUser((current) => ({ ...(current ?? {}), ...patch }));
+  }, []);
+
   const logout = useCallback(async () => {
     await AsyncStorage.removeItem(TOKEN_KEY);
     setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout }),
-    [user, isLoading, login, register, logout]
+    () => ({ user, isLoading, login, register, logout, updateProfile }),
+    [user, isLoading, login, register, logout, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

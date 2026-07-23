@@ -13,6 +13,7 @@ const TextField = ({
   secure = false,
   variant = 'dark',
   style,
+  inputStyle,
   ...inputProps
 }) => {
   const [hidden, setHidden] = useState(true);
@@ -24,7 +25,7 @@ const TextField = ({
       {label ? <Text style={v.label}>{label}</Text> : null}
       <View style={styles.inputWrap}>
         <TextInput
-          style={[v.input, secure && styles.inputSecure, error && v.inputError]}
+          style={[v.input, secure && styles.inputSecure, error && v.inputError, inputStyle]}
           placeholderTextColor={isDark ? dark.textMuted : colors.textMuted}
           secureTextEntry={secure && hidden}
           {...inputProps}

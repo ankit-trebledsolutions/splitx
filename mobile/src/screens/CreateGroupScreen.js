@@ -1,24 +1,46 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
-import { createGroup } from '../api/groups.api';
+import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
-import Button from '../components/Button';
-import { colors, spacing } from '../theme';
+import SelectField from '../components/SelectField';
+import StepperField from '../components/StepperField';
+import GradientButton from '../components/GradientButton';
+import { createGroup } from '../api/groups.api';
+import { spacing } from '../theme';
+
+export const GROUP_TYPES = [
+  { label: 'Trip', value: 'trip' },
+  { label: 'Home', value: 'home' },
+  { label: 'Couple', value: 'couple' },
+  { label: 'Event', value: 'event' },
+  { label: 'Other', value: 'other' },
+];
 
 const CreateGroupScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [groupType, setGroupType] = useState('trip');
+  const [totalDays, setTotalDays] = useState(2);
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const handleCreate = async () => {
+  const isTrip = groupType === 'trip';
+
+  const handleContinue = async () => {
     if (name.trim().length < 2) {
-      Alert.alert('Invalid name', 'Group name must be at least 2 characters.');
+      setErrors({ name: 'Group name must be at least 2 characters' });
       return;
     }
+    setErrors({});
     setLoading(true);
     try {
-      const group = await createGroup({ name: name.trim(), description: description.trim() });
-      navigation.replace('GroupDetail', { groupId: group._id, name: group.name });
+      const group = await createGroup({
+        name: name.trim(),
+        description: description.trim(),
+        groupType,
+        ...(isTrip ? { totalDays } : {}),
+      });
+      navigation.replace('GroupInvite', { group });
     } catch (err) {
       Alert.alert('Could not create group', err.message);
     } finally {
@@ -27,29 +49,59 @@ const CreateGroupScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <AuthLayout
+      title="Create Group"
+      subtitle="Set up your group details"
+      onBack={navigation.canGoBack() ? navigation.goBack : undefined}
+    >
       <TextField
-        variant="light"
-        label="Group name"
+        label="Group Name"
         value={name}
         onChangeText={setName}
-        placeholder="Goa trip, Flat 4B, ..."
+        placeholder="e.g. Summer Trip 2026"
+        error={errors.name}
       />
+
       <TextField
-        variant="light"
-        label="Description (optional)"
+        label="Group Description (optional)"
         value={description}
         onChangeText={setDescription}
         placeholder="What is this group for?"
         multiline
       />
-      <Button title="Create group" onPress={handleCreate} loading={loading} />
-    </View>
+
+      <SelectField
+        label="Group Type"
+        value={groupType}
+        options={GROUP_TYPES}
+        onChange={setGroupType}
+      />
+
+      {isTrip && (
+        <StepperField
+          label="Total Days"
+          value={totalDays}
+          onChange={setTotalDays}
+          min={1}
+          max={90}
+        />
+      )}
+
+      <View style={styles.spacer} />
+
+      <GradientButton
+        title="Continue"
+        onPress={handleContinue}
+        loading={loading}
+        style={styles.button}
+      />
+    </AuthLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  spacer: { flex: 1, minHeight: spacing.xl },
+  button: { marginBottom: spacing.md },
 });
 
 export default CreateGroupScreen;

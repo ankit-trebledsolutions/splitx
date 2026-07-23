@@ -35,6 +35,17 @@ export const createExpense = async (groupId, payload) => {
   return data.data.expense;
 };
 
+export const fetchExpense = async (expenseId) => {
+  const { data } = await client.get(`/expenses/${expenseId}`);
+  return data.data.expense;
+};
+
+// Omit userId to settle your own share.
+export const settleExpense = async (expenseId, userId) => {
+  const { data } = await client.post(`/expenses/${expenseId}/settle`, userId ? { userId } : {});
+  return data.data.expense;
+};
+
 export const deleteExpense = async (expenseId) => {
   await client.delete(`/expenses/${expenseId}`);
 };

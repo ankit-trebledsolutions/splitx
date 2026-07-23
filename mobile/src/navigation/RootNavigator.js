@@ -9,11 +9,14 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import EnterOtpScreen from '../screens/EnterOtpScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import PasswordChangedScreen from '../screens/PasswordChangedScreen';
-import GroupsScreen from '../screens/GroupsScreen';
-import GroupDetailScreen from '../screens/GroupDetailScreen';
+import MainTabs from './MainTabs';
+import GroupActionScreen from '../screens/GroupActionScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupInviteScreen from '../screens/GroupInviteScreen';
+import GroupChatScreen from '../screens/GroupChatScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -43,23 +46,42 @@ const RootNavigator = () => {
     >
       {user ? (
         <>
-          <Stack.Screen name="Groups" component={GroupsScreen} options={{ title: 'Splix' }} />
+          <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
-            name="GroupDetail"
-            component={GroupDetailScreen}
-            options={({ route }) => ({ title: route.params?.name || 'Group' })}
+            name="GroupAction"
+            component={GroupActionScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="CreateGroup"
             component={CreateGroupScreen}
-            options={{ title: 'New group', presentation: 'modal' }}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GroupInvite"
+            component={GroupInviteScreen}
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="GroupChat"
+            component={GroupChatScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="AddExpense"
             component={AddExpenseScreen}
-            options={{ title: 'Add expense', presentation: 'modal' }}
+            options={{ headerShown: false, presentation: 'modal' }}
           />
-          <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+          <Stack.Screen
+            name="ExpenseDetail"
+            component={ExpenseDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ headerShown: false }}
+          />
         </>
       ) : (
         <>
