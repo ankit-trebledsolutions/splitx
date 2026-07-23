@@ -4,10 +4,12 @@ const ApiError = require('../utils/ApiError');
 
 const MEMBER_FIELDS = 'name email';
 
-const createGroup = async (userId, { name, description }) => {
+const createGroup = async (userId, { name, description, groupType, totalDays }) => {
   const group = await Group.create({
     name,
     description,
+    groupType,
+    totalDays: groupType === 'trip' ? totalDays : null,
     createdBy: userId,
     members: [userId],
   });

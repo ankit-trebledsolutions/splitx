@@ -4,6 +4,8 @@ const splitSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     amount: { type: Number, required: true, min: 0 },
+    settled: { type: Boolean, default: false },
+    settledAt: { type: Date, default: null },
   },
   { _id: false }
 );
@@ -32,7 +34,19 @@ const expenseSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ['general', 'food', 'transport', 'housing', 'entertainment', 'utilities', 'other'],
+      enum: [
+        'general',
+        'food',
+        'stay',
+        'travel',
+        'fun',
+        'shopping',
+        'transport',
+        'housing',
+        'entertainment',
+        'utilities',
+        'other',
+      ],
       default: 'general',
     },
     date: { type: Date, default: Date.now },
