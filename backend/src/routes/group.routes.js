@@ -7,6 +7,10 @@ const expenseController = require('../controllers/expense.controller');
 const messageController = require('../controllers/message.controller');
 const taskController = require('../controllers/task.controller');
 const reminderController = require('../controllers/reminder.controller');
+const itineraryController = require('../controllers/itinerary.controller');
+const photoController = require('../controllers/photo.controller');
+const attractionController = require('../controllers/attraction.controller');
+const stayController = require('../controllers/stay.controller');
 
 const router = Router();
 router.use(protect);
@@ -94,6 +98,66 @@ const createReminderSchema = {
   }),
 };
 
+const createItineraryDaySchema = {
+  params: z.object({ groupId: objectId }),
+  body: z.object({
+    title: z.string().min(1, 'Day title is required').max(120),
+    date: z.coerce.date().nullish(),
+    dayNumber: z.number().int().min(1).max(365).optional(),
+    activities: z
+      .array(
+        z.object({
+          time: z.string().max(20).optional(),
+          title: z.string().min(1).max(200),
+          icon: z.string().max(40).optional(),
+          note: z.string().max(300).optional(),
+        })
+      )
+      .optional(),
+  }),
+};
+
+const addPhotoSchema = {
+  params: z.object({ groupId: objectId }),
+  body: z.object({
+    emoji: z.string().max(8).optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9a-f]{6}$/i, 'Colour must be a hex code')
+      .optional(),
+    imageUrl: z.string().url().max(2000).optional(),
+    caption: z.string().max(200).optional(),
+    taggedMembers: z.array(objectId).optional(),
+  }),
+};
+
+const createAttractionSchema = {
+  params: z.object({ groupId: objectId }),
+  body: z.object({
+    name: z.string().min(1, 'Attraction name is required').max(120),
+    category: z.string().max(60).optional(),
+    rating: z.number().min(0).max(5).optional(),
+    distanceKm: z.number().min(0).max(10000).optional(),
+    emoji: z.string().max(8).optional(),
+  }),
+};
+
+const createStaySchema = {
+  params: z.object({ groupId: objectId }),
+  body: z.object({
+    name: z.string().min(1, 'Stay name is required').max(120),
+    stars: z.number().int().min(1).max(5).optional(),
+    status: z.enum(['pending', 'confirmed', 'cancelled']).optional(),
+    checkIn: z.coerce.date(),
+    checkOut: z.coerce.date(),
+    guests: z.number().int().min(1).max(50).optional(),
+    pricePerNight: z.number().nonnegative(),
+    amenities: z.array(z.string().max(40)).max(12).optional(),
+    address: z.string().max(200).optional(),
+    emoji: z.string().max(8).optional(),
+  }),
+};
+
 router.post('/', validate(createGroupSchema), groupController.createGroup);
 router.get('/', groupController.listGroups);
 router.post('/join', validate(joinGroupSchema), groupController.joinGroup);
@@ -112,5 +176,17 @@ router.post('/:groupId/tasks', validate(createTaskSchema), taskController.create
 
 router.get('/:groupId/reminders', validate(groupParams), reminderController.listReminders);
 router.post('/:groupId/reminders', validate(createReminderSchema), reminderController.createReminder);
+
+router.get('/:groupId/itinerary', validate(groupParams), itineraryController.listDays);
+router.post('/:groupId/itinerary', validate(createItineraryDaySchema), itineraryController.createDay);
+
+router.get('/:groupId/photos', validate(groupParams), photoController.listPhotos);
+router.post('/:groupId/photos', validate(addPhotoSchema), photoController.addPhoto);
+
+router.get('/:groupId/attractions', validate(groupParams), attractionController.listAttractions);
+router.post('/:groupId/attractions', validate(createAttractionSchema), attractionController.createAttraction);
+
+router.get('/:groupId/stays', validate(groupParams), stayController.listStays);
+router.post('/:groupId/stays', validate(createStaySchema), stayController.createStay);
 
 module.exports = router;

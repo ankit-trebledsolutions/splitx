@@ -4,6 +4,10 @@ const groupRoutes = require('./group.routes');
 const expenseRoutes = require('./expense.routes');
 const taskRoutes = require('./task.routes');
 const reminderRoutes = require('./reminder.routes');
+const itineraryRoutes = require('./itinerary.routes');
+const photoRoutes = require('./photo.routes');
+const attractionRoutes = require('./attraction.routes');
+const stayRoutes = require('./stay.routes');
 
 const router = Router();
 
@@ -13,5 +17,9 @@ router.use('/groups', groupRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/reminders', reminderRoutes);
+router.use('/itinerary-days', itineraryRoutes);
+router.use('/photos', photoRoutes);
+router.use('/attractions', attractionRoutes);
+router.use('/stays', stayRoutes);
 
 module.exports = router;
