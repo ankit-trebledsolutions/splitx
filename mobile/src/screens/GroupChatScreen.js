@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,15 +7,39 @@ import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import NewTaskSheet from '../components/NewTaskSheet';
 import TaskSavedModal from '../components/TaskSavedModal';
+import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
+import NewActivitySheet from '../components/NewActivitySheet';
+import NewPhotoSheet from '../components/NewPhotoSheet';
+import NewAttractionSheet from '../components/NewAttractionSheet';
+import NewStaySheet from '../components/NewStaySheet';
 import ChatTab from './group/ChatTab';
 import ExpensesTab from './group/ExpensesTab';
 import TasksTab from './group/TasksTab';
 import RemindersTab from './group/RemindersTab';
+import ItineraryTab from './group/ItineraryTab';
+import GalleryTab from './group/GalleryTab';
+import AttractionsTab from './group/AttractionsTab';
+import StaysTab from './group/StaysTab';
 import { useAuth } from '../context/AuthContext';
 import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
 import { fetchReminders, createReminder, updateReminder } from '../api/reminders.api';
+import {
+  fetchItinerary,
+  createItineraryDay,
+  addItineraryActivity,
+  removeItineraryActivity,
+  deleteItineraryDay,
+} from '../api/itinerary.api';
+import { fetchPhotos, addPhoto, deletePhoto } from '../api/gallery.api';
+import {
+  fetchAttractions,
+  createAttraction,
+  toggleSaveAttraction,
+  deleteAttraction,
+} from '../api/attractions.api';
+import { fetchStays, createStay, updateStay, deleteStay } from '../api/stays.api';
 import { detectTask } from '../utils/taskDetect';
 import { dark, radius, spacing } from '../theme';
 
@@ -24,7 +48,14 @@ const TABS = [
   { key: 'expenses', label: 'Expenses', icon: 'cash-outline' },
   { key: 'tasks', label: 'Tasks', icon: 'checkbox-outline' },
   { key: 'reminders', label: 'Reminders', icon: 'alarm-outline' },
+  { key: 'itinerary', label: 'Itinerary', icon: 'map-outline' },
+  { key: 'gallery', label: 'Gallery', icon: 'images-outline' },
+  { key: 'attractions', label: 'Attractions', icon: 'compass-outline' },
+  { key: 'stays', label: 'Stays', icon: 'bed-outline' },
 ];
+
+// Which stay status a tap on the chip moves to next.
+const NEXT_STAY_STATUS = { pending: 'confirmed', confirmed: 'cancelled', cancelled: 'pending' };
 
 const MESSAGE_POLL_MS = 15000;
 
@@ -46,9 +77,18 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [expenses, setExpenses] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [itineraryDays, setItineraryDays] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [attractions, setAttractions] = useState([]);
+  const [stays, setStays] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
+  const [daySheetOpen, setDaySheetOpen] = useState(false);
+  const [activitySheetDay, setActivitySheetDay] = useState(null);
+  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
+  const [attractionSheetOpen, setAttractionSheetOpen] = useState(false);
+  const [staySheetOpen, setStaySheetOpen] = useState(false);
   const [suggestion, setSuggestion] = useState(null);
   const [sheetSeed, setSheetSeed] = useState(null);
   const [savedTask, setSavedTask] = useState(null);
@@ -59,18 +99,36 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   const loadAll = useCallback(async () => {
     try {
-      const [groupData, messageData, expenseData, taskData, reminderData] = await Promise.all([
+      const [
+        groupData,
+        messageData,
+        expenseData,
+        taskData,
+        reminderData,
+        itineraryData,
+        photoData,
+        attractionData,
+        stayData,
+      ] = await Promise.all([
         fetchGroup(groupId),
         fetchMessages(groupId),
         fetchExpenses(groupId),
         fetchTasks(groupId),
         fetchReminders(groupId),
+        fetchItinerary(groupId),
+        fetchPhotos(groupId),
+        fetchAttractions(groupId),
+        fetchStays(groupId),
       ]);
       setGroup(groupData);
       setMessages(messageData);
       setExpenses(expenseData);
       setTasks(taskData);
       setReminders(reminderData);
+      setItineraryDays(itineraryData);
+      setPhotos(photoData);
+      setAttractions(attractionData);
+      setStays(stayData);
     } catch (err) {
       Alert.alert('Could not load group', err.message);
     } finally {
@@ -229,6 +287,195 @@ const GroupChatScreen = ({ route, navigation }) => {
     }
   };
 
+  const refreshMessages = async () => {
+    try {
+      setMessages(await fetchMessages(groupId));
+    } catch {
+      // A stale chat feed is fine; the next poll or focus reloads it.
+    }
+  };
+
+  const handleCreateDay = async (payload) => {
+    try {
+      const day = await createItineraryDay(groupId, payload);
+      setDaySheetOpen(false);
+      setItineraryDays((prev) =>
+        [...prev, day].sort((a, b) => a.dayNumber - b.dayNumber)
+      );
+      await refreshMessages();
+    } catch (err) {
+      Alert.alert('Could not add day', err.message);
+    }
+  };
+
+  const replaceDay = (updated) =>
+    setItineraryDays((prev) => prev.map((d) => (d._id === updated._id ? updated : d)));
+
+  const handleAddActivity = async (payload) => {
+    const day = activitySheetDay;
+    if (!day) return;
+    try {
+      const updated = await addItineraryActivity(day._id, payload);
+      setActivitySheetDay(null);
+      replaceDay(updated);
+    } catch (err) {
+      Alert.alert('Could not add activity', err.message);
+    }
+  };
+
+  const handleRemoveActivity = (day, activity) => {
+    Alert.alert('Remove activity', `Remove “${activity.title}” from Day ${day.dayNumber}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            replaceDay(await removeItineraryActivity(day._id, activity._id));
+          } catch (err) {
+            Alert.alert('Could not remove activity', err.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteDay = (day) => {
+    Alert.alert('Delete day', `Delete Day ${day.dayNumber} · ${day.title}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteItineraryDay(day._id);
+            setItineraryDays((prev) => prev.filter((d) => d._id !== day._id));
+          } catch (err) {
+            Alert.alert('Could not delete day', err.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddPhoto = async (payload) => {
+    try {
+      const photo = await addPhoto(groupId, payload);
+      setPhotoSheetOpen(false);
+      setPhotos((prev) => [photo, ...prev]);
+      await refreshMessages();
+    } catch (err) {
+      Alert.alert('Could not add photo', err.message);
+    }
+  };
+
+  const handleDeletePhoto = (photo) => {
+    Alert.alert('Delete photo', 'Remove this photo from the gallery?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deletePhoto(photo._id);
+            setPhotos((prev) => prev.filter((p) => p._id !== photo._id));
+          } catch (err) {
+            Alert.alert('Could not delete photo', err.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddAttraction = async (payload) => {
+    try {
+      const attraction = await createAttraction(groupId, payload);
+      setAttractionSheetOpen(false);
+      setAttractions((prev) => [...prev, attraction]);
+      await refreshMessages();
+    } catch (err) {
+      Alert.alert('Could not add attraction', err.message);
+    }
+  };
+
+  const handleToggleSaveAttraction = async (attraction) => {
+    const saved = attraction.savedBy?.some((id) => (id?._id ?? id) === currentUserId);
+    const optimistic = {
+      ...attraction,
+      savedBy: saved
+        ? attraction.savedBy.filter((id) => (id?._id ?? id) !== currentUserId)
+        : [...(attraction.savedBy ?? []), currentUserId],
+    };
+    setAttractions((prev) => prev.map((a) => (a._id === attraction._id ? optimistic : a)));
+    try {
+      const updated = await toggleSaveAttraction(attraction._id);
+      setAttractions((prev) => prev.map((a) => (a._id === updated._id ? updated : a)));
+    } catch (err) {
+      setAttractions((prev) => prev.map((a) => (a._id === attraction._id ? attraction : a)));
+      Alert.alert('Could not update bookmark', err.message);
+    }
+  };
+
+  const handleDeleteAttraction = (attraction) => {
+    Alert.alert('Delete attraction', `Remove ${attraction.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAttraction(attraction._id);
+            setAttractions((prev) => prev.filter((a) => a._id !== attraction._id));
+          } catch (err) {
+            Alert.alert('Could not delete attraction', err.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddStay = async (payload) => {
+    try {
+      const stay = await createStay(groupId, payload);
+      setStaySheetOpen(false);
+      setStays((prev) =>
+        [...prev, stay].sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn))
+      );
+      await refreshMessages();
+    } catch (err) {
+      Alert.alert('Could not add stay', err.message);
+    }
+  };
+
+  const handleToggleStayStatus = async (stay) => {
+    const status = NEXT_STAY_STATUS[stay.status] ?? 'confirmed';
+    try {
+      const updated = await updateStay(stay._id, { status });
+      setStays((prev) => prev.map((s) => (s._id === updated._id ? updated : s)));
+      await refreshMessages();
+    } catch (err) {
+      Alert.alert('Could not update stay', err.message);
+    }
+  };
+
+  const handleDeleteStay = (stay) => {
+    Alert.alert('Delete stay', `Remove ${stay.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteStay(stay._id);
+            setStays((prev) => prev.filter((s) => s._id !== stay._id));
+          } catch (err) {
+            Alert.alert('Could not delete stay', err.message);
+          }
+        },
+      },
+    ]);
+  };
+
   const openAddExpense = () => {
     setActionsOpen(false);
     navigation.navigate('AddExpense', { groupId, members: group?.members ?? [] });
@@ -281,24 +528,26 @@ const GroupChatScreen = ({ route, navigation }) => {
       </View>
 
       <View style={styles.tabBar}>
-        {TABS.map((item) => {
-          const active = tab === item.key;
-          return (
-            <TouchableOpacity
-              key={item.key}
-              style={[styles.tab, active && styles.tabActive]}
-              onPress={() => setTab(item.key)}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={item.icon}
-                size={14}
-                color={active ? dark.accentGreen : dark.textMuted}
-              />
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>{item.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {TABS.map((item) => {
+            const active = tab === item.key;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.tab, active && styles.tabActive]}
+                onPress={() => setTab(item.key)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={item.icon}
+                  size={14}
+                  color={active ? dark.accentGreen : dark.textMuted}
+                />
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {tab === 'chat' && (
@@ -334,10 +583,102 @@ const GroupChatScreen = ({ route, navigation }) => {
         <RemindersTab reminders={reminders} loading={loading} onToggle={handleToggleReminder} />
       )}
 
+      {tab === 'itinerary' && (
+        <ItineraryTab
+          days={itineraryDays}
+          loading={loading}
+          onAddActivity={(day) => setActivitySheetDay(day)}
+          onRemoveActivity={handleRemoveActivity}
+          onDeleteDay={handleDeleteDay}
+        />
+      )}
+
+      {tab === 'gallery' && (
+        <GalleryTab
+          photos={photos}
+          loading={loading}
+          currentUserId={currentUserId}
+          onAddPhoto={() => setPhotoSheetOpen(true)}
+          onDeletePhoto={handleDeletePhoto}
+        />
+      )}
+
+      {tab === 'attractions' && (
+        <AttractionsTab
+          attractions={attractions}
+          loading={loading}
+          currentUserId={currentUserId}
+          onToggleSave={handleToggleSaveAttraction}
+          onDelete={handleDeleteAttraction}
+        />
+      )}
+
+      {tab === 'stays' && (
+        <StaysTab
+          stays={stays}
+          loading={loading}
+          organiserId={group?.createdBy?._id ?? group?.createdBy}
+          onToggleStatus={handleToggleStayStatus}
+          onDelete={handleDeleteStay}
+        />
+      )}
+
       {tab !== 'chat' || !suggestion ? (
         <View style={styles.fabWrap}>
           {actionsOpen && (
             <View style={styles.actionMenu}>
+              {tab === 'itinerary' && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setActionsOpen(false);
+                    setDaySheetOpen(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="map-outline" size={16} color={dark.accentGreen} />
+                  <Text style={styles.actionText}>Add Day</Text>
+                </TouchableOpacity>
+              )}
+              {tab === 'gallery' && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setActionsOpen(false);
+                    setPhotoSheetOpen(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="images-outline" size={16} color={dark.accentGreen} />
+                  <Text style={styles.actionText}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
+              {tab === 'attractions' && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setActionsOpen(false);
+                    setAttractionSheetOpen(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="compass-outline" size={16} color={dark.accentGreen} />
+                  <Text style={styles.actionText}>Add Attraction</Text>
+                </TouchableOpacity>
+              )}
+              {tab === 'stays' && (
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => {
+                    setActionsOpen(false);
+                    setStaySheetOpen(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="bed-outline" size={16} color={dark.accentGreen} />
+                  <Text style={styles.actionText}>Add Stay</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.actionItem} onPress={openAddExpense} activeOpacity={0.8}>
                 <Ionicons name="cash-outline" size={16} color={dark.accentGreen} />
                 <Text style={styles.actionText}>Add Expense</Text>
@@ -387,6 +728,39 @@ const GroupChatScreen = ({ route, navigation }) => {
         onSetReminder={handleSetReminderForTask}
         onDismiss={() => setSavedTask(null)}
       />
+
+      <NewItineraryDaySheet
+        visible={daySheetOpen}
+        nextDayNumber={(itineraryDays[itineraryDays.length - 1]?.dayNumber ?? 0) + 1}
+        onClose={() => setDaySheetOpen(false)}
+        onSubmit={handleCreateDay}
+      />
+
+      <NewActivitySheet
+        visible={!!activitySheetDay}
+        day={activitySheetDay}
+        onClose={() => setActivitySheetDay(null)}
+        onSubmit={handleAddActivity}
+      />
+
+      <NewPhotoSheet
+        visible={photoSheetOpen}
+        members={group?.members ?? []}
+        onClose={() => setPhotoSheetOpen(false)}
+        onSubmit={handleAddPhoto}
+      />
+
+      <NewAttractionSheet
+        visible={attractionSheetOpen}
+        onClose={() => setAttractionSheetOpen(false)}
+        onSubmit={handleAddAttraction}
+      />
+
+      <NewStaySheet
+        visible={staySheetOpen}
+        onClose={() => setStaySheetOpen(false)}
+        onSubmit={handleAddStay}
+      />
     </DarkScreen>
   );
 };
@@ -415,17 +789,16 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: dark.textMuted, fontSize: 11, marginTop: 1 },
 
   tabBar: {
-    flexDirection: 'row',
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: dark.border,
   },
   tab: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
+    paddingHorizontal: spacing.sm + 4,
     paddingVertical: spacing.sm + 2,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
