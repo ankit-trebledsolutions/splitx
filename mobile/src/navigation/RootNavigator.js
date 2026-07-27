@@ -17,6 +17,10 @@ import GroupChatScreen from '../screens/GroupChatScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import ContactUsScreen from '../screens/ContactUsScreen';
+import FaqScreen from '../screens/FaqScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -80,6 +84,22 @@ const RootNavigator = () => {
           <Stack.Screen
             name="EditProfile"
             component={EditProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ContactUs"
+            component={ContactUsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="Faq" component={FaqScreen} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="PrivacyPolicy"
+            component={PrivacyPolicyScreen}
             options={{ headerShown: false }}
           />
         </>

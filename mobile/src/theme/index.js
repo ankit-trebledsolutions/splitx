@@ -12,7 +12,9 @@ export const colors = {
 
 // Dark palette used by the Splix auth screens (per Figma).
 export const dark = {
-  background: '#04090C',
+  // Two-tone scheme used across the app: deep base with slightly raised cards.
+  background: '#05070A',
+  card: '#0E1014',
   backgroundAlt: '#0A1614',
   surface: 'rgba(255,255,255,0.05)',
   border: 'rgba(255,255,255,0.10)',

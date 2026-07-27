@@ -28,5 +28,30 @@ export const accountSettings = [
     icon: 'notifications-outline',
     label: 'Notifications',
     value: 'Push, Email & SMS',
+    screen: 'Notifications',
+  },
+];
+
+export const helpSupport = [
+  {
+    key: 'faq',
+    icon: 'help-circle-outline',
+    label: 'FAQ',
+    value: 'Frequently asked questions',
+    screen: 'Faq',
+  },
+  {
+    key: 'contact',
+    icon: 'mail-outline',
+    label: 'Contact Us',
+    value: 'Get in touch with support',
+    screen: 'ContactUs',
+  },
+  {
+    key: 'privacy',
+    icon: 'shield-checkmark-outline',
+    label: 'Privacy Policy',
+    value: 'Data & usage terms',
+    screen: 'PrivacyPolicy',
   },
 ];

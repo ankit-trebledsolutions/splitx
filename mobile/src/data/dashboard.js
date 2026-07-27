@@ -9,10 +9,10 @@ export const netBalance = {
 };
 
 export const quickActions = [
-  { key: 'add-expense', icon: 'add', label: 'Add Expense', tint: '#17E695' },
-  { key: 'create-group', icon: 'people-outline', label: 'Create Group', tint: '#4A7DF7' },
-  { key: 'invite-friend', icon: 'person-add-outline', label: 'Invite Friend', tint: '#A78BFA' },
-  { key: 'create-trip', icon: 'location-outline', label: 'Create Trip', tint: '#F59E0B' },
+  { key: 'add-expense', icon: 'add', label: 'Add Expense', tint: '#2DD4BF' },
+  { key: 'create-group', icon: 'people-outline', label: 'Create Group', tint: '#22C55E' },
+  { key: 'invite-friend', icon: 'person-outline', label: 'Invite Friend', tint: '#8B5CF6' },
+  { key: 'create-trip', icon: 'location-outline', label: 'Create Trip', tint: '#F97362' },
 ];
 
 export const upcomingTrips = [

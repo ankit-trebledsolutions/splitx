@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
+import NetBalanceBg from '../assets/net-balance-bg.svg';
+import { fetchNotifications } from '../api/notifications.api';
 import Avatar from '../components/Avatar';
 import SectionHeader from '../components/SectionHeader';
 import { useAuth } from '../context/AuthContext';
@@ -26,6 +28,25 @@ const greeting = () => {
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const name = user?.name || profileDefaults.name;
+  const [hasUnread, setHasUnread] = useState(false);
+
+  // Refresh the bell dot whenever the dashboard regains focus.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const notifications = await fetchNotifications();
+          if (active) setHasUnread(notifications.some((n) => !n.read));
+        } catch {
+          // Bell dot is best-effort; skip on network hiccups.
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const runQuickAction = (key) => {
     if (key === 'create-group' || key === 'create-trip') navigation.navigate('CreateGroup');
@@ -36,61 +57,78 @@ const HomeScreen = ({ navigation }) => {
   return (
     <DarkScreen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.topRow}>
+        <View style={styles.upperBg}>
+          <View style={styles.topRow}>
           <Avatar name={name} size={44} />
           <View style={styles.topText}>
             <Text style={styles.greeting}>{greeting()} 👋</Text>
             <Text style={styles.name}>{name}</Text>
           </View>
-          <TouchableOpacity style={styles.bell} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.bell}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Notifications')}
+          >
             <Ionicons name="notifications-outline" size={20} color={dark.text} />
+            {hasUnread && <View style={styles.bellDot} />}
           </TouchableOpacity>
         </View>
 
-        <LinearGradient
-          colors={[dark.accentBlue, dark.accentGreen]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.balanceCard}
-        >
-          <Text style={styles.balanceLabel}>Net Balance</Text>
-          <Text style={styles.balanceValue}>{usd(netBalance.total)}</Text>
-          <Text style={styles.balanceCaption}>{netBalance.caption}</Text>
+        <View style={styles.balanceCard}>
+          <NetBalanceBg
+            width="100%"
+            height="100%"
+            preserveAspectRatio="xMidYMid slice"
+            style={StyleSheet.absoluteFill}
+          />
 
-          <View style={styles.pillRow}>
-            <View style={styles.pill}>
-              <View style={[styles.pillIcon, { backgroundColor: 'rgba(23,230,149,0.30)' }]}>
-                <Ionicons name="arrow-up" size={13} color="#0B3D2B" />
+          <View style={styles.balanceBody}>
+            <Text style={styles.balanceLabel}>Net Balance</Text>
+            <Text style={styles.balanceValue}>{usd(netBalance.total)}</Text>
+            <Text style={styles.balanceCaption}>{netBalance.caption}</Text>
+          </View>
+
+          <View style={styles.statRow}>
+            <View style={styles.stat}>
+              <View style={styles.statIcon}>
+                <Ionicons name="trending-up" size={15} color={dark.accentGreen} />
               </View>
               <View>
-                <Text style={styles.pillLabel}>You owe</Text>
-                <Text style={styles.pillValue}>{usd(netBalance.youOwe)}</Text>
+                <Text style={styles.statLabel}>YOU OWE</Text>
+                <Text style={styles.statValue}>{usd(netBalance.youOwe)}</Text>
               </View>
             </View>
 
-            <View style={styles.pill}>
-              <View style={[styles.pillIcon, { backgroundColor: 'rgba(248,113,113,0.35)' }]}>
-                <Ionicons name="arrow-down" size={13} color="#5B1414" />
+            <View style={styles.statDivider} />
+
+            <View style={styles.stat}>
+              <View style={styles.statIcon}>
+                <Ionicons name="trending-down" size={15} color="#F87171" />
               </View>
               <View>
-                <Text style={styles.pillLabel}>Owed to you</Text>
-                <Text style={styles.pillValue}>{usd(netBalance.owedToYou)}</Text>
+                <Text style={styles.statLabel}>OWED TO YOU</Text>
+                <Text style={styles.statValue}>{usd(netBalance.owedToYou)}</Text>
               </View>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         <SectionHeader title="Quick Actions" style={styles.sectionSpacing} />
         <View style={styles.actionRow}>
           {quickActions.map((action) => (
             <TouchableOpacity
               key={action.key}
-              style={styles.actionTile}
+              style={styles.action}
               activeOpacity={0.8}
               onPress={() => runQuickAction(action.key)}
             >
-              <View style={[styles.actionIcon, { backgroundColor: `${action.tint}22` }]}>
-                <Ionicons name={action.icon} size={20} color={action.tint} />
+              <View
+                style={[
+                  styles.actionTile,
+                  { backgroundColor: `${action.tint}14`, borderColor: `${action.tint}3D` },
+                ]}
+              >
+                <Ionicons name={action.icon} size={22} color={action.tint} />
               </View>
               <Text style={styles.actionLabel} numberOfLines={2}>
                 {action.label}
@@ -99,7 +137,25 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
 
-        <SectionHeader
+        <TouchableOpacity
+          style={styles.contribCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Groups')}
+        >
+          <Ionicons name="heart-outline" size={20} color={dark.accentGreen} />
+          <View style={styles.contribBody}>
+            <Text style={styles.contribTitle}>View Contributions</Text>
+            <Text style={styles.contribMeta}>See community giving & impact</Text>
+          </View>
+          <View style={styles.contribButton}>
+            <Text style={styles.contribButtonText}>View</Text>
+            <Ionicons name="flash" size={12} color="#04121C" />
+          </View>
+        </TouchableOpacity>
+        </View>
+
+        <View style={styles.lowerBg}>
+          <SectionHeader
           title="Upcoming Trips"
           actionLabel="Plan new"
           actionIcon="chevron-down"
@@ -178,14 +234,16 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
         ))}
+        </View>
       </ScrollView>
     </DarkScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-
+  content: { paddingBottom: spacing.xl },
+  upperBg: {flex: 1, backgroundColor: dark.card, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg},
+  lowerBg: {flex: 1, paddingHorizontal: spacing.lg},
   topRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
   topText: { flex: 1, marginLeft: spacing.md },
   greeting: { color: dark.textMuted, fontSize: 13 },
@@ -196,63 +254,116 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: dark.border,
-    backgroundColor: dark.surface,
+    backgroundColor: dark.card,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 7,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: dark.accentGreen,
+    borderWidth: 1.5,
+    borderColor: dark.card,
   },
 
-  balanceCard: { borderRadius: radius.lg + 8, padding: spacing.lg, marginTop: spacing.sm },
-  balanceLabel: { color: 'rgba(4,18,28,0.7)', fontSize: 12, fontWeight: '600' },
-  balanceValue: { color: '#04121C', fontSize: 34, fontWeight: '800', marginTop: 2 },
-  balanceCaption: { color: 'rgba(4,18,28,0.75)', fontSize: 12, marginTop: 2 },
-  pillRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  pill: {
-    flex: 1,
+  balanceCard: {
+    borderRadius: radius.lg + 8,
+    marginTop: spacing.sm,
+    overflow: 'hidden',
+  },
+  balanceBody: {
+    alignItems: 'center',
+    paddingTop: spacing.lg + 4,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  balanceLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  balanceValue: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', marginTop: 4 },
+  balanceCaption: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 4 },
+
+  statRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: 'rgba(4,18,28,0.18)',
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  pillIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  stat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
+  statIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#0B0E12',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pillLabel: { color: 'rgba(4,18,28,0.75)', fontSize: 10, fontWeight: '600' },
-  pillValue: { color: '#04121C', fontSize: 15, fontWeight: '800' },
+  statLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  statValue: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', marginTop: 1 },
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    marginHorizontal: spacing.md,
+  },
 
   sectionSpacing: { marginTop: spacing.lg },
 
   actionRow: { flexDirection: 'row', gap: spacing.sm },
+  action: { flex: 1, alignItems: 'center' },
   actionTile: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: dark.surface,
+    width: 58,
+    height: 58,
+    borderRadius: radius.lg + 2,
     borderWidth: 1,
-    borderColor: dark.border,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xs,
-  },
-  actionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
   actionLabel: { color: dark.textMuted, fontSize: 10, fontWeight: '600', textAlign: 'center' },
 
+  contribCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    backgroundColor: dark.card,
+    borderWidth: 1,
+    borderColor: dark.border,
+    borderRadius: radius.lg + 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 4,
+    marginTop: spacing.md,
+  },
+  contribBody: { flex: 1 },
+  contribTitle: { color: dark.text, fontSize: 13, fontWeight: '700' },
+  contribMeta: { color: dark.textMuted, fontSize: 10, marginTop: 1 },
+  contribButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: dark.accentGreen,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 1,
+  },
+  contribButtonText: { color: '#04121C', fontSize: 12, fontWeight: '800' },
+
   hList: { gap: spacing.sm, paddingRight: spacing.lg },
   tripCard: {
     width: 190,
-    backgroundColor: dark.surface,
+    backgroundColor: dark.card,
     borderWidth: 1,
     borderColor: dark.border,
     borderRadius: radius.lg,
@@ -280,7 +391,7 @@ const styles = StyleSheet.create({
 
   taskCard: {
     width: 190,
-    backgroundColor: dark.surface,
+    backgroundColor: dark.card,
     borderWidth: 1,
     borderColor: dark.border,
     borderRadius: radius.lg,
@@ -303,7 +414,7 @@ const styles = StyleSheet.create({
   expenseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: dark.card,
     borderWidth: 1,
     borderColor: dark.border,
     borderRadius: radius.lg,

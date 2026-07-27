@@ -26,7 +26,7 @@ const MainTabs = () => (
       tabBarActiveTintColor: dark.accentGreen,
       tabBarInactiveTintColor: dark.textMuted,
       tabBarStyle: {
-        backgroundColor: '#070C0F',
+        backgroundColor: '#0E1014',
         borderTopColor: dark.border,
         borderTopWidth: 1,
         height: Platform.OS === 'ios' ? 84 : 64,

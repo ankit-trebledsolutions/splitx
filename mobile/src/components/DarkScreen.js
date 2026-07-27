@@ -2,18 +2,12 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import SplashGlow from '../assets/splash-glow.svg';
+import { dark } from '../theme';
 
-// Dark scaffold for the non-auth screens: same glow background as AuthLayout,
-// but without the logo/title block so each screen owns its own header.
+// Dark scaffold for the non-auth screens: flat deep background (#05070A) with
+// cards raised on #0E1014, per the dashboard design.
 const DarkScreen = ({ children, edges = ['top'], style }) => (
   <View style={styles.screen}>
-    <SplashGlow
-      width="100%"
-      height="100%"
-      preserveAspectRatio="xMidYMid slice"
-      style={StyleSheet.absoluteFill}
-    />
     <StatusBar style="light" />
     <SafeAreaView style={[styles.flex, style]} edges={edges}>
       {children}
@@ -22,7 +16,7 @@ const DarkScreen = ({ children, edges = ['top'], style }) => (
 );
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0A0A' },
+  screen: { flex: 1, backgroundColor: dark.background },
   flex: { flex: 1 },
 });
 

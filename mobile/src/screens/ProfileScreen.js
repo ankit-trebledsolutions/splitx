@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
-import { profileDefaults, accountSettings } from '../data/profile';
+import { profileDefaults, accountSettings, helpSupport } from '../data/profile';
 import { dark, radius, spacing } from '../theme';
 
 const ProfileScreen = ({ navigation }) => {
@@ -49,7 +49,7 @@ const ProfileScreen = ({ navigation }) => {
               key={item.key}
               style={[styles.settingRow, index > 0 && styles.settingDivider]}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('EditProfile')}
+              onPress={() => navigation.navigate(item.screen ?? 'EditProfile')}
             >
               <View style={styles.settingIcon}>
                 <Ionicons name={item.icon} size={18} color={dark.accentBlue} />
@@ -58,6 +58,30 @@ const ProfileScreen = ({ navigation }) => {
                 <Text style={styles.settingLabel}>{item.label}</Text>
                 <Text style={styles.settingValue} numberOfLines={1}>
                   {item.value ?? profile[item.valueFrom]}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Help & Support</Text>
+
+        <View style={styles.settingsCard}>
+          {helpSupport.map((item, index) => (
+            <TouchableOpacity
+              key={item.key}
+              style={[styles.settingRow, index > 0 && styles.settingDivider]}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate(item.screen)}
+            >
+              <View style={[styles.settingIcon, styles.supportIcon]}>
+                <Ionicons name={item.icon} size={18} color={dark.accentGreen} />
+              </View>
+              <View style={styles.settingBody}>
+                <Text style={styles.settingLabel}>{item.label}</Text>
+                <Text style={styles.settingValue} numberOfLines={1}>
+                  {item.value}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
@@ -139,6 +163,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: spacing.md,
   },
+  supportIcon: { backgroundColor: 'rgba(23,230,149,0.12)' },
   settingBody: { flex: 1 },
   settingLabel: { color: dark.text, fontSize: 14, fontWeight: '600' },
   settingValue: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
