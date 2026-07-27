@@ -2,6 +2,7 @@ const Photo = require('../models/Photo');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [
@@ -39,6 +40,14 @@ const addPhoto = async (userId, groupId, payload) => {
 
   const uploader = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
   await messageService.postSystem(groupId, `${uploader} added a photo to the gallery`);
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'photo',
+    title: 'Photo Added',
+    body: `${uploader} added a photo to the "${group.name}" gallery.`,
+  });
 
   return photo;
 };

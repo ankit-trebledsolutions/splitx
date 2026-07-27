@@ -2,6 +2,7 @@ const ItineraryDay = require('../models/ItineraryDay');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [{ path: 'createdBy', select: USER_FIELDS }];
@@ -40,6 +41,14 @@ const createDay = async (userId, groupId, payload) => {
     groupId,
     `${memberName(group, userId)} added Day ${dayNumber} · ${day.title} to the itinerary`
   );
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'itinerary',
+    title: 'Itinerary Updated',
+    body: `${memberName(group, userId)} added Day ${dayNumber} · ${day.title} to the itinerary.`,
+  });
 
   return day;
 };

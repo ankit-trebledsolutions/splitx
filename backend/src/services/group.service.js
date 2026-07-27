@@ -1,6 +1,7 @@
 const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const ApiError = require('../utils/ApiError');
+const notificationService = require('./notification.service');
 
 const MEMBER_FIELDS = 'name email';
 
@@ -37,7 +38,18 @@ const joinGroupByCode = async (userId, inviteCode) => {
   }
   group.members.push(userId);
   await group.save();
-  return group.populate('members', MEMBER_FIELDS);
+  await group.populate('members', MEMBER_FIELDS);
+
+  const joiner = group.members.find((m) => m._id.equals(userId));
+  await notificationService.notifyGroup({
+    groupId: group._id,
+    actorId: userId,
+    type: 'member',
+    title: 'Friend Joined the Group',
+    body: `${joiner?.name ?? 'Someone'} has joined your "${group.name}" group.`,
+  });
+
+  return group;
 };
 
 const leaveGroup = async (groupId, userId) => {

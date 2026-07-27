@@ -2,6 +2,7 @@ const Attraction = require('../models/Attraction');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [{ path: 'addedBy', select: USER_FIELDS }];
@@ -28,6 +29,14 @@ const createAttraction = async (userId, groupId, payload) => {
 
   const adder = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
   await messageService.postSystem(groupId, `${adder} added ${attraction.name} to attractions`);
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'attraction',
+    title: 'Attraction Added',
+    body: `${adder} added ${attraction.name} to attractions.`,
+  });
 
   return attraction;
 };

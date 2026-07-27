@@ -2,6 +2,7 @@ const Reminder = require('../models/Reminder');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const listReminders = async (groupId, userId) => {
   await groupService.getGroupForMember(groupId, userId);
@@ -36,6 +37,17 @@ const createReminder = async (userId, groupId, payload) => {
     text: reminder.title,
     reminder: reminder._id,
   });
+
+  // Private reminders stay private; only group-scope ones notify others.
+  if (reminder.scope === 'group') {
+    await notificationService.notifyGroup({
+      groupId,
+      actorId: userId,
+      type: 'reminder',
+      title: 'Reminder Set',
+      body: `${reminder.createdBy.name} set a reminder: "${reminder.title}".`,
+    });
+  }
 
   return reminder;
 };

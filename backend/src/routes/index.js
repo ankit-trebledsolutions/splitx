@@ -8,6 +8,8 @@ const itineraryRoutes = require('./itinerary.routes');
 const photoRoutes = require('./photo.routes');
 const attractionRoutes = require('./attraction.routes');
 const stayRoutes = require('./stay.routes');
+const notificationRoutes = require('./notification.routes');
+const supportRoutes = require('./support.routes');
 
 const router = Router();
 
@@ -21,5 +23,7 @@ router.use('/itinerary-days', itineraryRoutes);
 router.use('/photos', photoRoutes);
 router.use('/attractions', attractionRoutes);
 router.use('/stays', stayRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/support', supportRoutes);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const Reminder = require('../models/Reminder');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [
@@ -45,6 +46,14 @@ const createTask = async (userId, groupId, payload) => {
     type: 'task',
     text: task.title,
     task: task._id,
+  });
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'task',
+    title: 'Task Added',
+    body: `New task "${task.title}" was added to your shared list.`,
   });
 
   return task;

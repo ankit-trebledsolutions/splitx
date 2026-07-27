@@ -2,6 +2,7 @@ const Stay = require('../models/Stay');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [{ path: 'bookedBy', select: USER_FIELDS }];
@@ -41,6 +42,14 @@ const createStay = async (userId, groupId, payload) => {
   const booker = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
   await messageService.postSystem(groupId, `${booker} added ${stay.name} to stays`);
 
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'stay',
+    title: 'Stay Added',
+    body: `${booker} added ${stay.name} to stays.`,
+  });
+
   return stay;
 };
 
@@ -76,6 +85,13 @@ const updateStay = async (stayId, userId, payload) => {
 
   if (statusChanged) {
     await messageService.postSystem(stay.group, `${stay.name} is now ${stay.status}`);
+    await notificationService.notifyGroup({
+      groupId: stay.group,
+      actorId: userId,
+      type: 'stay',
+      title: 'Stay Updated',
+      body: `${stay.name} is now ${stay.status}.`,
+    });
   }
 
   return stay;

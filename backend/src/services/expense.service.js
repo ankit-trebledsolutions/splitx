@@ -2,6 +2,7 @@ const Expense = require('../models/Expense');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
+const notificationService = require('./notification.service');
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -65,6 +66,15 @@ const createExpense = async (userId, groupId, payload) => {
     type: 'expense',
     text: expense.description,
     expense: expense._id,
+  });
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'expense',
+    title: 'Expense Added',
+    body: `An expense of $${expense.amount.toFixed(2)} for ${expense.description} was added by ${expense.paidBy.name}.`,
+    amount: -expense.amount,
   });
 
   return expense;
