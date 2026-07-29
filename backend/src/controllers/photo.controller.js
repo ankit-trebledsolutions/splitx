@@ -11,9 +11,23 @@ const addPhoto = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: { photo } });
 });
 
+// Multipart upload: multer has already written the file to /uploads.
+const uploadPhoto = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ success: false, message: 'No image file received' });
+    return;
+  }
+  const photo = await photoService.addPhoto(req.user._id, req.params.groupId, {
+    imageUrl: `/uploads/${req.file.filename}`,
+    caption: req.body.caption ?? '',
+    emoji: '📷',
+  });
+  res.status(201).json({ success: true, data: { photo } });
+});
+
 const deletePhoto = asyncHandler(async (req, res) => {
   await photoService.deletePhoto(req.params.photoId, req.user._id);
   res.json({ success: true, message: 'Photo deleted' });
 });
 
-module.exports = { listPhotos, addPhoto, deletePhoto };
+module.exports = { listPhotos, addPhoto, uploadPhoto, deletePhoto };

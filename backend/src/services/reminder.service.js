@@ -24,6 +24,7 @@ const createReminder = async (userId, groupId, payload) => {
     subtitle: payload.subtitle,
     remindAt: payload.remindAt,
     scope: payload.scope,
+    repeatWeekly: payload.repeatWeekly ?? false,
     icon: payload.icon,
     task: payload.task ?? null,
     createdBy: userId,
@@ -64,7 +65,7 @@ const getReminderForMember = async (reminderId, userId) => {
 
 const updateReminder = async (reminderId, userId, payload) => {
   const reminder = await getReminderForMember(reminderId, userId);
-  for (const field of ['title', 'subtitle', 'remindAt', 'scope', 'icon', 'enabled']) {
+  for (const field of ['title', 'subtitle', 'remindAt', 'scope', 'repeatWeekly', 'icon', 'enabled']) {
     if (payload[field] !== undefined) reminder[field] = payload[field];
   }
   await reminder.save();

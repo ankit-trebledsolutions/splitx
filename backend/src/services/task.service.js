@@ -35,6 +35,8 @@ const createTask = async (userId, groupId, payload) => {
     priority: payload.priority,
     assignees,
     dueAt: payload.dueAt ?? null,
+    subtasks: payload.subtasks ?? [],
+    links: payload.links ?? [],
     source: payload.source ?? {},
     createdBy: userId,
   });
@@ -69,7 +71,7 @@ const getTaskForMember = async (taskId, userId) => {
 const updateTask = async (taskId, userId, payload) => {
   const task = await getTaskForMember(taskId, userId);
 
-  const fields = ['title', 'notes', 'priority', 'assignees', 'dueAt'];
+  const fields = ['title', 'notes', 'priority', 'assignees', 'dueAt', 'subtasks', 'links'];
   for (const field of fields) {
     if (payload[field] !== undefined) task[field] = payload[field];
   }

@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
+const { photoUpload } = require('../middleware/upload');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
 const messageController = require('../controllers/message.controller');
@@ -75,6 +76,14 @@ const createTaskSchema = {
     priority: z.enum(['high', 'med', 'low']).default('med'),
     assignees: z.array(objectId).optional(),
     dueAt: z.coerce.date().nullish(),
+    subtasks: z
+      .array(z.object({ title: z.string().min(1).max(200), done: z.boolean().default(false) }))
+      .max(20)
+      .optional(),
+    links: z
+      .array(z.object({ title: z.string().max(120).optional(), url: z.string().max(500) }))
+      .max(10)
+      .optional(),
     source: z
       .object({
         message: objectId.optional(),
@@ -93,6 +102,7 @@ const createReminderSchema = {
     subtitle: z.string().max(200).optional(),
     remindAt: z.coerce.date(),
     scope: z.enum(['group', 'me']).default('group'),
+    repeatWeekly: z.boolean().optional(),
     icon: z.string().max(40).optional(),
     task: objectId.optional(),
   }),
@@ -182,6 +192,12 @@ router.post('/:groupId/itinerary', validate(createItineraryDaySchema), itinerary
 
 router.get('/:groupId/photos', validate(groupParams), photoController.listPhotos);
 router.post('/:groupId/photos', validate(addPhotoSchema), photoController.addPhoto);
+router.post(
+  '/:groupId/photos/upload',
+  validate(groupParams),
+  photoUpload.single('photo'),
+  photoController.uploadPhoto
+);
 
 router.get('/:groupId/attractions', validate(groupParams), attractionController.listAttractions);
 router.post('/:groupId/attractions', validate(createAttractionSchema), attractionController.createAttraction);

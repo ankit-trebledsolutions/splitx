@@ -15,6 +15,18 @@ const taskSchema = new mongoose.Schema(
     dueAt: { type: Date, default: null },
     status: { type: String, enum: ['open', 'done'], default: 'open' },
     completedAt: { type: Date, default: null },
+    subtasks: [
+      {
+        title: { type: String, required: true, trim: true, maxlength: 200 },
+        done: { type: Boolean, default: false },
+      },
+    ],
+    links: [
+      {
+        title: { type: String, trim: true, maxlength: 120, default: '' },
+        url: { type: String, required: true, trim: true, maxlength: 500 },
+      },
+    ],
     // Set when the task was auto-detected from a chat message, so the sheet can
     // show "Mentioned by Sam L. — 'Do not forget to book tickets'".
     source: {

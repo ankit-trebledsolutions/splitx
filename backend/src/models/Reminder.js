@@ -13,6 +13,8 @@ const reminderSchema = new mongoose.Schema(
     remindAt: { type: Date, required: true },
     // 'group' notifies every member, 'me' only the creator.
     scope: { type: String, enum: ['group', 'me'], default: 'group' },
+    // "Repeat weekly until trip ends" toggle on the New Reminder sheet.
+    repeatWeekly: { type: Boolean, default: false },
     enabled: { type: Boolean, default: true },
     // Ionicons name, so the list can show the flight/train/hotel glyphs.
     icon: { type: String, trim: true, default: 'alarm-outline' },

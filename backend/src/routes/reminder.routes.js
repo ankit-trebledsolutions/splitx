@@ -17,6 +17,7 @@ const updateReminderSchema = {
     subtitle: z.string().max(200).optional(),
     remindAt: z.coerce.date().optional(),
     scope: z.enum(['group', 'me']).optional(),
+    repeatWeekly: z.boolean().optional(),
     icon: z.string().max(40).optional(),
     enabled: z.boolean().optional(),
   }),

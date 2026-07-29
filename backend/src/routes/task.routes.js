@@ -19,6 +19,14 @@ const updateTaskSchema = {
     assignees: z.array(objectId).optional(),
     dueAt: z.coerce.date().nullish(),
     status: z.enum(['open', 'done']).optional(),
+    subtasks: z
+      .array(z.object({ title: z.string().min(1).max(200), done: z.boolean().default(false) }))
+      .max(20)
+      .optional(),
+    links: z
+      .array(z.object({ title: z.string().max(120).optional(), url: z.string().max(500) }))
+      .max(10)
+      .optional(),
   }),
 };
 
