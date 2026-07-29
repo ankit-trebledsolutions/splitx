@@ -9,7 +9,7 @@ import NewTaskSheet from '../components/NewTaskSheet';
 import TaskSavedModal from '../components/TaskSavedModal';
 import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
 import NewActivitySheet from '../components/NewActivitySheet';
-import NewPhotoSheet from '../components/NewPhotoSheet';
+import NewReminderSheet from '../components/NewReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
 import ChatTab from './group/ChatTab';
@@ -29,10 +29,8 @@ import {
   fetchItinerary,
   createItineraryDay,
   addItineraryActivity,
-  removeItineraryActivity,
-  deleteItineraryDay,
 } from '../api/itinerary.api';
-import { fetchPhotos, addPhoto, deletePhoto } from '../api/gallery.api';
+import { fetchPhotos, deletePhoto } from '../api/gallery.api';
 import {
   fetchAttractions,
   createAttraction,
@@ -67,11 +65,11 @@ const defaultRemindAt = (dueAt) => {
 };
 
 const GroupChatScreen = ({ route, navigation }) => {
-  const { groupId } = route.params;
+  const { groupId, initialTab } = route.params;
   const { user } = useAuth();
   const currentUserId = user?._id;
 
-  const [tab, setTab] = useState('chat');
+  const [tab, setTab] = useState(initialTab ?? 'chat');
   const [group, setGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -86,7 +84,7 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [daySheetOpen, setDaySheetOpen] = useState(false);
   const [activitySheetDay, setActivitySheetDay] = useState(null);
-  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
+  const [reminderSheetOpen, setReminderSheetOpen] = useState(false);
   const [attractionSheetOpen, setAttractionSheetOpen] = useState(false);
   const [staySheetOpen, setStaySheetOpen] = useState(false);
   const [suggestion, setSuggestion] = useState(null);
@@ -215,13 +213,14 @@ const GroupChatScreen = ({ route, navigation }) => {
     }
   };
 
-  const addReminder = async ({ title, subtitle, remindAt, taskId, icon }) => {
+  const addReminder = async ({ title, subtitle, remindAt, taskId, icon, scope, repeatWeekly }) => {
     try {
       const reminder = await createReminder(groupId, {
         title,
         subtitle,
         remindAt,
-        scope: 'group',
+        scope: scope ?? 'group',
+        ...(repeatWeekly !== undefined ? { repeatWeekly } : {}),
         icon: icon ?? 'alarm-outline',
         ...(taskId ? { task: taskId } : {}),
       });
@@ -323,50 +322,24 @@ const GroupChatScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleRemoveActivity = (day, activity) => {
-    Alert.alert('Remove activity', `Remove “${activity.title}” from Day ${day.dayNumber}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            replaceDay(await removeItineraryActivity(day._id, activity._id));
-          } catch (err) {
-            Alert.alert('Could not remove activity', err.message);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleDeleteDay = (day) => {
-    Alert.alert('Delete day', `Delete Day ${day.dayNumber} · ${day.title}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteItineraryDay(day._id);
-            setItineraryDays((prev) => prev.filter((d) => d._id !== day._id));
-          } catch (err) {
-            Alert.alert('Could not delete day', err.message);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleAddPhoto = async (payload) => {
-    try {
-      const photo = await addPhoto(groupId, payload);
-      setPhotoSheetOpen(false);
-      setPhotos((prev) => [photo, ...prev]);
-      await refreshMessages();
-    } catch (err) {
-      Alert.alert('Could not add photo', err.message);
+  const handleCreateReminder = async (payload) => {
+    const created = await addReminder(payload);
+    if (created) {
+      setReminderSheetOpen(false);
+      setTab('reminders');
     }
+  };
+
+  const openEditDay = (day) => {
+    navigation.navigate('EditItineraryDay', { day, groupName: group?.name });
+  };
+
+  const openUploadPhotos = () => {
+    navigation.navigate('UploadPhotos', { groupId, groupName: group?.name });
+  };
+
+  const openTaskDetail = (task) => {
+    if (task?._id) navigation.navigate('TaskDetail', { taskId: task._id });
   };
 
   const handleDeletePhoto = (photo) => {
@@ -561,7 +534,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           onRemindSuggestion={handleRemindFromSuggestion}
           onSend={handleSend}
           onOpenExpense={openExpense}
-          onOpenTask={() => setTab('tasks')}
+          onOpenTask={(task) => (task?._id ? openTaskDetail(task) : setTab('tasks'))}
           onOpenReminders={() => setTab('reminders')}
         />
       )}
@@ -576,7 +549,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       )}
 
       {tab === 'tasks' && (
-        <TasksTab tasks={tasks} loading={loading} onToggle={handleToggleTask} onOpenTask={() => {}} />
+        <TasksTab tasks={tasks} loading={loading} onToggle={handleToggleTask} onOpenTask={openTaskDetail} />
       )}
 
       {tab === 'reminders' && (
@@ -587,9 +560,9 @@ const GroupChatScreen = ({ route, navigation }) => {
         <ItineraryTab
           days={itineraryDays}
           loading={loading}
+          onAddDay={() => setDaySheetOpen(true)}
+          onEditDay={openEditDay}
           onAddActivity={(day) => setActivitySheetDay(day)}
-          onRemoveActivity={handleRemoveActivity}
-          onDeleteDay={handleDeleteDay}
         />
       )}
 
@@ -598,7 +571,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           photos={photos}
           loading={loading}
           currentUserId={currentUserId}
-          onAddPhoto={() => setPhotoSheetOpen(true)}
+          onAddPhoto={openUploadPhotos}
           onDeletePhoto={handleDeletePhoto}
         />
       )}
@@ -627,73 +600,81 @@ const GroupChatScreen = ({ route, navigation }) => {
         <View style={styles.fabWrap}>
           {actionsOpen && (
             <View style={styles.actionMenu}>
-              {tab === 'itinerary' && (
-                <TouchableOpacity
-                  style={styles.actionItem}
-                  onPress={() => {
-                    setActionsOpen(false);
-                    setDaySheetOpen(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="map-outline" size={16} color={dark.accentGreen} />
-                  <Text style={styles.actionText}>Add Day</Text>
-                </TouchableOpacity>
-              )}
-              {tab === 'gallery' && (
-                <TouchableOpacity
-                  style={styles.actionItem}
-                  onPress={() => {
-                    setActionsOpen(false);
-                    setPhotoSheetOpen(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="images-outline" size={16} color={dark.accentGreen} />
-                  <Text style={styles.actionText}>Add Photo</Text>
-                </TouchableOpacity>
-              )}
-              {tab === 'attractions' && (
-                <TouchableOpacity
-                  style={styles.actionItem}
-                  onPress={() => {
-                    setActionsOpen(false);
-                    setAttractionSheetOpen(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="compass-outline" size={16} color={dark.accentGreen} />
-                  <Text style={styles.actionText}>Add Attraction</Text>
-                </TouchableOpacity>
-              )}
-              {tab === 'stays' && (
-                <TouchableOpacity
-                  style={styles.actionItem}
-                  onPress={() => {
-                    setActionsOpen(false);
-                    setStaySheetOpen(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="bed-outline" size={16} color={dark.accentGreen} />
-                  <Text style={styles.actionText}>Add Stay</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={styles.actionItem} onPress={openAddExpense} activeOpacity={0.8}>
-                <Ionicons name="cash-outline" size={16} color={dark.accentGreen} />
-                <Text style={styles.actionText}>Add Expense</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionItem}
-                onPress={() => {
-                  setActionsOpen(false);
-                  openTaskSheet(null);
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="checkbox-outline" size={16} color={dark.accentBlue} />
-                <Text style={styles.actionText}>New Task</Text>
-              </TouchableOpacity>
+              {[
+                tab === 'itinerary' && {
+                  key: 'day',
+                  icon: 'map-outline',
+                  tint: '#2DD4BF',
+                  label: 'Add Day',
+                  onPress: () => setDaySheetOpen(true),
+                },
+                tab === 'gallery' && {
+                  key: 'photo',
+                  icon: 'images-outline',
+                  tint: '#2DD4BF',
+                  label: 'Upload Photos',
+                  onPress: openUploadPhotos,
+                },
+                tab === 'attractions' && {
+                  key: 'attraction',
+                  icon: 'compass-outline',
+                  tint: '#2DD4BF',
+                  label: 'Add Attraction',
+                  onPress: () => setAttractionSheetOpen(true),
+                },
+                tab === 'stays' && {
+                  key: 'stay',
+                  icon: 'bed-outline',
+                  tint: '#2DD4BF',
+                  label: 'Add Stay',
+                  onPress: () => setStaySheetOpen(true),
+                },
+                {
+                  key: 'task',
+                  icon: 'checkmark',
+                  tint: '#22C55E',
+                  label: 'New Task',
+                  onPress: () => openTaskSheet(null),
+                },
+                {
+                  key: 'reminder',
+                  icon: 'notifications-outline',
+                  tint: '#2DD4BF',
+                  label: 'New Reminder',
+                  onPress: () => setReminderSheetOpen(true),
+                },
+                {
+                  key: 'expense',
+                  icon: 'cash-outline',
+                  tint: '#22C55E',
+                  label: 'Add Expense',
+                  onPress: openAddExpense,
+                },
+                {
+                  key: 'friends',
+                  icon: 'person-add-outline',
+                  tint: '#2DD4BF',
+                  label: 'Add Friends',
+                  onPress: () => navigation.navigate('GroupInvite', { group }),
+                },
+              ]
+                .filter(Boolean)
+                .map((item, index) => (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[styles.actionItem, index > 0 && styles.actionItemBorder]}
+                    onPress={() => {
+                      setActionsOpen(false);
+                      item.onPress();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.actionIcon, { backgroundColor: `${item.tint}26` }]}>
+                      <Ionicons name={item.icon} size={15} color={item.tint} />
+                    </View>
+                    <Text style={styles.actionText}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
             </View>
           )}
 
@@ -743,11 +724,10 @@ const GroupChatScreen = ({ route, navigation }) => {
         onSubmit={handleAddActivity}
       />
 
-      <NewPhotoSheet
-        visible={photoSheetOpen}
-        members={group?.members ?? []}
-        onClose={() => setPhotoSheetOpen(false)}
-        onSubmit={handleAddPhoto}
+      <NewReminderSheet
+        visible={reminderSheetOpen}
+        onClose={() => setReminderSheetOpen(false)}
+        onSubmit={handleCreateReminder}
       />
 
       <NewAttractionSheet
@@ -808,22 +788,36 @@ const styles = StyleSheet.create({
   tabTextActive: { color: dark.accentGreen },
 
   fabWrap: { position: 'absolute', right: spacing.lg, bottom: spacing.xl, alignItems: 'flex-end' },
+  // Light popup card, per the "+" menu mockup.
   actionMenu: {
-    backgroundColor: '#0F1A20',
-    borderWidth: 1,
-    borderColor: dark.border,
-    borderRadius: radius.lg,
-    padding: spacing.xs,
+    backgroundColor: '#F7FAF9',
+    borderRadius: radius.lg + 6,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
     marginBottom: spacing.sm,
+    minWidth: 190,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.sm + 2,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm + 3,
   },
-  actionText: { color: dark.text, fontSize: 13, fontWeight: '600' },
+  actionItemBorder: { borderTopWidth: 1, borderTopColor: 'rgba(11,17,22,0.06)' },
+  actionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: { color: '#0B1116', fontSize: 14, fontWeight: '600' },
   fab: { borderRadius: 28 },
   fabInner: {
     width: 56,

@@ -6,7 +6,10 @@ import { Platform } from 'react-native';
 // On a physical device, replace this with your machine's LAN IP.
 const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 
-export const API_BASE_URL = `http://${HOST}:4000/api/v1`;
+// Server origin (no /api/v1) — used to build absolute URLs for /uploads images.
+export const API_ORIGIN = `http://${HOST}:4000`;
+
+export const API_BASE_URL = `${API_ORIGIN}/api/v1`;
 
 export const TOKEN_KEY = 'splity.token';
 

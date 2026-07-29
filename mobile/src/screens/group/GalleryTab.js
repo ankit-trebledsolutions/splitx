@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   FlatList,
   ScrollView,
   TouchableOpacity,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { avatarColor } from '../../components/Avatar';
+import { API_ORIGIN } from '../../api/client';
 import { dark, radius, spacing } from '../../theme';
 import { initials } from '../../utils/format';
 
@@ -52,6 +54,12 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
     const uploaderName = item.uploadedBy?.name ?? '';
     const isMine = item.uploadedBy?._id === currentUserId;
 
+    const imageUri = item.imageUrl
+      ? item.imageUrl.startsWith('http')
+        ? item.imageUrl
+        : `${API_ORIGIN}${item.imageUrl}`
+      : null;
+
     return (
       <TouchableOpacity
         style={[styles.tile, { backgroundColor: item.color || '#173A33' }]}
@@ -59,7 +67,11 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
         onPress={() => item.caption && Alert.alert(uploaderName || 'Photo', item.caption)}
         onLongPress={() => isMine && onDeletePhoto?.(item)}
       >
-        <Text style={styles.tileEmoji}>{item.emoji || '🖼️'}</Text>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <Text style={styles.tileEmoji}>{item.emoji || '🖼️'}</Text>
+        )}
 
         <View style={[styles.uploaderChip, { backgroundColor: avatarColor(uploaderName) }]}>
           <Text style={styles.uploaderChipText}>{initials(uploaderName)}</Text>

@@ -18,6 +18,9 @@ import AddExpenseScreen from '../screens/AddExpenseScreen';
 import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import EditItineraryDayScreen from '../screens/EditItineraryDayScreen';
+import UploadPhotosScreen from '../screens/UploadPhotosScreen';
+import TaskDetailScreen from '../screens/TaskDetailScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import FaqScreen from '../screens/FaqScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -89,6 +92,21 @@ const RootNavigator = () => {
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="EditItineraryDay"
+            component={EditItineraryDayScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="UploadPhotos"
+            component={UploadPhotosScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="TaskDetail"
+            component={TaskDetailScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

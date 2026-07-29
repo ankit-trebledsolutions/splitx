@@ -10,6 +10,11 @@ export const createTask = async (groupId, payload) => {
   return data.data.task;
 };
 
+export const fetchTask = async (taskId) => {
+  const { data } = await client.get(`/tasks/${taskId}`);
+  return data.data.task;
+};
+
 export const updateTask = async (taskId, payload) => {
   const { data } = await client.patch(`/tasks/${taskId}`, payload);
   return data.data.task;

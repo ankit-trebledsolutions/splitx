@@ -53,22 +53,27 @@ const ChatMessage = ({ message, currentUserId, onOpenExpense, onOpenTask, onOpen
   }
 
   // ---- Activity cards -----------------------------------------------------
+  // Cards for things I created sit on my side of the chat, like my messages.
 
   const wrapper = (content) => (
-    <View style={[styles.row, styles.rowTheirs]}>
-      {sender ? (
-        <Avatar name={sender?.name} size={30} solid style={styles.rowAvatar} />
-      ) : (
-        <View style={styles.rowAvatarSpacer} />
-      )}
+    <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+      {!isMine &&
+        (sender ? (
+          <Avatar name={sender?.name} size={30} solid style={styles.rowAvatar} />
+        ) : (
+          <View style={styles.rowAvatarSpacer} />
+        ))}
       <View style={styles.rowBody}>
-        {sender && (
+        {!isMine && sender && (
           <Text style={[styles.senderName, { color: avatarColor(sender.name) }]}>
             {sender.name}
           </Text>
         )}
         {content}
-        <Text style={styles.stamp}>{formatTime(message.createdAt)}</Text>
+        <View style={[styles.stampRow, isMine && styles.stampRowMine]}>
+          <Text style={styles.stamp}>{formatTime(message.createdAt)}</Text>
+          {isMine && <Ionicons name="checkmark-done" size={13} color={dark.accentGreen} />}
+        </View>
       </View>
     </View>
   );
