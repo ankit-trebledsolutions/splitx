@@ -31,4 +31,17 @@ const getBalances = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { createGroup, listGroups, getGroup, joinGroup, leaveGroup, getBalances };
+const getContributions = asyncHandler(async (req, res) => {
+  const data = await groupService.getContributions(req.params.groupId, req.user._id);
+  res.json({ success: true, data });
+});
+
+module.exports = {
+  createGroup,
+  listGroups,
+  getGroup,
+  joinGroup,
+  leaveGroup,
+  getBalances,
+  getContributions,
+};

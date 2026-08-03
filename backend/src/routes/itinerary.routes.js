@@ -12,7 +12,9 @@ const dayParams = { params: z.object({ dayId: objectId }) };
 
 const activitySchema = z.object({
   time: z.string().max(20).optional(),
+  endTime: z.string().max(20).optional(),
   title: z.string().min(1, 'Activity title is required').max(200),
+  location: z.string().max(200).optional(),
   icon: z.string().max(40).optional(),
   note: z.string().max(300).optional(),
 });

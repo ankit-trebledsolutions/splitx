@@ -15,7 +15,9 @@ const itineraryDaySchema = new mongoose.Schema(
     activities: [
       {
         time: { type: String, trim: true, maxlength: 20, default: '' },
+        endTime: { type: String, trim: true, maxlength: 20, default: '' },
         title: { type: String, required: true, trim: true, maxlength: 200 },
+        location: { type: String, trim: true, maxlength: 200, default: '' },
         // Ionicons name for the activity row glyph.
         icon: { type: String, trim: true, maxlength: 40, default: 'location-outline' },
         note: { type: String, trim: true, maxlength: 300, default: '' },

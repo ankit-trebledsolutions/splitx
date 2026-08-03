@@ -118,7 +118,9 @@ const createItineraryDaySchema = {
       .array(
         z.object({
           time: z.string().max(20).optional(),
+          endTime: z.string().max(20).optional(),
           title: z.string().min(1).max(200),
+          location: z.string().max(200).optional(),
           icon: z.string().max(40).optional(),
           note: z.string().max(300).optional(),
         })
@@ -174,6 +176,7 @@ router.post('/join', validate(joinGroupSchema), groupController.joinGroup);
 router.get('/:groupId', validate(groupParams), groupController.getGroup);
 router.post('/:groupId/leave', validate(groupParams), groupController.leaveGroup);
 router.get('/:groupId/balances', validate(groupParams), groupController.getBalances);
+router.get('/:groupId/contributions', validate(groupParams), groupController.getContributions);
 
 router.post('/:groupId/expenses', validate(createExpenseSchema), expenseController.createExpense);
 router.get('/:groupId/expenses', validate(groupParams), expenseController.listExpenses);

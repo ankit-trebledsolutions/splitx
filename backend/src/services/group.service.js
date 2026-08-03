@@ -1,5 +1,6 @@
 const Group = require('../models/Group');
 const Expense = require('../models/Expense');
+const Task = require('../models/Task');
 const ApiError = require('../utils/ApiError');
 const notificationService = require('./notification.service');
 
@@ -120,6 +121,106 @@ const getBalances = async (groupId, userId) => {
   return { balances: [...balances], settlements: balances.settlements };
 };
 
+const round2 = (n) => Math.round(n * 100) / 100;
+
+// Ignore net differences under this when deciding contribution badges.
+const MONEY_EPSILON = 5;
+
+/**
+ * The contribution dashboard: money fairness (paid vs fair share) combined
+ * with effort fairness (tasks done vs assigned), per member and group-wide.
+ */
+const getContributions = async (groupId, userId) => {
+  const group = await getGroupForMember(groupId, userId);
+  const [expenses, tasks] = await Promise.all([
+    Expense.find({ group: groupId }),
+    Task.find({ group: groupId }),
+  ]);
+
+  const totalExpenses = round2(expenses.reduce((sum, e) => sum + e.amount, 0));
+  const tasksTotal = tasks.length;
+  const tasksCompleted = tasks.filter((t) => t.status === 'done').length;
+
+  // Seed one stat row per member so members with no activity still appear.
+  const stats = new Map();
+  for (const member of group.members) {
+    stats.set(member._id.toString(), {
+      user: member,
+      paid: 0,
+      fairShare: 0,
+      tasksAssigned: 0,
+      tasksDone: 0,
+    });
+  }
+
+  for (const expense of expenses) {
+    const payer = stats.get(expense.paidBy.toString());
+    if (payer) payer.paid += expense.amount;
+    for (const split of expense.splits) {
+      const owner = stats.get(split.user.toString());
+      if (owner) owner.fairShare += split.amount;
+    }
+  }
+
+  for (const task of tasks) {
+    // Unassigned tasks count toward whoever created them.
+    const owners = task.assignees.length ? task.assignees : [task.createdBy];
+    for (const ownerId of owners) {
+      const owner = stats.get(ownerId.toString());
+      if (!owner) continue;
+      owner.tasksAssigned += 1;
+      if (task.status === 'done') owner.tasksDone += 1;
+    }
+  }
+
+  const members = [...stats.values()]
+    .map((s) => {
+      const net = round2(s.paid - s.fairShare);
+      let badge = 'balanced';
+      if (net < -MONEY_EPSILON) badge = 'owes-balance';
+      else if (net > MONEY_EPSILON) badge = 'contributed-extra';
+      else if (s.tasksAssigned > 0 && s.tasksDone / s.tasksAssigned < 0.5) badge = 'owes-effort';
+      return {
+        user: s.user,
+        expensesPaid: round2(s.paid),
+        fairShare: round2(s.fairShare),
+        net,
+        tasksAssigned: s.tasksAssigned,
+        tasksDone: s.tasksDone,
+        badge,
+      };
+    })
+    .sort((a, b) => b.expensesPaid - a.expensesPaid);
+
+  // Minimal total transfer to make everyone even (sum of what debtors owe).
+  const adjustmentsNeeded = round2(
+    members.reduce((sum, m) => sum + Math.max(0, -m.net), 0)
+  );
+
+  // Balance score: half money fairness, half task completion.
+  const moneyScore = totalExpenses > 0 ? Math.max(0, 1 - adjustmentsNeeded / totalExpenses) : 1;
+  const taskScore = tasksTotal > 0 ? tasksCompleted / tasksTotal : 1;
+  const score = Math.round(((moneyScore + taskScore) / 2) * 100);
+
+  const statusLabel = score >= 90 ? 'Fair' : score >= 70 ? 'Uneven' : 'Unbalanced';
+  const headline =
+    score >= 90 ? 'Almost Perfectly Balanced' : score >= 70 ? 'Slightly Uneven' : 'Time to Settle Up';
+
+  const me = members.find((m) => m.user._id.equals(userId)) ?? null;
+
+  return {
+    totalExpenses,
+    tasksCompleted,
+    tasksTotal,
+    score,
+    statusLabel,
+    headline,
+    adjustmentsNeeded,
+    members,
+    me,
+  };
+};
+
 module.exports = {
   createGroup,
   listGroupsForUser,
@@ -127,4 +228,5 @@ module.exports = {
   joinGroupByCode,
   leaveGroup,
   getBalances,
+  getContributions,
 };
