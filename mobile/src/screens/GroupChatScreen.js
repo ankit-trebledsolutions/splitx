@@ -8,7 +8,6 @@ import Avatar from '../components/Avatar';
 import NewTaskSheet from '../components/NewTaskSheet';
 import TaskSavedModal from '../components/TaskSavedModal';
 import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
-import NewActivitySheet from '../components/NewActivitySheet';
 import NewReminderSheet from '../components/NewReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
@@ -25,11 +24,7 @@ import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
 import { fetchReminders, createReminder, updateReminder } from '../api/reminders.api';
-import {
-  fetchItinerary,
-  createItineraryDay,
-  addItineraryActivity,
-} from '../api/itinerary.api';
+import { fetchItinerary, createItineraryDay } from '../api/itinerary.api';
 import { fetchPhotos, deletePhoto } from '../api/gallery.api';
 import {
   fetchAttractions,
@@ -83,7 +78,6 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [daySheetOpen, setDaySheetOpen] = useState(false);
-  const [activitySheetDay, setActivitySheetDay] = useState(null);
   const [reminderSheetOpen, setReminderSheetOpen] = useState(false);
   const [attractionSheetOpen, setAttractionSheetOpen] = useState(false);
   const [staySheetOpen, setStaySheetOpen] = useState(false);
@@ -307,21 +301,6 @@ const GroupChatScreen = ({ route, navigation }) => {
     }
   };
 
-  const replaceDay = (updated) =>
-    setItineraryDays((prev) => prev.map((d) => (d._id === updated._id ? updated : d)));
-
-  const handleAddActivity = async (payload) => {
-    const day = activitySheetDay;
-    if (!day) return;
-    try {
-      const updated = await addItineraryActivity(day._id, payload);
-      setActivitySheetDay(null);
-      replaceDay(updated);
-    } catch (err) {
-      Alert.alert('Could not add activity', err.message);
-    }
-  };
-
   const handleCreateReminder = async (payload) => {
     const created = await addReminder(payload);
     if (created) {
@@ -498,6 +477,13 @@ const GroupChatScreen = ({ route, navigation }) => {
         >
           <Ionicons name="person-add-outline" size={16} color={dark.text} />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.headerIcon}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Contributions', { groupId })}
+        >
+          <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.tabBar}>
@@ -562,7 +548,6 @@ const GroupChatScreen = ({ route, navigation }) => {
           loading={loading}
           onAddDay={() => setDaySheetOpen(true)}
           onEditDay={openEditDay}
-          onAddActivity={(day) => setActivitySheetDay(day)}
         />
       )}
 
@@ -684,7 +669,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             onPress={() => setActionsOpen((open) => !open)}
           >
             <LinearGradient
-              colors={[dark.accentBlue, dark.accentGreen]}
+              colors={dark.gradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.fabInner}
@@ -715,13 +700,6 @@ const GroupChatScreen = ({ route, navigation }) => {
         nextDayNumber={(itineraryDays[itineraryDays.length - 1]?.dayNumber ?? 0) + 1}
         onClose={() => setDaySheetOpen(false)}
         onSubmit={handleCreateDay}
-      />
-
-      <NewActivitySheet
-        visible={!!activitySheetDay}
-        day={activitySheetDay}
-        onClose={() => setActivitySheetDay(null)}
-        onSubmit={handleAddActivity}
       />
 
       <NewReminderSheet

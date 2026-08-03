@@ -94,9 +94,9 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   versionChip: {
-    backgroundColor: 'rgba(23,230,149,0.12)',
+    backgroundColor: 'rgba(0,196,208,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(23,230,149,0.35)',
+    borderColor: 'rgba(0,196,208,0.35)',
     borderRadius: 10,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,

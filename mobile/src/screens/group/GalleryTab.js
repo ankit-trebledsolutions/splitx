@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     borderColor: dark.accentGreen,
-    backgroundColor: 'rgba(23,230,149,0.10)',
+    backgroundColor: 'rgba(0,196,208,0.10)',
   },
   chipAvatar: {
     width: 16,

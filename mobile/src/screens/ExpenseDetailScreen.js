@@ -212,7 +212,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
         >
           <LinearGradient
             colors={
-              canSettleMine ? [dark.accentBlue, dark.accentGreen] : ['#1B2429', '#1B2429']
+              canSettleMine ? dark.gradient : ['#1B2429', '#1B2429']
             }
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tripChip: {
-    backgroundColor: 'rgba(23,230,149,0.16)',
+    backgroundColor: 'rgba(0,196,208,0.16)',
     borderRadius: 8,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,

@@ -3,13 +3,23 @@ import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-nat
 import { LinearGradient } from 'expo-linear-gradient';
 import { dark, radius, spacing } from '../theme';
 
-const GradientButton = ({ title, onPress, loading = false, style }) => (
-  <TouchableOpacity onPress={onPress} disabled={loading} activeOpacity={0.85} style={style}>
+/**
+ * Two designs:
+ *  - default: flat #4A8CFF → #00E5A0 gradient, no glow
+ *  - glow:    #00C4D0 → #00E5A0 gradient with a soft glow (e.g. "Save Task")
+ */
+const GradientButton = ({ title, onPress, loading = false, glow = false, style }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    disabled={loading}
+    activeOpacity={0.85}
+    style={[glow && styles.glow, style]}
+  >
     <LinearGradient
-      colors={[dark.accentBlue, dark.accentGreen]}
+      colors={glow ? dark.glowGradient : dark.gradient}
       start={{ x: 0, y: 0.5 }}
       end={{ x: 1, y: 0.5 }}
-      style={styles.button}
+      style={[styles.button, glow && styles.buttonGlow]}
     >
       {loading ? (
         <ActivityIndicator color="#04121C" />
@@ -26,6 +36,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  buttonGlow: { borderRadius: radius.lg + 4 },
+  glow: {
+    shadowColor: '#00E5A0',
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 12,
   },
   text: { color: '#04121C', fontSize: 17, fontWeight: '700' },
 });

@@ -239,6 +239,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
               title="Save Task"
               onPress={submit}
               loading={saving}
+              glow
               style={styles.save}
             />
           </Pressable>

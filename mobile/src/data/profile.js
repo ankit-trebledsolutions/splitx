@@ -10,22 +10,23 @@ export const profileDefaults = {
   bio: 'Explorer & developer. Always searching for the next breathtaking destination and seamless travel experience.',
 };
 
+// Filled (solid) glyphs in teal, per the design.
 export const accountSettings = [
   {
     key: 'email',
-    icon: 'mail-outline',
+    icon: 'mail',
     label: 'Email',
     valueFrom: 'email',
   },
   {
     key: 'phone',
-    icon: 'call-outline',
+    icon: 'call',
     label: 'Phone',
     valueFrom: 'phone',
   },
   {
     key: 'notifications',
-    icon: 'notifications-outline',
+    icon: 'notifications',
     label: 'Notifications',
     value: 'Push, Email & SMS',
     screen: 'Notifications',
@@ -35,21 +36,21 @@ export const accountSettings = [
 export const helpSupport = [
   {
     key: 'faq',
-    icon: 'help-circle-outline',
+    icon: 'help-circle',
     label: 'FAQ',
     value: 'Frequently asked questions',
     screen: 'Faq',
   },
   {
     key: 'contact',
-    icon: 'mail-outline',
+    icon: 'mail',
     label: 'Contact Us',
     value: 'Get in touch with support',
     screen: 'ContactUs',
   },
   {
     key: 'privacy',
-    icon: 'shield-checkmark-outline',
+    icon: 'shield-checkmark',
     label: 'Privacy Policy',
     value: 'Data & usage terms',
     screen: 'PrivacyPolicy',

@@ -52,7 +52,7 @@ const ProfileScreen = ({ navigation }) => {
               onPress={() => navigation.navigate(item.screen ?? 'EditProfile')}
             >
               <View style={styles.settingIcon}>
-                <Ionicons name={item.icon} size={18} color={dark.accentBlue} />
+                <Ionicons name={item.icon} size={18} color={dark.button} />
               </View>
               <View style={styles.settingBody}>
                 <Text style={styles.settingLabel}>{item.label}</Text>
@@ -75,8 +75,8 @@ const ProfileScreen = ({ navigation }) => {
               activeOpacity={0.7}
               onPress={() => navigation.navigate(item.screen)}
             >
-              <View style={[styles.settingIcon, styles.supportIcon]}>
-                <Ionicons name={item.icon} size={18} color={dark.accentGreen} />
+              <View style={styles.settingIcon}>
+                <Ionicons name={item.icon} size={18} color={dark.button} />
               </View>
               <View style={styles.settingBody}>
                 <Text style={styles.settingLabel}>{item.label}</Text>
@@ -158,12 +158,11 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 11,
-    backgroundColor: 'rgba(74,125,247,0.14)',
+    backgroundColor: 'rgba(0,196,208,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
-  supportIcon: { backgroundColor: 'rgba(23,230,149,0.12)' },
   settingBody: { flex: 1 },
   settingLabel: { color: dark.text, fontSize: 14, fontWeight: '600' },
   settingValue: { color: dark.textMuted, fontSize: 11, marginTop: 2 },

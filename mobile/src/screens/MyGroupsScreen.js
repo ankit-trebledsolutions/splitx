@@ -12,7 +12,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
-import ScreenHeader from '../components/ScreenHeader';
 import SearchField from '../components/SearchField';
 import AiItineraryModal from '../components/AiItineraryModal';
 import { fetchGroups } from '../api/groups.api';
@@ -79,7 +78,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
         onPress={() => navigation.navigate('GroupChat', { groupId: item._id, name: item.name })}
       >
         <LinearGradient
-          colors={[dark.accentBlue, dark.accentGreen]}
+          colors={dark.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.avatar}
@@ -101,43 +100,62 @@ const MyGroupsScreen = ({ navigation, route }) => {
 
   return (
     <DarkScreen>
-      <ScreenHeader
-        onBack={navigation.canGoBack() ? navigation.goBack : undefined}
-        rightIcon="menu"
-        onRightPress={() => navigation.navigate('Profile')}
-      />
+      {/* Upper container on the raised card background: header, title, search. */}
+      <View style={styles.topArea}>
+        <View style={styles.headerRow}>
+          {navigation.canGoBack() ? (
+            <TouchableOpacity
+              style={styles.circleButton}
+              onPress={navigation.goBack}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-back" size={18} color={dark.text} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.circleButton} />
+          )}
+          <TouchableOpacity
+            style={styles.circleButton}
+            onPress={() => navigation.navigate('Profile')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="options-outline" size={17} color={dark.text} />
+          </TouchableOpacity>
+        </View>
 
-      <FlatList
-        data={visibleGroups}
-        keyExtractor={(item) => item._id}
-        renderItem={renderGroup}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dark.textMuted} />
-        }
-        ListHeaderComponent={
-          <View>
-            <Text style={styles.title}>My Groups</Text>
-            <Text style={styles.subtitle}>
-              You have {groups.length} active group{groups.length === 1 ? '' : 's'} this month
-            </Text>
-            <SearchField
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Find a trip..."
-              style={styles.search}
-            />
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No groups yet</Text>
-            <Text style={styles.emptyBody}>
-              Create a group or join one with an invite link to start splitting expenses.
-            </Text>
-          </View>
-        }
-      />
+        <Text style={styles.title}>My Groups</Text>
+        <Text style={styles.subtitle}>
+          You have {groups.length} active group{groups.length === 1 ? '' : 's'} this month
+        </Text>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Find a trip..."
+          style={styles.search}
+        />
+      </View>
+
+      {/* Lower area on the deep base background, holding the group list. */}
+      <View style={styles.panel}>
+        <FlatList
+          data={visibleGroups}
+          keyExtractor={(item) => item._id}
+          renderItem={renderGroup}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dark.textMuted} />
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No groups yet</Text>
+              <Text style={styles.emptyBody}>
+                Create a group or join one with an invite link to start splitting expenses.
+              </Text>
+            </View>
+          }
+        />
+      </View>
 
       <TouchableOpacity
         style={styles.fab}
@@ -145,7 +163,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
         onPress={() => navigation.navigate('GroupAction')}
       >
         <LinearGradient
-          colors={[dark.accentBlue, dark.accentGreen]}
+          colors={dark.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.fabInner}
@@ -172,14 +190,38 @@ const MyGroupsScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
-  title: { color: dark.text, fontSize: 30, fontWeight: '800' },
+  topArea: { backgroundColor: dark.card, paddingHorizontal: spacing.lg },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  circleButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: dark.background,
+    borderWidth: 1,
+    borderColor: dark.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  title: { color: dark.text, fontSize: 30, fontWeight: '800', marginTop: spacing.sm },
   subtitle: { color: dark.textMuted, fontSize: 14, marginTop: spacing.xs },
-  search: { marginTop: spacing.lg, marginBottom: spacing.md },
+  search: { marginTop: spacing.lg, marginBottom: spacing.lg },
+
+  panel: {
+    flex: 1,
+    backgroundColor: dark.background,
+    paddingTop: spacing.md,
+  },
+  list: { paddingHorizontal: spacing.md, paddingBottom: 120 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
     borderColor: dark.border,
     borderRadius: radius.lg,

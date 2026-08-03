@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   dropZone: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(23,230,149,0.35)',
+    borderColor: 'rgba(0,196,208,0.35)',
     borderRadius: radius.lg + 4,
     alignItems: 'center',
     paddingVertical: spacing.xl + 8,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: 'rgba(23,230,149,0.10)',
+    backgroundColor: 'rgba(0,196,208,0.10)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,

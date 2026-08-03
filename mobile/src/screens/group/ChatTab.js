@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     backgroundColor: '#0F1A20',
     borderWidth: 1,
-    borderColor: 'rgba(23,230,149,0.35)',
+    borderColor: 'rgba(0,196,208,0.35)',
     borderRadius: radius.lg,
     padding: spacing.md,
   },

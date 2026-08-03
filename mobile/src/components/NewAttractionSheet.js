@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   },
   emojiCellActive: {
     borderColor: dark.accentGreen,
-    backgroundColor: 'rgba(23,230,149,0.10)',
+    backgroundColor: 'rgba(0,196,208,0.10)',
   },
   emoji: { fontSize: 20 },
 });

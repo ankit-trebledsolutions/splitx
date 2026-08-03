@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
 import NetBalanceBg from '../assets/net-balance-bg.svg';
 import { fetchNotifications } from '../api/notifications.api';
+import { fetchGroups } from '../api/groups.api';
 import Avatar from '../components/Avatar';
 import SectionHeader from '../components/SectionHeader';
 import { useAuth } from '../context/AuthContext';
@@ -52,6 +53,20 @@ const HomeScreen = ({ navigation }) => {
     if (key === 'create-group' || key === 'create-trip') navigation.navigate('CreateGroup');
     else if (key === 'invite-friend') navigation.navigate('GroupAction');
     else navigation.navigate('Groups');
+  };
+
+  // Opens the contribution dashboard for the most recently active group.
+  const openContributions = async () => {
+    try {
+      const groups = await fetchGroups();
+      if (!groups.length) {
+        Alert.alert('No groups yet', 'Create or join a group to see contributions.');
+        return;
+      }
+      navigation.navigate('Contributions', { groupId: groups[0]._id });
+    } catch (err) {
+      Alert.alert('Could not open contributions', err.message);
+    }
   };
 
   return (
@@ -140,7 +155,7 @@ const HomeScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.contribCard}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('Groups')}
+          onPress={openContributions}
         >
           <Ionicons name="heart-outline" size={20} color={dark.accentGreen} />
           <View style={styles.contribBody}>
@@ -338,7 +353,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm + 2,
-    backgroundColor: dark.card,
+    backgroundColor: dark.card2,
     borderWidth: 1,
     borderColor: dark.border,
     borderRadius: radius.lg + 4,
@@ -353,7 +368,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: dark.button,
     borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm - 1,

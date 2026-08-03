@@ -17,25 +17,26 @@ import { useAuth } from '../context/AuthContext';
 import { sendSupportMessage } from '../api/support.api';
 import { dark, radius, spacing } from '../theme';
 
+// Filled teal glyphs, matching the Profile settings icons.
 const CHANNELS = [
   {
     key: 'email',
-    icon: 'mail-outline',
-    tint: '#2DD4BF',
+    icon: 'mail',
+    tint: '#00C4D0',
     title: 'Email Support',
     subtitle: 'support@splix.app · Response within 2h',
   },
   {
     key: 'chat',
-    icon: 'chatbubble-ellipses-outline',
-    tint: '#22C55E',
+    icon: 'chatbubble-ellipses',
+    tint: '#00C4D0',
     title: 'Live Chat',
     subtitle: 'Average wait time: 2 mins',
   },
   {
     key: 'phone',
-    icon: 'call-outline',
-    tint: '#4A7DF7',
+    icon: 'call',
+    tint: '#00C4D0',
     title: 'Phone Support',
     subtitle: '+1 (555) 019-2834 · 9 AM – 6 PM EST',
   },

@@ -178,7 +178,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
           <View
             style={[
               styles.chip,
-              { backgroundColor: isDone ? 'rgba(23,230,149,0.14)' : 'rgba(245,179,66,0.14)' },
+              { backgroundColor: isDone ? 'rgba(0,196,208,0.14)' : 'rgba(245,179,66,0.14)' },
             ]}
           >
             <Text style={[styles.chipText, { color: isDone ? dark.accentGreen : '#F5B342' }]}>
@@ -415,9 +415,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(23,230,149,0.12)',
+    backgroundColor: 'rgba(0,196,208,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(23,230,149,0.35)',
+    borderColor: 'rgba(0,196,208,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },

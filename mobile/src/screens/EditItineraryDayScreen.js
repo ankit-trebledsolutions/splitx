@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,14 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
-import { updateItineraryDay, deleteItineraryDay } from '../api/itinerary.api';
+import {
+  fetchItinerary,
+  updateItineraryDay,
+  deleteItineraryDay,
+  removeItineraryActivity,
+} from '../api/itinerary.api';
 import { dark, radius, spacing } from '../theme';
 
 const dateLabel = (date) =>
@@ -25,9 +31,29 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
   const [title, setTitle] = useState(day.title);
   const [date, setDate] = useState(day.date ? new Date(day.date) : null);
   const [activities, setActivities] = useState(
-    (day.activities ?? []).map((a) => ({ time: a.time ?? '', title: a.title }))
+    (day.activities ?? []).map((a) => ({ ...a, time: a.time ?? '' }))
   );
   const [saving, setSaving] = useState(false);
+  const firstFocus = useRef(true);
+
+  // Returning from Add Activity: pull the fresh activity list from the server.
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      (async () => {
+        try {
+          const days = await fetchItinerary(day.group?._id ?? day.group);
+          const fresh = days.find((d) => d._id === day._id);
+          if (fresh) setActivities(fresh.activities.map((a) => ({ ...a, time: a.time ?? '' })));
+        } catch {
+          // Keep the local list if the refresh fails.
+        }
+      })();
+    }, [day])
+  );
 
   const shiftDate = (days) => {
     setDate((prev) => {
@@ -41,12 +67,18 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
     setActivities((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)));
   };
 
-  const removeActivity = (index) => {
+  // Deletes immediately on the server (no Save needed), with rollback on failure.
+  const removeActivity = async (index) => {
+    const activity = activities[index];
+    const before = activities;
     setActivities((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addActivity = () => {
-    setActivities((prev) => [...prev, { time: '', title: '' }]);
+    if (!activity._id) return;
+    try {
+      await removeItineraryActivity(day._id, activity._id);
+    } catch (err) {
+      setActivities(before);
+      Alert.alert('Could not delete activity', err.message);
+    }
   };
 
   const save = async () => {
@@ -54,8 +86,17 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
       Alert.alert('Day name required', 'Give this day a name before saving.');
       return;
     }
+    // Keep endTime/location/note from the original rows; only time/title are
+    // edited on this screen.
     const cleaned = activities
-      .map((a) => ({ time: a.time.trim(), title: a.title.trim() }))
+      .map((a) => ({
+        time: a.time.trim(),
+        title: (a.title ?? '').trim(),
+        ...(a.endTime ? { endTime: a.endTime } : {}),
+        ...(a.location ? { location: a.location } : {}),
+        ...(a.note ? { note: a.note } : {}),
+        ...(a.icon ? { icon: a.icon } : {}),
+      }))
       .filter((a) => a.title.length > 0);
 
     setSaving(true);
@@ -181,7 +222,15 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
             </View>
           ))}
 
-          <TouchableOpacity style={styles.addActivity} activeOpacity={0.8} onPress={addActivity}>
+          <TouchableOpacity
+            style={styles.addActivity}
+            activeOpacity={0.8}
+            onPress={() =>
+              navigation.navigate('AddActivity', {
+                day: { ...day, title, date: date ? date.toISOString() : day.date },
+              })
+            }
+          >
             <Ionicons name="add" size={16} color={dark.accentGreen} />
             <Text style={styles.addActivityText}>Add New Activity</Text>
           </TouchableOpacity>
@@ -261,9 +310,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   dayChip: {
-    backgroundColor: 'rgba(23,230,149,0.14)',
+    backgroundColor: 'rgba(0,196,208,0.14)',
     borderWidth: 1,
-    borderColor: 'rgba(23,230,149,0.4)',
+    borderColor: 'rgba(0,196,208,0.4)',
     borderRadius: 10,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 3,
@@ -351,7 +400,7 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(23,230,149,0.45)',
+    borderColor: 'rgba(0,196,208,0.45)',
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     marginTop: spacing.xs,

@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
     marginBottom: spacing.sm,
   },
-  splitRowActive: { borderColor: 'rgba(23,230,149,0.45)' },
+  splitRowActive: { borderColor: 'rgba(0,196,208,0.45)' },
   checkbox: {
     width: 20,
     height: 20,

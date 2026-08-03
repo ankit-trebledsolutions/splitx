@@ -11,19 +11,20 @@ import { dark } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
+// Outline glyphs in both states, per the design — only the tint changes.
 const ICONS = {
-  Home: ['home', 'home-outline'],
-  Groups: ['people', 'people-outline'],
-  Trips: ['airplane', 'airplane-outline'],
-  Expenses: ['receipt', 'receipt-outline'],
-  Profile: ['person', 'person-outline'],
+  Home: 'home-outline',
+  Groups: 'people-outline',
+  Trips: 'briefcase-outline',
+  Expenses: 'card-outline',
+  Profile: 'person-outline',
 };
 
 const MainTabs = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveTintColor: dark.accentGreen,
+      tabBarActiveTintColor: dark.tabActive,
       tabBarInactiveTintColor: dark.textMuted,
       tabBarStyle: {
         backgroundColor: '#0E1014',
@@ -34,10 +35,9 @@ const MainTabs = () => (
         paddingBottom: Platform.OS === 'ios' ? 26 : 8,
       },
       tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-      tabBarIcon: ({ focused, color, size }) => {
-        const [active, inactive] = ICONS[route.name];
-        return <Ionicons name={focused ? active : inactive} size={size - 2} color={color} />;
-      },
+      tabBarIcon: ({ color, size }) => (
+        <Ionicons name={ICONS[route.name]} size={size - 2} color={color} />
+      ),
     })}
   >
     <Tab.Screen name="Home" component={HomeScreen} />

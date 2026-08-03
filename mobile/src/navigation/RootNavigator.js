@@ -19,8 +19,10 @@ import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import EditItineraryDayScreen from '../screens/EditItineraryDayScreen';
+import AddActivityScreen from '../screens/AddActivityScreen';
 import UploadPhotosScreen from '../screens/UploadPhotosScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
+import ContributionsScreen from '../screens/ContributionsScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import FaqScreen from '../screens/FaqScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -100,6 +102,11 @@ const RootNavigator = () => {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="AddActivity"
+            component={AddActivityScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="UploadPhotos"
             component={UploadPhotosScreen}
             options={{ headerShown: false }}
@@ -107,6 +114,11 @@ const RootNavigator = () => {
           <Stack.Screen
             name="TaskDetail"
             component={TaskDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Contributions"
+            component={ContributionsScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

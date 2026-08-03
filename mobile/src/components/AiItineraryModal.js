@@ -11,7 +11,7 @@ const AiItineraryModal = ({ visible, groupName, onAccept, onSkip }) => (
     <Pressable style={styles.backdrop} onPress={onSkip}>
       <Pressable style={styles.card}>
         <LinearGradient
-          colors={[dark.accentBlue, dark.accentGreen]}
+          colors={dark.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.badge}

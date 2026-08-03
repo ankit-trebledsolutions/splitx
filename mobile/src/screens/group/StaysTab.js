@@ -23,7 +23,7 @@ const STATUS = {
   confirmed: {
     label: 'CONFIRMED',
     color: dark.accentGreen,
-    chipBg: 'rgba(23,230,149,0.14)',
+    chipBg: 'rgba(0,196,208,0.14)',
     gradient: ['#122642', '#0B1730'],
   },
   cancelled: {

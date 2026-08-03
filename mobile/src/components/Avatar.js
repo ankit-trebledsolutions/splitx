@@ -33,7 +33,7 @@ const Avatar = ({ name, size = 44, solid = false, style, textStyle }) => {
 
   return (
     <LinearGradient
-      colors={[dark.accentBlue, dark.accentGreen]}
+      colors={dark.gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[dimensions, styles.center, style]}

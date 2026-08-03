@@ -17,7 +17,7 @@ const shortDate = (value) =>
 
 // Expandable "DAY 1 · Markets & Culture" cards with a pencil that opens the
 // Edit Day Details screen, per the Itinerary mockup.
-const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onAddActivity }) => {
+const ItineraryTab = ({ days, loading, onAddDay, onEditDay }) => {
   const [expandedId, setExpandedId] = useState(days[0]?._id ?? null);
 
   if (loading) {
@@ -79,15 +79,6 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onAddActivity }) => 
                 </Text>
               </View>
             ))}
-
-            <TouchableOpacity
-              style={styles.addActivity}
-              activeOpacity={0.8}
-              onPress={() => onAddActivity?.(item)}
-            >
-              <Ionicons name="add-circle-outline" size={14} color={dark.accentGreen} />
-              <Text style={styles.addActivityText}>Add activity</Text>
-            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -177,14 +168,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   activityTitle: { flex: 1, color: dark.text, fontSize: 13 },
-
-  addActivity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: spacing.sm,
-  },
-  addActivityText: { color: dark.accentGreen, fontSize: 12, fontWeight: '600' },
 
   addDay: {
     flexDirection: 'row',

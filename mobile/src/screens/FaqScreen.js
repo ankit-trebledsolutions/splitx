@@ -148,8 +148,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm + 2,
   },
   itemOpen: {
-    backgroundColor: 'rgba(23,230,149,0.06)',
-    borderColor: 'rgba(23,230,149,0.30)',
+    backgroundColor: 'rgba(0,196,208,0.06)',
+    borderColor: 'rgba(0,196,208,0.30)',
   },
   questionRow: { flexDirection: 'row', alignItems: 'center' },
   question: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600', marginRight: spacing.sm },

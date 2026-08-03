@@ -25,6 +25,11 @@ export const fetchBalances = async (groupId) => {
   return data.data;
 };
 
+export const fetchContributions = async (groupId) => {
+  const { data } = await client.get(`/groups/${groupId}/contributions`);
+  return data.data;
+};
+
 export const fetchExpenses = async (groupId) => {
   const { data } = await client.get(`/groups/${groupId}/expenses`);
   return data.data.expenses;
