@@ -2,233 +2,310 @@ import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  StyleSheet,
+  ScrollView,
   TouchableOpacity,
-  RefreshControl,
+  ActivityIndicator,
+  Switch,
   Alert,
-  Share,
+  StyleSheet,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchGroup, fetchExpenses, fetchBalances, deleteExpense } from '../api/groups.api';
+import DarkScreen from '../components/DarkScreen';
+import Avatar from '../components/Avatar';
+import { fetchGroup } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
-import Button from '../components/Button';
-import EmptyState from '../components/EmptyState';
-import { colors, radius, spacing } from '../theme';
-import { formatMoney, formatDate } from '../utils/format';
+import { dark, radius, spacing } from '../theme';
+import { presenceFor } from '../utils/presence';
 
+// "Group Info" screen, opened by tapping the group name in the chat header.
 const GroupDetailScreen = ({ route, navigation }) => {
   const { groupId } = route.params;
   const { user } = useAuth();
-  const [group, setGroup] = useState(null);
-  const [expenses, setExpenses] = useState([]);
-  const [balances, setBalances] = useState([]);
-  const [settlements, setSettlements] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState('expenses');
+  const currentUserId = user?._id;
 
-  const load = useCallback(async () => {
-    try {
-      const [groupData, expenseData, balanceData] = await Promise.all([
-        fetchGroup(groupId),
-        fetchExpenses(groupId),
-        fetchBalances(groupId),
-      ]);
-      setGroup(groupData);
-      setExpenses(expenseData);
-      setBalances(balanceData.balances);
-      setSettlements(balanceData.settlements);
-    } catch (err) {
-      Alert.alert('Could not load group', err.message);
-    }
-  }, [groupId]);
+  const [group, setGroup] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [muted, setMuted] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      let active = true;
+      (async () => {
+        try {
+          const data = await fetchGroup(groupId);
+          if (active) setGroup(data);
+        } catch (err) {
+          Alert.alert('Could not load group', err.message);
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [groupId])
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  if (loading || !group) {
+    return (
+      <DarkScreen>
+        <View style={styles.loading}>
+          <ActivityIndicator color={dark.accentGreen} />
+        </View>
+      </DarkScreen>
+    );
+  }
 
-  const shareInvite = () => {
-    if (!group) return;
-    Share.share({
-      message: `Join "${group.name}" on Splix with invite code: ${group.inviteCode}`,
+  const adminId = group.createdBy?._id ?? group.createdBy;
+  const memberCount = group.members?.length ?? 0;
+  const tripLabel = group.totalDays
+    ? `${group.totalDays}-day trip`
+    : group.groupType
+      ? `${group.groupType[0].toUpperCase()}${group.groupType.slice(1)} group`
+      : '';
+
+  const openMember = (member) => {
+    // The profile page is only for other members, not yourself.
+    if (member._id === currentUserId) return;
+    navigation.navigate('MemberProfile', {
+      member,
+      groupId,
+      isAdmin: member._id === adminId,
     });
   };
 
-  const confirmDelete = (expense) => {
-    Alert.alert('Delete expense', `Delete "${expense.description}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteExpense(expense._id);
-            await load();
-          } catch (err) {
-            Alert.alert('Could not delete', err.message);
-          }
-        },
-      },
-    ]);
-  };
-
-  const renderExpense = ({ item }) => (
-    <TouchableOpacity style={styles.card} onLongPress={() => confirmDelete(item)} activeOpacity={0.8}>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{item.description}</Text>
-        <Text style={styles.cardSubtitle}>
-          {item.paidBy?.name} paid · {formatDate(item.date)}
-        </Text>
-      </View>
-      <Text style={styles.amount}>{formatMoney(item.amount)}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderBalances = () => (
-    <View>
-      {balances.map((b) => {
-        const isMe = b.user._id === user?._id;
-        const owed = b.net >= 0;
-        return (
-          <View key={b.user._id} style={styles.card}>
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitle}>{isMe ? 'You' : b.user.name}</Text>
-            </View>
-            <Text style={[styles.amount, owed ? styles.positive : styles.negative]}>
-              {owed ? 'gets back ' : 'owes '}
-              {formatMoney(b.net)}
-            </Text>
-          </View>
-        );
-      })}
-      {settlements.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Suggested settlements</Text>
-          {settlements.map((s, idx) => (
-            <View key={idx} style={styles.card}>
-              <Text style={styles.cardSubtitle}>
-                <Text style={styles.cardTitle}>{s.from._id === user?._id ? 'You' : s.from.name}</Text>
-                {'  →  '}
-                <Text style={styles.cardTitle}>{s.to._id === user?._id ? 'you' : s.to.name}</Text>
-                {'   '}
-                {formatMoney(s.amount)}
-              </Text>
-            </View>
-          ))}
-        </>
-      )}
-      {balances.length === 0 && (
-        <EmptyState title="All settled" subtitle="No balances yet — add an expense first." />
-      )}
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.tabs}>
-        {['expenses', 'balances'].map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'expenses' ? 'Expenses' : 'Balances'}
+    <DarkScreen>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={18} color={dark.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Group Info</Text>
+        <TouchableOpacity style={styles.headerIcon} activeOpacity={0.7}>
+          <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Avatar name={group.name} size={92} />
+          <Text style={styles.groupName}>{group.name}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaMuted}>
+              {memberCount} Member{memberCount === 1 ? '' : 's'}
             </Text>
+            {!!tripLabel && (
+              <>
+                <View style={styles.metaDot} />
+                <Text style={styles.metaAccent}>{tripLabel}</Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>GROUP MEMBERS</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('GroupInvite', { group })}
+          >
+            <Text style={styles.addFriend}>+ Add Friend</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      {tab === 'expenses' ? (
-        <FlatList
-          data={expenses}
-          keyExtractor={(item) => item._id}
-          renderItem={renderExpense}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <EmptyState title="No expenses yet" subtitle="Add the first expense to get started." />
-          }
-        />
-      ) : (
-        <FlatList
-          data={[]}
-          renderItem={null}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListHeaderComponent={renderBalances()}
-        />
-      )}
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.contribButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Contributions', { groupId })}
+          >
+            <Text style={styles.contribButtonText}>View contributions</Text>
+          </TouchableOpacity>
 
-      <View style={styles.footer}>
-        <Button
-          title="Add expense"
-          onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members ?? [] })}
-        />
-        <Button
-          title={`Share invite code · ${group?.inviteCode ?? ''}`}
-          variant="outline"
-          onPress={shareInvite}
-          style={styles.shareButton}
-        />
-      </View>
-    </View>
+          {group.members.map((member, index) => {
+            const presence = presenceFor(member._id, member._id === currentUserId);
+            const isAdmin = member._id === adminId;
+            return (
+              <TouchableOpacity
+                key={member._id}
+                style={[styles.memberRow, index > 0 && styles.memberRowBorder]}
+                activeOpacity={member._id === currentUserId ? 1 : 0.7}
+                onPress={() => openMember(member)}
+              >
+                <View>
+                  <Avatar name={member.name} size={40} solid />
+                  <View
+                    style={[
+                      styles.presenceDot,
+                      { backgroundColor: presence.online ? '#22C55E' : dark.textMuted },
+                    ]}
+                  />
+                </View>
+                <View style={styles.memberBody}>
+                  <Text style={styles.memberName} numberOfLines={1}>
+                    {member._id === currentUserId ? `${member.name} (You)` : member.name}
+                  </Text>
+                  <Text style={styles.memberMeta}>{presence.label}</Text>
+                </View>
+                {isAdmin ? (
+                  <View style={styles.adminBadge}>
+                    <Text style={styles.adminBadgeText}>Admin</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.memberRole}>Member</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sectionLabel, styles.prefsLabel]}>PREFERENCES</Text>
+
+        <View style={styles.card}>
+          <View style={styles.prefRow}>
+            <View style={styles.prefIcon}>
+              <Ionicons name="notifications-off-outline" size={16} color={dark.textMuted} />
+            </View>
+            <Text style={styles.prefText}>Mute notifications</Text>
+            <Switch
+              value={muted}
+              onValueChange={setMuted}
+              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#22C55E' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={[styles.prefRow, styles.prefRowBorder]}>
+            <View style={styles.prefIcon}>
+              <Ionicons name="card-outline" size={16} color={dark.textMuted} />
+            </View>
+            <Text style={styles.prefText}>Shared expenses</Text>
+            <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+          </View>
+
+          <TouchableOpacity style={[styles.prefRow, styles.prefRowBorder]} activeOpacity={0.7}>
+            <View style={[styles.prefIcon, styles.leaveIcon]}>
+              <Ionicons name="log-out-outline" size={16} color="#F97362" />
+            </View>
+            <Text style={[styles.prefText, styles.leaveText]}>Leave group</Text>
+            <Ionicons name="chevron-forward" size={16} color="#F97362" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </DarkScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  tabs: {
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  header: {
     flexDirection: 'row',
-    margin: spacing.md,
-    backgroundColor: colors.border,
-    borderRadius: radius.md,
-    padding: 3,
-  },
-  tab: {
-    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md - 3,
-    alignItems: 'center',
   },
-  tabActive: { backgroundColor: colors.surface },
-  tabText: { color: colors.textMuted, fontWeight: '600' },
-  tabTextActive: { color: colors.text },
-  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
-  card: {
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: dark.card,
+    borderWidth: 1,
+    borderColor: dark.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+
+  hero: { alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.lg },
+  groupName: { color: dark.text, fontSize: 24, fontWeight: '800', marginTop: spacing.md },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
+  metaMuted: { color: dark.textMuted, fontSize: 13 },
+  metaDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: dark.textMuted },
+  metaAccent: { color: dark.accentGreen, fontSize: 13, fontWeight: '600' },
+
+  sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
+    justifyContent: 'space-between',
     marginBottom: spacing.sm,
+  },
+  sectionLabel: {
+    color: dark.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+  },
+  addFriend: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
+
+  card: {
+    backgroundColor: dark.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: dark.border,
+    borderRadius: radius.lg + 4,
+    padding: spacing.md,
   },
-  cardBody: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-  cardSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  amount: { fontSize: 15, fontWeight: '700', color: colors.text },
-  positive: { color: colors.success },
-  negative: { color: colors.danger },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textMuted,
-    marginVertical: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  contribButton: {
+    backgroundColor: dark.button,
+    borderRadius: 22,
+    paddingVertical: spacing.sm + 5,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  footer: { padding: spacing.md, gap: spacing.sm },
-  shareButton: { marginTop: spacing.sm },
+  contribButtonText: { color: '#04121C', fontSize: 14, fontWeight: '800' },
+
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 4,
+  },
+  memberRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
+  presenceDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: dark.card,
+  },
+  memberBody: { flex: 1, marginLeft: spacing.sm + 4 },
+  memberName: { color: dark.text, fontSize: 14, fontWeight: '700' },
+  memberMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  adminBadge: {
+    backgroundColor: 'rgba(0,196,208,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,196,208,0.35)',
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: 3,
+  },
+  adminBadgeText: { color: dark.accentGreen, fontSize: 11, fontWeight: '700' },
+  memberRole: { color: dark.textMuted, fontSize: 12 },
+
+  prefsLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
+  prefRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 4,
+  },
+  prefRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
+  prefIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveIcon: { backgroundColor: 'rgba(249,115,98,0.12)' },
+  prefText: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600', marginLeft: spacing.sm + 4 },
+  leaveText: { color: '#F97362' },
 });
 
 export default GroupDetailScreen;

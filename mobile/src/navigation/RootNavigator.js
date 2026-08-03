@@ -14,6 +14,8 @@ import GroupActionScreen from '../screens/GroupActionScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import GroupInviteScreen from '../screens/GroupInviteScreen';
 import GroupChatScreen from '../screens/GroupChatScreen';
+import GroupDetailScreen from '../screens/GroupDetailScreen';
+import MemberProfileScreen from '../screens/MemberProfileScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
@@ -74,6 +76,16 @@ const RootNavigator = () => {
           <Stack.Screen
             name="GroupChat"
             component={GroupChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GroupDetail"
+            component={GroupDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MemberProfile"
+            component={MemberProfileScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

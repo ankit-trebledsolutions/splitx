@@ -452,16 +452,21 @@ const GroupChatScreen = ({ route, navigation }) => {
           <Ionicons name="chevron-back" size={20} color={dark.text} />
         </TouchableOpacity>
 
-        <Avatar name={group?.name ?? '…'} size={36} style={styles.headerAvatar} />
-
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {group?.name ?? 'Group'}
-          </Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {headerSubtitle}
-          </Text>
-        </View>
+        <TouchableOpacity
+          style={styles.headerCenter}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('GroupDetail', { groupId })}
+        >
+          <Avatar name={group?.name ?? '…'} size={36} style={styles.headerAvatar} />
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {group?.name ?? 'Group'}
+            </Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {headerSubtitle}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.headerIcon} activeOpacity={0.7}>
           <Ionicons name="call-outline" size={17} color={dark.text} />
@@ -480,7 +485,7 @@ const GroupChatScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.headerIcon}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('Contributions', { groupId })}
+          onPress={() => navigation.navigate('GroupDetail', { groupId })}
         >
           <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
         </TouchableOpacity>
@@ -741,6 +746,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   headerAvatar: { marginHorizontal: spacing.sm },
   headerText: { flex: 1, marginRight: spacing.sm },
   headerTitle: { color: dark.text, fontSize: 16, fontWeight: '700' },

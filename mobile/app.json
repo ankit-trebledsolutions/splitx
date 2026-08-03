@@ -14,6 +14,9 @@
     },
     "android": {
       "package": "com.splity.app"
-    }
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
   }
 }
