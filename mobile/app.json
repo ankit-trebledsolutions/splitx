@@ -14,6 +14,22 @@
     },
     "android": {
       "package": "com.splity.app"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "dcc7c129-b738-468c-b681-f4b90e08c1a1"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
   }
 }
