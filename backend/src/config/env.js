@@ -1,7 +1,12 @@
 require('dotenv').config();
 
-const required = (key, fallback) => {
-  const value = process.env[key] ?? fallback;
+const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+
+// Fallbacks are for local development only — in production the real value
+// must come from the environment, so a missing secret fails loudly instead
+// of silently running with a known default.
+const required = (key, devFallback) => {
+  const value = process.env[key] ?? (isProduction ? undefined : devFallback);
   if (value === undefined) {
     throw new Error(`Missing required environment variable: ${key}`);
   }
