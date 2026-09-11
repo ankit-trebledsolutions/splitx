@@ -19,4 +19,7 @@ module.exports = {
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),
   jwtSecret: required('JWT_SECRET', 'dev-only-secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  // Stream (video calling) — no dev fallback: these are real credentials.
+  streamApiKey: required('STREAM_API_KEY'),
+  streamApiSecret: required('STREAM_API_SECRET'),
 };

@@ -468,10 +468,18 @@ const GroupChatScreen = ({ route, navigation }) => {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.headerIcon} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.headerIcon}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Call', { callId: groupId, audioOnly: true })}
+        >
           <Ionicons name="call-outline" size={17} color={dark.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerIcon} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.headerIcon}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Call', { callId: groupId })}
+        >
           <Ionicons name="videocam-outline" size={17} color={dark.text} />
         </TouchableOpacity>
         <TouchableOpacity

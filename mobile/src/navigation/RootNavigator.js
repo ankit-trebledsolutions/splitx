@@ -26,6 +26,7 @@ import UploadPhotosScreen from '../screens/UploadPhotosScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import ContributionsScreen from '../screens/ContributionsScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
+import CallScreen from '../screens/CallScreen';
 import FaqScreen from '../screens/FaqScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 
@@ -132,6 +133,11 @@ const RootNavigator = () => {
             name="Contributions"
             component={ContributionsScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Call"
+            component={CallScreen}
+            options={{ headerShown: false, gestureEnabled: false }}
           />
           <Stack.Screen
             name="ContactUs"

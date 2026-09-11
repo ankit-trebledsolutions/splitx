@@ -13,7 +13,11 @@
       "bundleIdentifier": "com.splity.app"
     },
     "android": {
-      "package": "com.splity.app"
+      "package": "com.splity.app",
+      "permissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "extra": {
       "eas": {
@@ -26,8 +30,17 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "minSdkVersion": 24
           }
+        }
+      ],
+      "@stream-io/video-react-native-sdk",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Splix needs camera access for group video calls",
+          "microphonePermission": "Splix needs microphone access for group calls"
         }
       ]
     ]

@@ -10,6 +10,7 @@ const attractionRoutes = require('./attraction.routes');
 const stayRoutes = require('./stay.routes');
 const notificationRoutes = require('./notification.routes');
 const supportRoutes = require('./support.routes');
+const streamRoutes = require('./stream.routes');
 
 const router = Router();
 
@@ -25,5 +26,6 @@ router.use('/attractions', attractionRoutes);
 router.use('/stays', stayRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/support', supportRoutes);
+router.use('/stream', streamRoutes);
 
 module.exports = router;
