@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
+import CallBanner from '../components/CallBanner';
 import NewTaskSheet from '../components/NewTaskSheet';
 import TaskSavedModal from '../components/TaskSavedModal';
 import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
@@ -20,6 +21,7 @@ import GalleryTab from './group/GalleryTab';
 import AttractionsTab from './group/AttractionsTab';
 import StaysTab from './group/StaysTab';
 import { useAuth } from '../context/AuthContext';
+import { useActiveCall } from '../context/ActiveCallProvider';
 import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
@@ -63,6 +65,7 @@ const GroupChatScreen = ({ route, navigation }) => {
   const { groupId, initialTab } = route.params;
   const { user } = useAuth();
   const currentUserId = user?._id;
+  const { join } = useActiveCall();
 
   const [tab, setTab] = useState(initialTab ?? 'chat');
   const [group, setGroup] = useState(null);
@@ -471,14 +474,20 @@ const GroupChatScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.headerIcon}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('Call', { callId: groupId, audioOnly: true })}
+          onPress={() => {
+            join(groupId, { audioOnly: true });
+            navigation.navigate('Call');
+          }}
         >
           <Ionicons name="call-outline" size={17} color={dark.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerIcon}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('Call', { callId: groupId })}
+          onPress={() => {
+            join(groupId, { audioOnly: false });
+            navigation.navigate('Call');
+          }}
         >
           <Ionicons name="videocam-outline" size={17} color={dark.text} />
         </TouchableOpacity>
@@ -498,6 +507,8 @@ const GroupChatScreen = ({ route, navigation }) => {
           <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
         </TouchableOpacity>
       </View>
+
+      <CallBanner groupId={groupId} navigation={navigation} />
 
       <View style={styles.tabBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>

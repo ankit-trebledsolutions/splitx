@@ -1,73 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ActivityIndicator,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  PermissionsAndroid,
-} from 'react-native';
+import React from 'react';
+import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StreamCall, CallContent } from '@stream-io/video-react-native-sdk';
-import { useStreamClient } from '../context/StreamVideoProvider';
+import { useActiveCall } from '../context/ActiveCallProvider';
 import { dark, radius, spacing } from '../theme';
 
-// Android needs runtime consent for the camera/mic before a call can open
-// them; iOS prompts on first use via the Info.plist strings. A voice call
-// only needs the mic. Returns false if the user denies anything required.
-const requestCallPermissions = async (audioOnly) => {
-  if (Platform.OS !== 'android') return true;
-  const needed = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-  if (!audioOnly) needed.push(PermissionsAndroid.PERMISSIONS.CAMERA);
-  const result = await PermissionsAndroid.requestMultiple(needed);
-  return needed.every((p) => result[p] === PermissionsAndroid.RESULTS.GRANTED);
-};
+// Full-screen view of the call the user is in. The call itself lives in
+// ActiveCallProvider, so leaving this screen (back / minimize) keeps the call
+// running and shows the minimized bar in the chat — only Hang up ends it.
+const CallScreen = ({ navigation }) => {
+  const { call, status, error, leave } = useActiveCall();
 
-// One shared room per group: the call id IS the group id, so everyone who
-// taps the call button in the same group lands in the same call.
-const CallScreen = ({ route, navigation }) => {
-  const { callId, audioOnly = false } = route.params;
-  const { client } = useStreamClient();
+  const hangup = async () => {
+    await leave();
+    navigation.goBack();
+  };
 
-  const [call, setCall] = useState(null);
-  const [joinError, setJoinError] = useState(null);
-
-  useEffect(() => {
-    if (!client) return undefined;
-
-    const activeCall = client.call('default', callId);
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const granted = await requestCallPermissions(audioOnly);
-        if (cancelled) return;
-        if (!granted) {
-          setJoinError(new Error('Camera and microphone access are needed to join the call.'));
-          return;
-        }
-        if (audioOnly) await activeCall.camera.disable();
-        await activeCall.join({ create: true });
-        if (!cancelled) setCall(activeCall);
-      } catch (err) {
-        if (!cancelled) setJoinError(err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      activeCall.leave().catch(() => {});
-    };
-  }, [client, callId, audioOnly]);
-
-  if (!client || joinError) {
+  if (status === 'error' || error) {
     return (
       <View style={styles.fallback}>
-        <Text style={styles.fallbackTitle}>
-          {joinError ? 'Could not join the call' : 'Calls are unavailable right now'}
-        </Text>
+        <Text style={styles.fallbackTitle}>Could not join the call</Text>
         <Text style={styles.fallbackText}>
-          {joinError?.message ?? 'Check your connection and try again.'}
+          {error?.message ?? 'Check your connection and try again.'}
         </Text>
         <TouchableOpacity style={styles.backButton} onPress={navigation.goBack} activeOpacity={0.8}>
           <Text style={styles.backButtonText}>Go back</Text>
@@ -76,7 +30,7 @@ const CallScreen = ({ route, navigation }) => {
     );
   }
 
-  if (!call) {
+  if (status !== 'joined' || !call) {
     return (
       <View style={styles.fallback}>
         <ActivityIndicator color={dark.accentGreen} size="large" />
@@ -88,7 +42,15 @@ const CallScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <StreamCall call={call}>
-        <CallContent onHangupCallHandler={navigation.goBack} />
+        <CallContent onHangupCallHandler={hangup} />
+        {/* Minimize: return to the chat while staying in the call. */}
+        <TouchableOpacity
+          style={styles.minimize}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chevron-down" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
       </StreamCall>
     </View>
   );
@@ -96,6 +58,18 @@ const CallScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: dark.background },
+  minimize: {
+    position: 'absolute',
+    top: spacing.xl,
+    left: spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 20,
+  },
   fallback: {
     flex: 1,
     backgroundColor: dark.background,
@@ -103,12 +77,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
-  fallbackTitle: {
-    color: dark.text,
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
+  fallbackTitle: { color: dark.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   fallbackText: {
     color: dark.textMuted,
     fontSize: 13,

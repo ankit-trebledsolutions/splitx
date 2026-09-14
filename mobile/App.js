@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { StreamVideoProvider } from './src/context/StreamVideoProvider';
+import { ActiveCallProvider } from './src/context/ActiveCallProvider';
 import RootNavigator from './src/navigation/RootNavigator';
 
 export default function App() {
@@ -11,10 +12,12 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <StreamVideoProvider>
-          <NavigationContainer>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </NavigationContainer>
+          <ActiveCallProvider>
+            <NavigationContainer>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </NavigationContainer>
+          </ActiveCallProvider>
         </StreamVideoProvider>
       </AuthProvider>
     </SafeAreaProvider>
