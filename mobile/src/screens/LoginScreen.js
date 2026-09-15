@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
@@ -10,10 +10,11 @@ import GoogleIcon from '../assets/google.svg';
 import { dark, radius, spacing } from '../theme';
 
 const LoginScreen = ({ navigation }) => {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -30,8 +31,22 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      // Closing the account picker isn't an error worth an alert.
+      if (!err.cancelled) Alert.alert('Google sign-in failed', err.message);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   const socialComingSoon = (provider) =>
     Alert.alert(provider, `${provider} sign-in is coming soon.`);
+
+  const busy = loading || googleLoading;
 
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to access your splix">
@@ -69,15 +84,25 @@ const LoginScreen = ({ navigation }) => {
 
       <View style={styles.socialRow}>
         <TouchableOpacity
-          style={styles.socialButton}
-          onPress={() => socialComingSoon('Google')}
+          style={[styles.socialButton, busy && styles.socialDisabled]}
+          onPress={handleGoogle}
+          disabled={busy}
+          activeOpacity={0.8}
         >
-          <GoogleIcon width={20} height={20} />
-          <Text style={styles.socialText}>Google</Text>
+          {googleLoading ? (
+            <ActivityIndicator color={dark.text} />
+          ) : (
+            <>
+              <GoogleIcon width={20} height={20} />
+              <Text style={styles.socialText}>Google</Text>
+            </>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.socialButton}
+          style={[styles.socialButton, busy && styles.socialDisabled]}
           onPress={() => socialComingSoon('Apple')}
+          disabled={busy}
+          activeOpacity={0.8}
         >
           <Ionicons name="logo-apple" size={22} color={dark.text} />
           <Text style={styles.socialText}>Apple</Text>
@@ -96,7 +121,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   forgotWrap: { alignSelf: 'flex-end', marginBottom: spacing.lg },
   forgotText: { color: dark.textMuted, fontSize: 14, fontWeight: '600' },
-  loginBtn: {marginTop: 85, marginBottom: 30},
+  loginBtn: { marginTop: 85, marginBottom: 30 },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -118,6 +143,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.md,
   },
+  socialDisabled: { opacity: 0.6 },
   socialText: { color: dark.text, fontSize: 16, fontWeight: '600' },
 });
 

@@ -42,6 +42,12 @@
           "cameraPermission": "Splix needs camera access for group video calls",
           "microphonePermission": "Splix needs microphone access for group calls"
         }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.PASTE-YOUR-IOS-CLIENT-ID-PREFIX"
+        }
       ]
     ]
   }

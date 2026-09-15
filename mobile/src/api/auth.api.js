@@ -10,6 +10,12 @@ export const loginRequest = async (payload) => {
   return data.data;
 };
 
+// Exchanges a Google ID token for our own { user, token } — signs up or logs in.
+export const googleLoginRequest = async (idToken) => {
+  const { data } = await client.post('/auth/google', { idToken });
+  return data.data;
+};
+
 export const meRequest = async () => {
   const { data } = await client.get('/auth/me');
   return data.data;
