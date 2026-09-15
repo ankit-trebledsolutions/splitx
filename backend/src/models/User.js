@@ -12,7 +12,19 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    password: { type: String, required: true, minlength: 8, select: false },
+    // Accounts created through Google Sign-In have no password; everyone else
+    // must set one. `googleId` is Google's permanent id for the account (the
+    // ID token's `sub`), so the link survives the person changing their email.
+    password: {
+      type: String,
+      minlength: 8,
+      select: false,
+      required: function requirePassword() {
+        return !this.googleId;
+      },
+    },
+    googleId: { type: String, unique: true, sparse: true },
+    avatar: { type: String, default: null },
     resetOtpHash: { type: String, select: false },
     resetOtpExpires: { type: Date, select: false },
   },
@@ -26,6 +38,8 @@ userSchema.pre('save', async function hashPassword(next) {
 });
 
 userSchema.methods.comparePassword = function comparePassword(candidate) {
+  // Google-only accounts have no password to compare against.
+  if (!this.password) return Promise.resolve(false);
   return bcrypt.compare(candidate, this.password);
 };
 

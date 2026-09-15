@@ -21,6 +21,12 @@ const loginSchema = {
   }),
 };
 
+const googleSchema = {
+  body: z.object({
+    idToken: z.string().min(1, 'Google ID token is required'),
+  }),
+};
+
 const forgotPasswordSchema = {
   body: z.object({ email: z.string().email('A valid email is required') }),
 };
@@ -41,6 +47,7 @@ const resetPasswordSchema = {
 
 router.post('/register', validate(registerSchema), controller.register);
 router.post('/login', validate(loginSchema), controller.login);
+router.post('/google', validate(googleSchema), controller.googleLogin);
 router.get('/me', protect, controller.me);
 router.post('/forgot-password', validate(forgotPasswordSchema), controller.forgotPassword);
 router.post('/verify-otp', validate(verifyOtpSchema), controller.verifyOtp);

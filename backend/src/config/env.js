@@ -22,4 +22,13 @@ module.exports = {
   // Stream (video calling) — no dev fallback: these are real credentials.
   streamApiKey: required('STREAM_API_KEY'),
   streamApiSecret: required('STREAM_API_SECRET'),
+  // Google Sign-In. Deliberately optional so a missing value never stops the
+  // whole API from booting — /auth/google answers "not configured" instead.
+  // The web client id is the token audience; the iOS/Android ids are accepted
+  // too so a token minted for either platform's client still verifies.
+  googleClientIds: [
+    process.env.GOOGLE_WEB_CLIENT_ID,
+    process.env.GOOGLE_IOS_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+  ].filter(Boolean),
 };

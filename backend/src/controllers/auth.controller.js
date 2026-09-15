@@ -11,6 +11,12 @@ const login = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user, token } });
 });
 
+// One endpoint serves both Google sign-up and sign-in.
+const googleLogin = asyncHandler(async (req, res) => {
+  const { user, token } = await authService.loginWithGoogle(req.body.idToken);
+  res.json({ success: true, data: { user, token } });
+});
+
 const me = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: req.user } });
 });
@@ -30,4 +36,4 @@ const resetPassword = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { register, login, me, forgotPassword, verifyOtp, resetPassword };
+module.exports = { register, login, googleLogin, me, forgotPassword, verifyOtp, resetPassword };
