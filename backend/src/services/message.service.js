@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const groupService = require('./group.service');
+const { emitToGroup } = require('../realtime/socket');
 
 const SENDER_FIELDS = 'name email';
 
@@ -23,19 +24,37 @@ const POPULATE = [
   { path: 'reminder' },
 ];
 
-const listMessages = async (groupId, userId, { limit = 100, before } = {}) => {
+/**
+ * `before` pages backwards through history; `after` returns only what arrived
+ * since a given time, so the app can catch up after a dropped connection
+ * without re-downloading the whole conversation.
+ */
+const listMessages = async (groupId, userId, { limit = 100, before, after } = {}) => {
   await groupService.getGroupForMember(groupId, userId);
 
   const query = { group: groupId };
-  if (before) query.createdAt = { $lt: new Date(before) };
+  if (before || after) {
+    query.createdAt = {};
+    if (before) query.createdAt.$lt = new Date(before);
+    if (after) query.createdAt.$gt = new Date(after);
+  }
+  const cap = Math.min(limit, 200);
+
+  if (after) {
+    // Catch-up: oldest-first, everything newer than the client's last message.
+    return Message.find(query).sort({ createdAt: 1 }).limit(cap).populate(POPULATE);
+  }
 
   // Newest-first for the limit, then flipped so the client renders oldest-first.
-  const messages = await Message.find(query)
-    .sort({ createdAt: -1 })
-    .limit(Math.min(limit, 200))
-    .populate(POPULATE);
-
+  const messages = await Message.find(query).sort({ createdAt: -1 }).limit(cap).populate(POPULATE);
   return messages.reverse();
+};
+
+// Push a freshly created message to everyone with the group open. The HTTP
+// caller still receives it in the response, so the sender never waits on this.
+const publish = (groupId, message) => {
+  emitToGroup(groupId, 'message:new', { message });
+  return message;
 };
 
 const sendMessage = async (userId, groupId, text) => {
@@ -47,7 +66,7 @@ const sendMessage = async (userId, groupId, text) => {
     text,
     readBy: [userId],
   });
-  return message.populate(POPULATE);
+  return publish(groupId, await message.populate(POPULATE));
 };
 
 /**
@@ -65,7 +84,7 @@ const postActivity = async ({ groupId, senderId, type, text, expense, task, remi
     reminder: reminder ?? null,
     readBy: senderId ? [senderId] : [],
   });
-  return message.populate(POPULATE);
+  return publish(groupId, await message.populate(POPULATE));
 };
 
 const postSystem = (groupId, text) =>

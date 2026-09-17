@@ -4,7 +4,7 @@ const Task = require('../models/Task');
 const ApiError = require('../utils/ApiError');
 const notificationService = require('./notification.service');
 
-const MEMBER_FIELDS = 'name email';
+const MEMBER_FIELDS = 'name email lastSeenAt';
 
 const createGroup = async (userId, { name, description, groupType, totalDays }) => {
   const group = await Group.create({

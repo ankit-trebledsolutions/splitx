@@ -5,6 +5,8 @@ const listMessages = asyncHandler(async (req, res) => {
   const messages = await messageService.listMessages(req.params.groupId, req.user._id, {
     limit: Number(req.query.limit) || 100,
     before: req.query.before,
+    // Reconnect catch-up: only messages newer than this timestamp.
+    after: req.query.after,
   });
   res.json({ success: true, data: { messages } });
 });

@@ -25,6 +25,9 @@ const userSchema = new mongoose.Schema(
     },
     googleId: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: null },
+    // Presence: when this user's last live connection closed. "Online" itself
+    // is never stored — it's derived from open sockets (see realtime/socket.js).
+    lastSeenAt: { type: Date, default: null },
     resetOtpHash: { type: String, select: false },
     resetOtpExpires: { type: Date, select: false },
   },
