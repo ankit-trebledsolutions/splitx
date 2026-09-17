@@ -11,6 +11,7 @@ const stayRoutes = require('./stay.routes');
 const notificationRoutes = require('./notification.routes');
 const supportRoutes = require('./support.routes');
 const streamRoutes = require('./stream.routes');
+const homeRoutes = require('./home.routes');
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/stays', stayRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/support', supportRoutes);
 router.use('/stream', streamRoutes);
+router.use('/home', homeRoutes);
 
 module.exports = router;

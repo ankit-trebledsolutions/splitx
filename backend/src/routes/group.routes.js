@@ -24,6 +24,8 @@ const createGroupSchema = {
     description: z.string().max(300).optional(),
     groupType: z.enum(['trip', 'home', 'couple', 'event', 'other']).default('trip'),
     totalDays: z.number().int().min(1).max(365).optional(),
+    startDate: z.coerce.date().optional(),
+    location: z.string().max(120).optional(),
   }),
 };
 

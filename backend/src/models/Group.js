@@ -12,6 +12,8 @@ const groupSchema = new mongoose.Schema(
     },
     // Only meaningful for trip groups; null for everything else.
     totalDays: { type: Number, min: 1, max: 365, default: null },
+    startDate: { type: Date, default: null },
+    location: { type: String, trim: true, maxlength: 120, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }],
     inviteCode: { type: String, unique: true, index: true },

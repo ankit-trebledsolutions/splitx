@@ -6,12 +6,14 @@ const notificationService = require('./notification.service');
 
 const MEMBER_FIELDS = 'name email lastSeenAt';
 
-const createGroup = async (userId, { name, description, groupType, totalDays }) => {
+const createGroup = async (userId, { name, description, groupType, totalDays, startDate, location }) => {
   const group = await Group.create({
     name,
     description,
     groupType,
     totalDays: groupType === 'trip' ? totalDays : null,
+    startDate: groupType === 'trip' ? startDate : null,
+    location: groupType === 'trip' ? location : '',
     createdBy: userId,
     members: [userId],
   });
