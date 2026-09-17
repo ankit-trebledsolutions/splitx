@@ -6,6 +6,7 @@ import MemberAvatars from '../../components/MemberAvatars';
 import StatTile from '../../components/StatTile';
 import { dark, radius, spacing } from '../../theme';
 import { usd, formatDate } from '../../utils/format';
+import { categoryIcon } from '../../utils/expenseCategory';
 
 const CATEGORY_LABEL = {
   general: 'General',
@@ -19,20 +20,6 @@ const CATEGORY_LABEL = {
   entertainment: 'Fun',
   utilities: 'Bills',
   other: 'Other',
-};
-
-const CATEGORY_ICON = {
-  food: 'restaurant-outline',
-  stay: 'bed-outline',
-  travel: 'train-outline',
-  transport: 'train-outline',
-  housing: 'bed-outline',
-  fun: 'beer-outline',
-  entertainment: 'beer-outline',
-  shopping: 'cart-outline',
-  utilities: 'flash-outline',
-  general: 'receipt-outline',
-  other: 'receipt-outline',
 };
 
 const ExpensesTab = ({ expenses, loading, currentUserId, onOpenExpense }) => {
@@ -77,7 +64,7 @@ const ExpensesTab = ({ expenses, loading, currentUserId, onOpenExpense }) => {
         <View style={styles.cardTop}>
           <View style={styles.categoryIcon}>
             <Ionicons
-              name={CATEGORY_ICON[item.category] ?? 'receipt-outline'}
+              name={categoryIcon(item.category)}
               size={17}
               color={dark.text}
             />

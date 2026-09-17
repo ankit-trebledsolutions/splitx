@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
@@ -10,14 +18,68 @@ import Avatar from '../components/Avatar';
 import SectionHeader from '../components/SectionHeader';
 import { useAuth } from '../context/AuthContext';
 import { profileDefaults } from '../data/profile';
-import { netBalance, quickActions, upcomingTrips, tasks, recentExpenses } from '../data/dashboard';
+import { fetchHome } from '../api/home.api';
+import { quickActions } from '../data/dashboard';
+import { usd } from '../utils/format';
+import { tripFlag } from '../utils/tripFlag';
+import { categoryIcon } from '../utils/expenseCategory';
 import { dark, radius, spacing } from '../theme';
 
-const usd = (value) =>
-  `$${Math.abs(value).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+const EMPTY_HOME = {
+  balance: { net: 0, youOwe: 0, owedToYou: 0, groupCount: 0 },
+  upcomingTrips: [],
+  tasks: [],
+  recentExpenses: [],
+};
+
+const PRIORITY_COLOR = { high: '#F87171', med: '#F59E0B', low: '#17E695' };
+
+// Task badges name the group the task belongs to, tinted by group type.
+const GROUP_TYPE_COLOR = {
+  trip: '#17E695',
+  home: '#4A7DF7',
+  couple: '#F472B6',
+  event: '#F59E0B',
+  other: '#8A97A6',
+};
+
+const balanceCaption = ({ net, groupCount }) => {
+  if (!groupCount) return 'All settled up';
+  const across = `overall across ${groupCount} group${groupCount === 1 ? '' : 's'}`;
+  if (net > 0) return `You're owed ${across}`;
+  if (net < 0) return `You owe ${across}`;
+  return `You're even ${across}`;
+};
+
+const shortDate = (date, withMonth = true) =>
+  date.toLocaleDateString('en-GB', withMonth ? { day: 'numeric', month: 'short' } : { day: 'numeric' });
+
+// "2 – 10 Sep" / "28 Sep – 3 Oct" / "2 Sep"
+const tripDates = (startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (start.toDateString() === end.toDateString()) return shortDate(start);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  return `${shortDate(start, !sameMonth)} – ${shortDate(end)}`;
+};
+
+// "Today" / "Yesterday" / "Mon" / "2 Sep"
+const relativeDay = (value) => {
+  const date = new Date(value);
+  const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(new Date()) - startOf(date)) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days > 1 && days < 7) return date.toLocaleDateString('en-GB', { weekday: 'short' });
+  return shortDate(date);
+};
+
+const taskMeta = (task) => {
+  if (task.status === 'done') return 'Completed';
+  if (!task.dueAt) return 'Ongoing';
+  const due = new Date(task.dueAt);
+  return `${due < new Date() ? 'Overdue' : 'Due'} ${shortDate(due)}`;
+};
 
 const greeting = () => {
   const hour = new Date().getHours();
@@ -30,11 +92,24 @@ const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const name = user?.name || profileDefaults.name;
   const [hasUnread, setHasUnread] = useState(false);
+  const [home, setHome] = useState(EMPTY_HOME);
+  const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Refresh the bell dot whenever the dashboard regains focus.
+  const loadHome = useCallback(async () => {
+    try {
+      setHome(await fetchHome());
+      setLoaded(true);
+    } catch {
+      // Keep showing the last good dashboard on network hiccups.
+    }
+  }, []);
+
+  // Refresh the dashboard and bell dot whenever the screen regains focus.
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      loadHome();
       (async () => {
         try {
           const notifications = await fetchNotifications();
@@ -46,8 +121,16 @@ const HomeScreen = ({ navigation }) => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [loadHome])
   );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadHome();
+    setRefreshing(false);
+  };
+
+  const { balance, upcomingTrips, tasks, recentExpenses } = home;
 
   const runQuickAction = (key) => {
     if (key === 'create-group' || key === 'create-trip') navigation.navigate('CreateGroup');
@@ -71,7 +154,13 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <DarkScreen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dark.accentGreen} />
+        }
+      >
         <View style={styles.upperBg}>
           <View style={styles.topRow}>
           <Avatar name={name} size={44} />
@@ -99,18 +188,21 @@ const HomeScreen = ({ navigation }) => {
 
           <View style={styles.balanceBody}>
             <Text style={styles.balanceLabel}>Net Balance</Text>
-            <Text style={styles.balanceValue}>{usd(netBalance.total)}</Text>
-            <Text style={styles.balanceCaption}>{netBalance.caption}</Text>
+            <Text style={styles.balanceValue}>
+              {balance.net < 0 ? '-' : ''}
+              {usd(balance.net)}
+            </Text>
+            <Text style={styles.balanceCaption}>{balanceCaption(balance)}</Text>
           </View>
 
           <View style={styles.statRow}>
             <View style={styles.stat}>
               <View style={styles.statIcon}>
-                <Ionicons name="trending-up" size={15} color={dark.accentGreen} />
+                <Ionicons name="trending-down" size={15} color="#F87171" />
               </View>
               <View>
                 <Text style={styles.statLabel}>YOU OWE</Text>
-                <Text style={styles.statValue}>{usd(netBalance.youOwe)}</Text>
+                <Text style={styles.statValue}>{usd(balance.youOwe)}</Text>
               </View>
             </View>
 
@@ -118,11 +210,11 @@ const HomeScreen = ({ navigation }) => {
 
             <View style={styles.stat}>
               <View style={styles.statIcon}>
-                <Ionicons name="trending-down" size={15} color="#F87171" />
+                <Ionicons name="trending-up" size={15} color={dark.accentGreen} />
               </View>
               <View>
                 <Text style={styles.statLabel}>OWED TO YOU</Text>
-                <Text style={styles.statValue}>{usd(netBalance.owedToYou)}</Text>
+                <Text style={styles.statValue}>{usd(balance.owedToYou)}</Text>
               </View>
             </View>
           </View>
@@ -177,24 +269,33 @@ const HomeScreen = ({ navigation }) => {
           onActionPress={() => navigation.navigate('CreateGroup')}
           style={styles.sectionSpacing}
         />
+        {loaded && !upcomingTrips.length ? (
+          <Text style={styles.empty}>No upcoming trips yet. Plan one to see it here.</Text>
+        ) : null}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
           {upcomingTrips.map((trip) => (
-            <View key={trip.id} style={styles.tripCard}>
-              <View style={styles.tripTop}>
-                <Text style={styles.flag}>{trip.flag}</Text>
-                {trip.amount != null && <Text style={styles.tripAmount}>{usd(trip.amount)}</Text>}
-              </View>
-              <Text style={styles.tripName}>{trip.name}</Text>
-              <Text style={styles.tripDates}>{trip.dates}</Text>
+            <TouchableOpacity
+              key={trip._id}
+              style={styles.tripCard}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('GroupDetail', { groupId: trip._id })}
+            >
+              <Text style={styles.flag}>{tripFlag(trip.location)}</Text>
+              <Text style={styles.tripName} numberOfLines={1}>
+                {trip.name}
+              </Text>
+              <Text style={styles.tripDates}>{tripDates(trip.startDate, trip.endDate)}</Text>
               <View style={styles.tripFooter}>
-                <Text style={styles.tripMeta}>{trip.members} members</Text>
-                {trip.status !== 'active' && (
+                <Text style={styles.tripMeta}>
+                  {trip.memberCount} member{trip.memberCount === 1 ? '' : 's'}
+                </Text>
+                {trip.status === 'not-started' && (
                   <View style={styles.statusChip}>
-                    <Text style={styles.statusText}>{trip.status}</Text>
+                    <Text style={styles.statusText}>Not started</Text>
                   </View>
                 )}
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
 
@@ -205,23 +306,41 @@ const HomeScreen = ({ navigation }) => {
           style={styles.sectionSpacing}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hList}>
-          {tasks.map((task) => (
-            <View key={task.id} style={styles.taskCard}>
-              <View style={[styles.tag, { backgroundColor: `${task.tagColor}22` }]}>
-                <Text style={[styles.tagText, { color: task.tagColor }]}>{task.tag}</Text>
-              </View>
-              <View style={styles.taskBody}>
-                <View style={styles.taskTextWrap}>
-                  <Text style={styles.taskTitle} numberOfLines={1}>
-                    {task.title}
+          {tasks.map((task) => {
+            const tagColor = GROUP_TYPE_COLOR[task.group?.groupType] ?? GROUP_TYPE_COLOR.other;
+            return (
+              <TouchableOpacity
+                key={task._id}
+                style={styles.taskCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('TaskDetail', { taskId: task._id })}
+              >
+                <View style={[styles.tag, { backgroundColor: `${tagColor}22` }]}>
+                  <Text style={[styles.tagText, { color: tagColor }]} numberOfLines={1}>
+                    {task.group?.name ?? 'Group'}
                   </Text>
-                  <Text style={styles.taskMeta}>{task.meta}</Text>
                 </View>
-                <View style={[styles.taskDot, task.done && styles.taskDotDone]} />
-              </View>
-            </View>
-          ))}
+                <View style={styles.taskBody}>
+                  <View style={styles.taskTextWrap}>
+                    <Text style={styles.taskTitle} numberOfLines={1}>
+                      {task.title}
+                    </Text>
+                    <Text style={styles.taskMeta}>{taskMeta(task)}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.taskDot,
+                      { backgroundColor: PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.med },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
+        {loaded && !tasks.length ? (
+          <Text style={styles.empty}>No tasks yet. New tasks from your groups show up here.</Text>
+        ) : null}
 
         <SectionHeader
           title="Recent Expenses"
@@ -230,24 +349,39 @@ const HomeScreen = ({ navigation }) => {
           onActionPress={() => navigation.navigate('Expenses')}
           style={styles.sectionSpacing}
         />
+        {loaded && !recentExpenses.length ? (
+          <Text style={styles.empty}>No expenses yet.</Text>
+        ) : null}
         {recentExpenses.map((expense) => (
-          <View key={expense.id} style={styles.expenseRow}>
+          <TouchableOpacity
+            key={expense._id}
+            style={styles.expenseRow}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('ExpenseDetail', { expenseId: expense._id })}
+          >
             <View style={styles.expenseIcon}>
-              <Ionicons name={expense.icon} size={18} color={dark.text} />
+              <Ionicons name={categoryIcon(expense.category)} size={18} color={dark.text} />
             </View>
             <View style={styles.expenseBody}>
-              <Text style={styles.expenseTitle}>{expense.title}</Text>
-              <Text style={styles.expenseMeta}>{expense.meta}</Text>
+              <Text style={styles.expenseTitle} numberOfLines={1}>
+                {expense.description}
+              </Text>
+              <Text style={styles.expenseMeta} numberOfLines={1}>
+                Paid by {expense.paidByMe ? 'you' : expense.paidBy?.name ?? 'someone'} ·{' '}
+                {relativeDay(expense.date)}
+              </Text>
             </View>
             <View style={styles.expenseRight}>
               <Text style={styles.expenseAmount}>{usd(expense.amount)}</Text>
               {expense.settled ? (
                 <Text style={styles.settled}>✓ Settled</Text>
+              ) : expense.paidByMe ? (
+                <Text style={styles.owed}>Owed: {usd(expense.owedToYou)}</Text>
               ) : (
-                <Text style={styles.share}>Your: {usd(expense.share)}</Text>
+                <Text style={styles.share}>Your: {usd(expense.yourShare)}</Text>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
         </View>
       </ScrollView>
@@ -384,9 +518,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  tripTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  empty: { color: dark.textMuted, fontSize: 12, marginBottom: spacing.sm },
   flag: { fontSize: 20 },
-  tripAmount: { color: dark.accentGreen, fontSize: 18, fontWeight: '800' },
   tripName: { color: dark.text, fontSize: 15, fontWeight: '700', marginTop: spacing.sm },
   tripDates: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
   tripFooter: {
@@ -414,6 +547,7 @@ const styles = StyleSheet.create({
   },
   tag: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
@@ -423,8 +557,7 @@ const styles = StyleSheet.create({
   taskTextWrap: { flex: 1 },
   taskTitle: { color: dark.text, fontSize: 14, fontWeight: '600' },
   taskMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
-  taskDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: dark.accentBlue },
-  taskDotDone: { backgroundColor: dark.accentGreen },
+  taskDot: { width: 10, height: 10, borderRadius: 5, marginLeft: spacing.sm },
 
   expenseRow: {
     flexDirection: 'row',
@@ -451,6 +584,7 @@ const styles = StyleSheet.create({
   expenseRight: { alignItems: 'flex-end' },
   expenseAmount: { color: dark.text, fontSize: 15, fontWeight: '700' },
   settled: { color: dark.accentGreen, fontSize: 11, marginTop: 2 },
+  owed: { color: dark.accentGreen, fontSize: 11, marginTop: 2 },
   share: { color: '#F87171', fontSize: 11, marginTop: 2 },
 });
 

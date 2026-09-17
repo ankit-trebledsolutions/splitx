@@ -4,6 +4,7 @@ import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import SelectField from '../components/SelectField';
 import StepperField from '../components/StepperField';
+import DateField from '../components/DateField';
 import GradientButton from '../components/GradientButton';
 import { createGroup } from '../api/groups.api';
 import { spacing } from '../theme';
@@ -21,6 +22,8 @@ const CreateGroupScreen = ({ navigation }) => {
   const [description, setDescription] = useState('');
   const [groupType, setGroupType] = useState('trip');
   const [totalDays, setTotalDays] = useState(2);
+  const [startDate, setStartDate] = useState(null);
+  const [location, setLocation] = useState('');
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +34,10 @@ const CreateGroupScreen = ({ navigation }) => {
       setErrors({ name: 'Group name must be at least 2 characters' });
       return;
     }
+    if (isTrip && !startDate) {
+      setErrors({ startDate: 'Pick the day your trip starts' });
+      return;
+    }
     setErrors({});
     setLoading(true);
     try {
@@ -38,7 +45,9 @@ const CreateGroupScreen = ({ navigation }) => {
         name: name.trim(),
         description: description.trim(),
         groupType,
-        ...(isTrip ? { totalDays } : {}),
+        ...(isTrip
+          ? { totalDays, startDate: startDate.toISOString(), location: location.trim() }
+          : {}),
       });
       navigation.replace('GroupInvite', { group });
     } catch (err) {
@@ -78,13 +87,32 @@ const CreateGroupScreen = ({ navigation }) => {
       />
 
       {isTrip && (
-        <StepperField
-          label="Total Days"
-          value={totalDays}
-          onChange={setTotalDays}
-          min={1}
-          max={90}
-        />
+        <>
+          <TextField
+            label="Location (optional)"
+            value={location}
+            onChangeText={setLocation}
+            placeholder="e.g. Bali, Indonesia"
+            maxLength={120}
+          />
+
+          <DateField
+            label="Start Date"
+            value={startDate}
+            onChange={setStartDate}
+            minDate={new Date()}
+            placeholder="When does the trip start?"
+            error={errors.startDate}
+          />
+
+          <StepperField
+            label="Total Days"
+            value={totalDays}
+            onChange={setTotalDays}
+            min={1}
+            max={90}
+          />
+        </>
       )}
 
       <View style={styles.spacer} />
