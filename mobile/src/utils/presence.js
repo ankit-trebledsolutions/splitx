@@ -1,21 +1,25 @@
-// Deterministic pseudo-presence until a real presence system exists. Hashing
-// the user id keeps each member's status stable across screens and reloads.
-const OPTIONS = [
-  { label: 'Active now', online: true },
-  { label: 'Active 5m ago', online: true },
-  { label: 'Active 1 hour ago', online: false },
-  { label: 'Offline', online: false },
-];
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+/**
+ * Turns "is connected right now" (from the socket) plus "when they last
+ * disconnected" (from the backend's lastSeenAt) into the { online, label }
+ * shape the member screens render.
+ */
+export const presenceFrom = (online, lastSeenAt) => {
+  if (online) return { online: true, label: 'Active now' };
+  if (!lastSeenAt) return { online: false, label: 'Offline' };
+  const age = Date.now() - new Date(lastSeenAt).getTime();
+  if (age < MINUTE) return { online: false, label: 'Active just now' };
+  if (age < HOUR) return { online: false, label: `Active ${Math.round(age / MINUTE)}m ago` };
+  if (age < 24 * HOUR) return { online: false, label: `Active ${Math.round(age / HOUR)}h ago` };
+  return { online: false, label: 'Offline' };
+};
 
 const hash = (value = '') => {
   let h = 0;
   for (let i = 0; i < value.length; i += 1) h = (h * 31 + value.charCodeAt(i)) % 9973;
   return h;
-};
-
-export const presenceFor = (userId, isSelf = false) => {
-  if (isSelf) return OPTIONS[0];
-  return OPTIONS[hash(String(userId)) % OPTIONS.length];
 };
 
 // Stable placeholder phone number; the backend doesn't store phones yet.

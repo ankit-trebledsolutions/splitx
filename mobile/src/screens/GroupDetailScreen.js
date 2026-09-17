@@ -16,13 +16,15 @@ import Avatar from '../components/Avatar';
 import { fetchGroup } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
 import { dark, radius, spacing } from '../theme';
-import { presenceFor } from '../utils/presence';
+import { presenceFrom } from '../utils/presence';
+import { useGroupPresence } from '../hooks/useGroupPresence';
 
 // "Group Info" screen, opened by tapping the group name in the chat header.
 const GroupDetailScreen = ({ route, navigation }) => {
   const { groupId } = route.params;
   const { user } = useAuth();
   const currentUserId = user?._id;
+  const onlineIds = useGroupPresence(groupId);
 
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -124,7 +126,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
           </TouchableOpacity>
 
           {group.members.map((member, index) => {
-            const presence = presenceFor(member._id, member._id === currentUserId);
+            const presence = presenceFrom(onlineIds.has(member._id), member.lastSeenAt);
             const isAdmin = member._id === adminId;
             return (
               <TouchableOpacity

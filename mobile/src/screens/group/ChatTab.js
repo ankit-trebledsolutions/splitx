@@ -28,6 +28,8 @@ const ChatTab = ({
   onAddSuggestionToTasks,
   onRemindSuggestion,
   onSend,
+  onTyping,
+  typingUsers = [],
   onOpenExpense,
   onOpenTask,
   onOpenReminders,
@@ -54,6 +56,7 @@ const ChatTab = ({
   const submit = async () => {
     const text = draft.trim();
     if (!text || sending) return;
+    onTyping?.(false);
     setSending(true);
     setDraft('');
     try {
@@ -147,6 +150,14 @@ const ChatTab = ({
         </View>
       )}
 
+      {typingUsers.length > 0 && (
+        <Text style={styles.typing}>
+          {typingUsers.length === 1
+            ? `${typingUsers[0]} is typing…`
+            : `${typingUsers.slice(0, 2).join(', ')} are typing…`}
+        </Text>
+      )}
+
       <View style={styles.composer}>
         <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
           <Ionicons name="attach" size={20} color={dark.textMuted} />
@@ -156,7 +167,10 @@ const ChatTab = ({
           <TextInput
             style={styles.input}
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={(value) => {
+              setDraft(value);
+              onTyping?.(value.trim().length > 0);
+            }}
             placeholder="Message..."
             placeholderTextColor={dark.textMuted}
             multiline
@@ -190,6 +204,7 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.md },
   empty: { color: dark.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl },
+  typing: { color: dark.textMuted, fontSize: 12, paddingHorizontal: spacing.md, paddingBottom: 4 },
 
   dividerRow: {
     flexDirection: 'row',

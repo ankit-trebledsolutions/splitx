@@ -22,6 +22,7 @@ import AttractionsTab from './group/AttractionsTab';
 import StaysTab from './group/StaysTab';
 import { useAuth } from '../context/AuthContext';
 import { useActiveCall } from '../context/ActiveCallProvider';
+import { useSocket } from '../context/SocketProvider';
 import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
@@ -52,7 +53,9 @@ const TABS = [
 // Which stay status a tap on the chip moves to next.
 const NEXT_STAY_STATUS = { pending: 'confirmed', confirmed: 'cancelled', cancelled: 'pending' };
 
-const MESSAGE_POLL_MS = 15000;
+// Announce typing at most this often; hide a member's indicator after silence.
+const TYPING_THROTTLE_MS = 3000;
+const TYPING_HIDE_MS = 5000;
 
 // One hour before the due time, or an hour from now if the task has no due date.
 const defaultRemindAt = (dueAt) => {
@@ -66,6 +69,7 @@ const GroupChatScreen = ({ route, navigation }) => {
   const { user } = useAuth();
   const currentUserId = user?._id;
   const { join } = useActiveCall();
+  const { socket, connected } = useSocket();
 
   const [tab, setTab] = useState(initialTab ?? 'chat');
   const [group, setGroup] = useState(null);
@@ -91,6 +95,13 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   // Suggestions the user already acted on or dismissed, so they stay gone.
   const handledSuggestions = useRef(new Set());
+
+  // Other members currently typing (userId -> name); timers auto-hide them.
+  const [typingUsers, setTypingUsers] = useState({});
+  const typingTimers = useRef({});
+  const lastTypingSent = useRef(0);
+  // Latest message time, for reconnect catch-up.
+  const latestMessageAt = useRef(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -137,18 +148,66 @@ const GroupChatScreen = ({ route, navigation }) => {
     }, [loadAll])
   );
 
-  // Light polling stands in for websockets so other members' activity appears.
   useEffect(() => {
-    if (tab !== 'chat') return undefined;
-    const timer = setInterval(async () => {
+    latestMessageAt.current = messages.length ? messages[messages.length - 1].createdAt : null;
+  }, [messages]);
+
+  // Live updates over the socket replace polling: new messages and activity
+  // cards are pushed the instant they're saved, typing is relayed, and a
+  // reconnect fetches only what was missed while the connection was down.
+  useEffect(() => {
+    if (!socket || !connected) return undefined;
+    socket.emit('group:open', { groupId });
+
+    const appendUnique = (message) =>
+      setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [...prev, message]));
+
+    const onMessage = ({ message } = {}) => {
+      if (!message) return;
+      const g = message.group?._id ?? message.group;
+      if (String(g) !== String(groupId)) return;
+      appendUnique(message);
+    };
+
+    const hideTyping = (userId) => {
+      delete typingTimers.current[userId];
+      setTypingUsers((prev) => {
+        if (!prev[userId]) return prev;
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+    };
+
+    const onTyping = ({ groupId: g, userId, name, typing } = {}) => {
+      if (String(g) !== String(groupId) || userId === currentUserId) return;
+      clearTimeout(typingTimers.current[userId]);
+      if (!typing) return hideTyping(userId);
+      setTypingUsers((prev) => (prev[userId] ? prev : { ...prev, [userId]: name }));
+      typingTimers.current[userId] = setTimeout(() => hideTyping(userId), TYPING_HIDE_MS);
+    };
+
+    // Catch up on anything sent while we were disconnected.
+    (async () => {
+      if (!latestMessageAt.current) return;
       try {
-        setMessages(await fetchMessages(groupId));
+        const missed = await fetchMessages(groupId, { after: latestMessageAt.current });
+        missed.forEach(appendUnique);
       } catch {
-        // Ignore transient polling failures; the next tick retries.
+        // The next reconnect (or reopening the screen) retries.
       }
-    }, MESSAGE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [tab, groupId]);
+    })();
+
+    socket.on('message:new', onMessage);
+    socket.on('typing', onTyping);
+    return () => {
+      socket.off('message:new', onMessage);
+      socket.off('typing', onTyping);
+    };
+  }, [socket, connected, groupId, currentUserId]);
+
+  // Drop any pending typing timers when leaving the screen.
+  useEffect(() => () => Object.values(typingTimers.current).forEach(clearTimeout), []);
 
   // Offer a task whenever the newest chat message reads like a to-do.
   useEffect(() => {
@@ -185,10 +244,20 @@ const GroupChatScreen = ({ route, navigation }) => {
   const handleSend = async (text) => {
     try {
       const message = await sendMessage(groupId, text);
-      setMessages((prev) => [...prev, message]);
+      // The server also pushes this back over the socket; keep whichever lands first.
+      setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [...prev, message]));
     } catch (err) {
       Alert.alert('Could not send', err.message);
     }
+  };
+
+  // Throttled: a burst of keystrokes becomes one event per TYPING_THROTTLE_MS.
+  const handleTyping = (isTyping) => {
+    if (!socket || !connected) return;
+    const now = Date.now();
+    if (isTyping && now - lastTypingSent.current < TYPING_THROTTLE_MS) return;
+    lastTypingSent.current = isTyping ? now : 0;
+    socket.emit('typing', { groupId, typing: isTyping });
   };
 
   const openTaskSheet = (seed = null) => {
@@ -203,7 +272,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       if (suggestion) handledSuggestions.current.add(suggestion.messageId);
       setSuggestion(null);
       setTasks((prev) => [task, ...prev]);
-      setMessages(await fetchMessages(groupId));
+      if (!connected) setMessages(await fetchMessages(groupId));
       setSavedTask(task);
     } catch (err) {
       Alert.alert('Could not save task', err.message);
@@ -222,7 +291,7 @@ const GroupChatScreen = ({ route, navigation }) => {
         ...(taskId ? { task: taskId } : {}),
       });
       setReminders((prev) => [...prev, reminder]);
-      setMessages(await fetchMessages(groupId));
+      if (!connected) setMessages(await fetchMessages(groupId));
       return reminder;
     } catch (err) {
       Alert.alert('Could not set reminder', err.message);
@@ -285,7 +354,7 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   const refreshMessages = async () => {
     try {
-      setMessages(await fetchMessages(groupId));
+      if (!connected) setMessages(await fetchMessages(groupId));
     } catch {
       // A stale chat feed is fine; the next poll or focus reloads it.
     }
@@ -543,6 +612,8 @@ const GroupChatScreen = ({ route, navigation }) => {
           onAddSuggestionToTasks={() => openTaskSheet(suggestion)}
           onRemindSuggestion={handleRemindFromSuggestion}
           onSend={handleSend}
+          onTyping={handleTyping}
+          typingUsers={Object.values(typingUsers)}
           onOpenExpense={openExpense}
           onOpenTask={(task) => (task?._id ? openTaskDetail(task) : setTab('tasks'))}
           onOpenReminders={() => setTab('reminders')}

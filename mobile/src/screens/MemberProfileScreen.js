@@ -14,7 +14,8 @@ import Avatar, { avatarColor } from '../components/Avatar';
 import GradientButton from '../components/GradientButton';
 import { fetchGroups } from '../api/groups.api';
 import { dark, radius, spacing } from '../theme';
-import { presenceFor, phoneFor } from '../utils/presence';
+import { presenceFrom, phoneFor } from '../utils/presence';
+import { useGroupPresence } from '../hooks/useGroupPresence';
 import { initials } from '../utils/format';
 
 // Profile page for another group member (never opened for yourself).
@@ -22,7 +23,8 @@ const MemberProfileScreen = ({ route, navigation }) => {
   const { member, groupId, isAdmin } = route.params;
 
   const [commonGroups, setCommonGroups] = useState(null);
-  const presence = presenceFor(member._id);
+  const onlineIds = useGroupPresence(groupId);
+  const presence = presenceFrom(onlineIds.has(member._id), member.lastSeenAt);
 
   useFocusEffect(
     useCallback(() => {

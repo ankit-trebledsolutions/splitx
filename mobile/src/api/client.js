@@ -1,14 +1,33 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // Production builds (the APK) talk to the deployed API.
 const PROD_ORIGIN = 'https://splitx-dj1h.onrender.com';
 
-// Development (Expo Go) talks to the backend on this machine.
-// Android emulators reach the host via 10.0.2.2; on a physical device,
-// replace this with your machine's LAN IP (e.g. 192.168.1.9).
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+// The Android emulator can't use "localhost" to mean the host machine; it has
+// a fixed alias for it instead. A physical phone reached over USB with
+// `adb reverse` really does use localhost.
+const EMULATOR_HOST_ALIAS = '10.0.2.2';
+const isAndroidEmulator = () => {
+  if (Platform.OS !== 'android') return false;
+  const { Model = '', Fingerprint = '', Brand = '' } = Platform.constants ?? {};
+  return (
+    /sdk_gphone|emulator|android sdk built for|generic/i.test(`${Model} ${Fingerprint}`) ||
+    (Brand === 'google' && /^sdk/i.test(Model))
+  );
+};
+
+// Development talks to the backend on the same machine that serves Metro.
+// Expo tells us that machine's address (`hostUri`, e.g. "192.168.1.9:8081"),
+// so a phone on the same Wi-Fi finds the backend automatically with no IP to
+// edit. Over a loopback address (adb reverse) the emulator needs its host
+// alias, while a real phone keeps localhost (with `adb reverse tcp:4000` set).
+const metroHost = Constants.expoConfig?.hostUri?.split(':')[0];
+const isLoopback = !metroHost || metroHost === 'localhost' || metroHost === '127.0.0.1';
+const loopbackHost = isAndroidEmulator() ? EMULATOR_HOST_ALIAS : 'localhost';
+const DEV_HOST = isLoopback ? loopbackHost : metroHost;
 
 // Server origin (no /api/v1) — used to build absolute URLs for /uploads images.
 export const API_ORIGIN = __DEV__ ? `http://${DEV_HOST}:4000` : PROD_ORIGIN;
