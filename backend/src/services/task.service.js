@@ -56,6 +56,7 @@ const createTask = async (userId, groupId, payload) => {
     type: 'task',
     title: 'Task Added',
     body: `New task "${task.title}" was added to your shared list.`,
+    entityId: task._id,
   });
 
   return task;

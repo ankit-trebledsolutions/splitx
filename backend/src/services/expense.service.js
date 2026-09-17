@@ -75,6 +75,7 @@ const createExpense = async (userId, groupId, payload) => {
     title: 'Expense Added',
     body: `An expense of $${expense.amount.toFixed(2)} for ${expense.description} was added by ${expense.paidBy.name}.`,
     amount: -expense.amount,
+    entityId: expense._id,
   });
 
   return expense;

@@ -1,5 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const notificationService = require('../services/notification.service');
+const pushService = require('../services/push.service');
 
 const listNotifications = asyncHandler(async (req, res) => {
   const notifications = await notificationService.listForUser(req.user._id);
@@ -26,4 +27,22 @@ const clearAll = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Notifications cleared' });
 });
 
-module.exports = { listNotifications, markRead, markAllRead, deleteNotification, clearAll };
+const registerPushToken = asyncHandler(async (req, res) => {
+  await pushService.registerToken(req.user._id, req.body.token);
+  res.json({ success: true, message: 'Push token registered' });
+});
+
+const removePushToken = asyncHandler(async (req, res) => {
+  await pushService.removeToken(req.user._id, req.body.token);
+  res.json({ success: true, message: 'Push token removed' });
+});
+
+module.exports = {
+  registerPushToken,
+  removePushToken,
+  listNotifications,
+  markRead,
+  markAllRead,
+  deleteNotification,
+  clearAll,
+};

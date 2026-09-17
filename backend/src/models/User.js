@@ -28,6 +28,8 @@ const userSchema = new mongoose.Schema(
     // Presence: when this user's last live connection closed. "Online" itself
     // is never stored — it's derived from open sockets (see realtime/socket.js).
     lastSeenAt: { type: Date, default: null },
+    // Expo push tokens, one per device this user is logged in on.
+    pushTokens: { type: [String], default: [], select: false },
     resetOtpHash: { type: String, select: false },
     resetOtpExpires: { type: Date, select: false },
   },
