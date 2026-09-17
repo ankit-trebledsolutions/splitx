@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOKEN_KEY } from '../api/client';
 import { loginRequest, registerRequest, meRequest, googleLoginRequest } from '../api/auth.api';
 import { signInWithGoogle, signOutOfGoogle } from '../utils/googleSignIn';
+import { unregisterFromPush } from '../utils/pushNotifications';
 
 const AuthContext = createContext(null);
 
@@ -56,6 +57,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Needs the auth token, so it runs before the session is cleared.
+    await unregisterFromPush();
     await AsyncStorage.removeItem(TOKEN_KEY);
     await signOutOfGoogle();
     setUser(null);

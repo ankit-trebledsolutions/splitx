@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import usePushNotifications from '../hooks/usePushNotifications';
 import { colors } from '../theme';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -42,6 +43,8 @@ const RootNavigator = () => {
     const timer = setTimeout(() => setSplashDone(true), MIN_SPLASH_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  usePushNotifications({ userId: user?._id, ready: Boolean(user) && !isLoading && splashDone });
 
   if (isLoading || !splashDone) {
     return <SplashScreen />;

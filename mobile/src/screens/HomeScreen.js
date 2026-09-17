@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import DarkScreen from '../components/DarkScreen';
 import NetBalanceBg from '../assets/net-balance-bg.svg';
 import { fetchNotifications } from '../api/notifications.api';
@@ -123,6 +124,15 @@ const HomeScreen = ({ navigation }) => {
       };
     }, [loadHome])
   );
+
+  // A push arriving while the dashboard is open lights the bell and refreshes the data.
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener(() => {
+      setHasUnread(true);
+      loadHome();
+    });
+    return () => sub.remove();
+  }, [loadHome]);
 
   const onRefresh = async () => {
     setRefreshing(true);

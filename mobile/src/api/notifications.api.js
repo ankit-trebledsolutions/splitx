@@ -1,5 +1,13 @@
 import client from './client';
 
+export const registerPushToken = async (token) => {
+  await client.post('/notifications/push-token', { token });
+};
+
+export const removePushToken = async (token) => {
+  await client.delete('/notifications/push-token', { data: { token } });
+};
+
 export const fetchNotifications = async () => {
   const { data } = await client.get('/notifications');
   return data.data.notifications;

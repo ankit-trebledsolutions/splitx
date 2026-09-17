@@ -8,3 +8,4 @@ dist/
 # committed android/ breaks EAS autolinking ("No variants exist").
 /android
 /ios
+splix-e3191-firebase-adminsdk-fbsvc-0e2d29a770.json
