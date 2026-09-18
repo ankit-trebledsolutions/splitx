@@ -15,6 +15,10 @@ const errorHandler = (err, _req, res, _next) => {
   } else if (err.name === 'CastError') {
     statusCode = 400;
     message = `Invalid ${err.path}: ${err.value}`;
+  } else if (err.name === 'MulterError') {
+    // Upload problems are the sender's to fix, not a server fault.
+    statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    message = err.code === 'LIMIT_FILE_SIZE' ? 'That photo is too large (max 10MB)' : err.message;
   } else if (err.code === 11000) {
     statusCode = 409;
     const field = Object.keys(err.keyValue || {})[0] || 'field';

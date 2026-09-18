@@ -22,8 +22,18 @@ const joinGroup = asyncHandler(async (req, res) => {
 });
 
 const leaveGroup = asyncHandler(async (req, res) => {
-  await groupService.leaveGroup(req.params.groupId, req.user._id);
+  await groupService.leaveGroup(req.params.groupId, req.user._id, req.body);
   res.json({ success: true, message: 'Left group' });
+});
+
+const removeMember = asyncHandler(async (req, res) => {
+  await groupService.removeMember(req.params.groupId, req.user._id, req.params.memberId);
+  res.json({ success: true, message: 'Member removed' });
+});
+
+const setMuted = asyncHandler(async (req, res) => {
+  const data = await groupService.setMuted(req.params.groupId, req.user._id, req.body.muted);
+  res.json({ success: true, data });
 });
 
 const getBalances = asyncHandler(async (req, res) => {
@@ -42,6 +52,8 @@ module.exports = {
   getGroup,
   joinGroup,
   leaveGroup,
+  removeMember,
+  setMuted,
   getBalances,
   getContributions,
 };

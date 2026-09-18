@@ -37,6 +37,19 @@ const joinGroupSchema = {
 
 const groupParams = { params: z.object({ groupId: objectId }) };
 
+const leaveGroupSchema = {
+  params: z.object({ groupId: objectId }),
+  // Only needed when the admin leaves a group of three or more.
+  body: z.object({ newAdminId: objectId.optional() }).optional(),
+};
+
+const removeMemberSchema = { params: z.object({ groupId: objectId, memberId: objectId }) };
+
+const muteGroupSchema = {
+  params: z.object({ groupId: objectId }),
+  body: z.object({ muted: z.boolean() }),
+};
+
 const createExpenseSchema = {
   params: z.object({ groupId: objectId }),
   body: z.object({
@@ -176,7 +189,9 @@ router.post('/', validate(createGroupSchema), groupController.createGroup);
 router.get('/', groupController.listGroups);
 router.post('/join', validate(joinGroupSchema), groupController.joinGroup);
 router.get('/:groupId', validate(groupParams), groupController.getGroup);
-router.post('/:groupId/leave', validate(groupParams), groupController.leaveGroup);
+router.post('/:groupId/leave', validate(leaveGroupSchema), groupController.leaveGroup);
+router.delete('/:groupId/members/:memberId', validate(removeMemberSchema), groupController.removeMember);
+router.put('/:groupId/mute', validate(muteGroupSchema), groupController.setMuted);
 router.get('/:groupId/balances', validate(groupParams), groupController.getBalances);
 router.get('/:groupId/contributions', validate(groupParams), groupController.getContributions);
 

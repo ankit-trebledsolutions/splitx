@@ -2,3 +2,6 @@ node_modules/
 .env
 *.log
 coverage/
+
+# Uploaded gallery photos (development fallback only; production uses Cloudinary)
+uploads/

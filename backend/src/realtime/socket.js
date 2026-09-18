@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const User = require('../models/User');
 const Group = require('../models/Group');
+const Conversation = require('../models/Conversation');
 
 /**
  * The app's live connection: one authenticated socket per open app, joined to
@@ -29,6 +30,26 @@ const connections = new Map();
 const offlineTimers = new Map();
 
 const groupRoom = (groupId) => `group:${groupId}`;
+// Every socket also sits in a room of its own user, which is how direct
+// messages reach all of someone's devices.
+const userRoom = (userId) => `user:${userId}`;
+
+// The other person in a direct conversation, or null if this user isn't in it.
+// Cached per socket: typing events arrive in bursts and must not hit the DB.
+const dmPeerOf = async (socket, conversationId) => {
+  const key = String(conversationId);
+  if (socket.data.dmPeers.has(key)) return socket.data.dmPeers.get(key);
+  let peer = null;
+  if (/^[a-f\d]{24}$/i.test(key)) {
+    const conversation = await Conversation.findById(key).select('participants').lean();
+    const me = socket.data.user.id;
+    if (conversation && conversation.participants.some((p) => String(p) === me)) {
+      peer = String(conversation.participants.find((p) => String(p) !== me) ?? '') || null;
+    }
+  }
+  socket.data.dmPeers.set(key, peer);
+  return peer;
+};
 
 const memberGroupIds = async (userId) => {
   const groups = await Group.find({ members: userId }).select('_id').lean();
@@ -128,6 +149,9 @@ const init = (httpServer) => {
     // below and each awaits `ready`, so events the client sends right after
     // connecting are answered instead of dropped while the query runs.
     socket.data.groupIds = new Set();
+    socket.data.dmPeers = new Map();
+    socket.data.activeConversation = null;
+    socket.join(userRoom(userId));
     const ready = (async () => {
       socket.data.groupIds = new Set(await memberGroupIds(userId));
       for (const groupId of socket.data.groupIds) socket.join(groupRoom(groupId));
@@ -164,6 +188,44 @@ const init = (httpServer) => {
       socket.to(groupRoom(groupId)).emit('typing', { groupId, userId, name, typing });
     });
 
+    // ---- Direct (one-to-one) chat ------------------------------------------
+
+    // Which conversation this device has on screen, so a message that lands
+    // while they're reading it doesn't also buzz their phone.
+    socket.on('dm:open', async (payload) => {
+      const conversationId = payload && payload.conversationId;
+      if (!conversationId || !(await dmPeerOf(socket, conversationId))) return;
+      socket.data.activeConversation = String(conversationId);
+    });
+
+    socket.on('dm:close', () => {
+      socket.data.activeConversation = null;
+    });
+
+    // Relayed to the other person only, never stored.
+    socket.on('dm:typing', async (payload) => {
+      const conversationId = payload && payload.conversationId;
+      if (!conversationId) return;
+      const peer = await dmPeerOf(socket, conversationId);
+      if (!peer) return;
+      io.to(userRoom(peer)).emit('dm:typing', {
+        conversationId: String(conversationId),
+        userId,
+        name,
+        typing: Boolean(payload.typing),
+      });
+    });
+
+    // "Active now" for the other person in a conversation.
+    socket.on('dm:presence', async (payload, ack) => {
+      if (typeof ack !== 'function') return;
+      const peer = payload && (await dmPeerOf(socket, payload.conversationId));
+      if (!peer) return ack({ online: false, lastSeenAt: null });
+      if (connections.has(peer)) return ack({ online: true, lastSeenAt: null });
+      const user = await User.findById(peer).select('lastSeenAt').lean();
+      return ack({ online: false, lastSeenAt: user ? user.lastSeenAt : null });
+    });
+
     socket.on('disconnect', async () => {
       await ready;
       const set = connections.get(userId);
@@ -183,6 +245,46 @@ const emitToGroup = (groupId, event, payload) => {
   if (io) io.to(groupRoom(groupId)).emit(event, payload);
 };
 
+// Reaches every device a person has connected.
+const emitToUser = (userId, event, payload) => {
+  if (io) io.to(userRoom(userId)).emit(event, payload);
+};
+
+// True when any of the user's devices has this conversation open right now.
+const isViewingConversation = (userId, conversationId) => {
+  if (!io) return false;
+  for (const socketId of connections.get(String(userId)) ?? []) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket && socket.data.activeConversation === String(conversationId)) return true;
+  }
+  return false;
+};
+
+/**
+ * Someone left or was removed: tell the group (their own devices included, so
+ * an open chat can close itself), then take their sockets out of the room so
+ * nothing further from the group reaches them.
+ */
+const removeFromGroup = (userId, groupId) => {
+  if (!io) return;
+  const uid = String(userId);
+  const gid = String(groupId);
+  io.to(groupRoom(gid)).emit('group:member-left', { groupId: gid, userId: uid });
+  for (const socketId of connections.get(uid) ?? []) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (!socket) continue;
+    socket.data.groupIds.delete(gid);
+    socket.leave(groupRoom(gid));
+  }
+};
+
 const close = () => new Promise((resolve) => (io ? io.close(() => resolve()) : resolve()));
 
-module.exports = { init, emitToGroup, close };
+module.exports = {
+  init,
+  emitToGroup,
+  emitToUser,
+  isViewingConversation,
+  removeFromGroup,
+  close,
+};

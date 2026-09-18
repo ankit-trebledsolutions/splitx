@@ -13,7 +13,26 @@ const required = (key, devFallback) => {
   return value;
 };
 
+// Image storage. All three values or none: with none, uploads fall back to the
+// local uploads folder, which is fine for development but is wiped on every
+// deploy by hosts like Render.
+const cloudinaryKeys = [
+  process.env.CLOUDINARY_CLOUD_NAME,
+  process.env.CLOUDINARY_API_KEY,
+  process.env.CLOUDINARY_API_SECRET,
+];
+const cloudinary = cloudinaryKeys.every(Boolean)
+  ? { cloudName: cloudinaryKeys[0], apiKey: cloudinaryKeys[1], apiSecret: cloudinaryKeys[2] }
+  : null;
+if (!cloudinary && cloudinaryKeys.some(Boolean)) {
+  throw new Error('Cloudinary is half configured: set CLOUDINARY_CLOUD_NAME, _API_KEY and _API_SECRET');
+}
+if (!cloudinary && isProduction) {
+  console.warn('[storage] Cloudinary is not configured: uploaded photos will be lost on the next deploy');
+}
+
 module.exports = {
+  cloudinary,
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),

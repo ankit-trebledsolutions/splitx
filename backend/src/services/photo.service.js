@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
 const notificationService = require('./notification.service');
+const storage = require('../storage');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [
@@ -31,6 +32,9 @@ const addPhoto = async (userId, groupId, payload) => {
     emoji: payload.emoji,
     color: payload.color,
     imageUrl: payload.imageUrl,
+    thumbUrl: payload.thumbUrl,
+    storageProvider: payload.storageProvider,
+    storageKey: payload.storageKey,
     caption: payload.caption,
     taggedMembers,
     uploadedBy: userId,
@@ -64,7 +68,10 @@ const deletePhoto = async (photoId, userId) => {
   if (!photo.uploadedBy._id.equals(userId)) {
     throw ApiError.forbidden('Only the member who uploaded this photo can delete it');
   }
+  // storageKey is hidden from normal reads, so fetch it just for the clean-up.
+  const stored = await Photo.findById(photoId).select('+storageKey storageProvider');
   await photo.deleteOne();
+  await storage.remove(stored?.storageKey, stored?.storageProvider);
 };
 
 module.exports = { listPhotos, addPhoto, getPhotoForMember, deletePhoto };

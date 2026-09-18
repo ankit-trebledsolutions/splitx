@@ -13,15 +13,17 @@ const pushService = require('./push.service');
  */
 const notifyGroup = async ({ groupId, actorId, type, title, body, amount = null, entityId = null }) => {
   try {
-    const group = await Group.findById(groupId).select('members');
+    const group = await Group.findById(groupId).select('members mutedBy');
     if (!group) return;
     const recipients = group.members.filter((m) => !m.equals(actorId));
     if (!recipients.length) return;
     await Notification.insertMany(
       recipients.map((user) => ({ user, group: groupId, type, title, body, amount }))
     );
+    // Members who muted the group still get the in-app entry, just no device push.
+    const unmuted = recipients.filter((m) => !group.mutedBy.some((muted) => muted.equals(m)));
     // Not awaited: the request should not wait on Expo's push service.
-    pushService.sendToUsers(recipients, {
+    pushService.sendToUsers(unmuted, {
       title,
       body,
       data: {
@@ -32,6 +34,20 @@ const notifyGroup = async ({ groupId, actorId, type, title, body, amount = null,
     });
   } catch (err) {
     console.error('notifyGroup failed:', err.message);
+  }
+};
+
+/**
+ * Notify one person directly, for things that are about them rather than a
+ * group they can see (e.g. being removed from it). No group is attached, so
+ * tapping the push opens the notification list instead of a group they've lost.
+ */
+const notifyUser = async ({ userId, type, title, body }) => {
+  try {
+    await Notification.create({ user: userId, type, title, body });
+    pushService.sendToUsers([userId], { title, body, data: { type } });
+  } catch (err) {
+    console.error('notifyUser failed:', err.message);
   }
 };
 
@@ -64,4 +80,4 @@ const remove = async (notificationId, userId) => {
 
 const clearAll = (userId) => Notification.deleteMany({ user: userId });
 
-module.exports = { notifyGroup, listForUser, markRead, markAllRead, remove, clearAll };
+module.exports = { notifyGroup, notifyUser,listForUser, markRead, markAllRead, remove, clearAll };

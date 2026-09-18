@@ -15,6 +15,7 @@ const createGroup = async (userId, { name, description, groupType, totalDays, st
     startDate: groupType === 'trip' ? startDate : null,
     location: groupType === 'trip' ? location : '',
     createdBy: userId,
+    admin: userId,
     members: [userId],
   });
   return group.populate('members', MEMBER_FIELDS);
@@ -55,16 +56,125 @@ const joinGroupByCode = async (userId, inviteCode) => {
   return group;
 };
 
-const leaveGroup = async (groupId, userId) => {
+const sameId = (a, b) => a.toString() === b.toString();
+
+/**
+ * What a member still owes, or is owed, in a group. Only unsettled shares
+ * count, matching the totals the app shows on the Expenses tab.
+ */
+const outstandingFor = async (groupId, userId) => {
+  const expenses = await Expense.find({ group: groupId, 'splits.settled': false })
+    .select('paidBy splits')
+    .lean();
+  let total = 0;
+  for (const expense of expenses) {
+    const paid = sameId(expense.paidBy, userId);
+    for (const split of expense.splits) {
+      if (split.settled) continue;
+      const mine = sameId(split.user, userId);
+      if ((paid && !mine) || (!paid && mine)) total += split.amount;
+    }
+  }
+  return Math.round(total * 100) / 100;
+};
+
+// Takes someone out of the group document and off its live chat room.
+const detachMember = async (group, userId) => {
+  group.members = group.members.filter((m) => !sameId(m._id, userId));
+  group.mutedBy = group.mutedBy.filter((m) => !sameId(m, userId));
+  await group.save();
+  // Required lazily: the realtime layer and message service both depend on this module.
+  require('../realtime/socket').removeFromGroup(userId, group._id);
+};
+
+const postSystem = (groupId, text) => require('./message.service').postSystem(groupId, text);
+
+/**
+ * Leave a group. An admin hands the role over on the way out: automatically
+ * when only one other member remains, otherwise to the `newAdminId` they chose.
+ */
+const leaveGroup = async (groupId, userId, { newAdminId } = {}) => {
   const group = await getGroupForMember(groupId, userId);
-  const balances = await computeBalances(groupId);
-  const mine = balances.find((b) => b.user._id.equals(userId));
-  if (mine && Math.abs(mine.net) >= 0.01) {
+  if ((await outstandingFor(groupId, userId)) >= 0.01) {
     throw ApiError.badRequest('Settle your balance before leaving the group');
   }
-  group.members = group.members.filter((m) => !m._id.equals(userId));
-  await group.save();
+
+  const leaver = group.members.find((m) => sameId(m._id, userId));
+  const others = group.members.filter((m) => !sameId(m._id, userId));
+
+  let nextAdmin = null;
+  if (sameId(group.adminId, userId) && others.length) {
+    if (others.length === 1) [nextAdmin] = others;
+    else {
+      if (!newAdminId) throw ApiError.badRequest('Choose a new admin before leaving the group');
+      nextAdmin = others.find((m) => sameId(m._id, newAdminId));
+      if (!nextAdmin) throw ApiError.badRequest('The new admin must be a member of this group');
+    }
+    group.admin = nextAdmin._id;
+  }
+
+  await detachMember(group, userId);
+
+  await postSystem(groupId, `${leaver.name} left the group`);
+  if (nextAdmin) await postSystem(groupId, `${nextAdmin.name} is now the group admin`);
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'member',
+    title: 'Member Left',
+    body: nextAdmin
+      ? `${leaver.name} left "${group.name}". ${nextAdmin.name} is now the admin.`
+      : `${leaver.name} left "${group.name}".`,
+  });
+
   return group;
+};
+
+// Admin only. The removed person is told directly, since they are no longer in the group.
+const removeMember = async (groupId, adminId, memberId) => {
+  const group = await getGroupForMember(groupId, adminId);
+  if (!sameId(group.adminId, adminId)) {
+    throw ApiError.forbidden('Only the group admin can remove members');
+  }
+  if (sameId(memberId, adminId)) throw ApiError.badRequest('Use leave group to remove yourself');
+
+  const member = group.members.find((m) => sameId(m._id, memberId));
+  if (!member) throw ApiError.notFound('That person is not a member of this group');
+  if ((await outstandingFor(groupId, memberId)) >= 0.01) {
+    throw ApiError.badRequest(`Settle ${member.name}'s balance before removing them`);
+  }
+
+  const admin = group.members.find((m) => sameId(m._id, adminId));
+  await detachMember(group, memberId);
+
+  await postSystem(groupId, `${member.name} was removed by ${admin.name}`);
+
+  await notificationService.notifyUser({
+    userId: memberId,
+    type: 'member',
+    title: 'Removed from Group',
+    body: `${admin.name} removed you from "${group.name}".`,
+  });
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: adminId,
+    type: 'member',
+    title: 'Member Removed',
+    body: `${member.name} was removed from "${group.name}" by ${admin.name}.`,
+  });
+
+  return group;
+};
+
+// Muting only silences device pushes; the in-app notification list still fills.
+const setMuted = async (groupId, userId, muted) => {
+  await getGroupForMember(groupId, userId);
+  await Group.updateOne(
+    { _id: groupId },
+    muted ? { $addToSet: { mutedBy: userId } } : { $pull: { mutedBy: userId } }
+  );
+  return { muted };
 };
 
 /**
@@ -229,6 +339,8 @@ module.exports = {
   getGroupForMember,
   joinGroupByCode,
   leaveGroup,
+  removeMember,
+  setMuted,
   getBalances,
   getContributions,
 };
