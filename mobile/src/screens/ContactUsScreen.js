@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import GradientButton from '../components/GradientButton';
 import { useAuth } from '../context/AuthContext';
 import { sendSupportMessage } from '../api/support.api';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 // Filled teal glyphs, matching the Profile settings icons.
 const CHANNELS = [
@@ -74,9 +74,9 @@ const ContactUsScreen = ({ navigation }) => {
       });
       setSubject('');
       setMessage('');
-      Alert.alert('Message sent', "Thanks for reaching out — we'll get back to you shortly.");
+      AppAlert.alert('Message sent', "Thanks for reaching out — we'll get back to you shortly.");
     } catch (err) {
-      Alert.alert('Could not send', err.message);
+      AppAlert.alert('Could not send', err.message);
     } finally {
       setSending(false);
     }
@@ -108,7 +108,7 @@ const ContactUsScreen = ({ navigation }) => {
                 style={[styles.channelRow, index > 0 && styles.channelDivider]}
                 activeOpacity={0.7}
                 onPress={() =>
-                  Alert.alert(channel.title, `${channel.subtitle}\n\nComing soon in-app.`)
+                  AppAlert.alert(channel.title, `${channel.subtitle}\n\nComing soon in-app.`)
                 }
               >
                 <View style={[styles.channelIcon, { backgroundColor: `${channel.tint}1F` }]}>

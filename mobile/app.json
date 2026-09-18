@@ -50,7 +50,16 @@
           "iosUrlScheme": "com.googleusercontent.apps.PASTE-YOUR-IOS-CLIENT-ID-PREFIX"
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Splix saves photos from your group galleries to your phone.",
+          "photosPermission": "Splix saves photos from your group galleries to your phone.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
+        }
+      ]
     ]
   }
 }

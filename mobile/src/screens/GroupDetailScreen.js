@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,21 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Switch,
-  Alert,
+  Modal,
+  Pressable,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
-import { fetchGroup } from '../api/groups.api';
+import { fetchGroup, leaveGroup, setGroupMuted } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketProvider';
 import { dark, radius, spacing } from '../theme';
 import { presenceFrom } from '../utils/presence';
 import { useGroupPresence } from '../hooks/useGroupPresence';
+import AppAlert from '../components/AppAlert';
 
 // "Group Info" screen, opened by tapping the group name in the chat header.
 const GroupDetailScreen = ({ route, navigation }) => {
@@ -28,7 +31,13 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [pickingAdmin, setPickingAdmin] = useState(false);
+  const [newAdminId, setNewAdminId] = useState(null);
+  const [leaving, setLeaving] = useState(false);
+  // True while our own leave request is in flight, so its echo isn't mistaken for a removal.
+  const leavingRef = useRef(false);
+  const { socket } = useSocket();
 
   useFocusEffect(
     useCallback(() => {
@@ -36,9 +45,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
       (async () => {
         try {
           const data = await fetchGroup(groupId);
-          if (active) setGroup(data);
+          if (!active) return;
+          setGroup(data);
+          setMuted((data.mutedBy ?? []).includes(currentUserId));
         } catch (err) {
-          Alert.alert('Could not load group', err.message);
+          AppAlert.alert('Could not load group', err.message);
         } finally {
           if (active) setLoading(false);
         }
@@ -46,8 +57,30 @@ const GroupDetailScreen = ({ route, navigation }) => {
       return () => {
         active = false;
       };
-    }, [groupId])
+    }, [groupId, currentUserId])
   );
+
+  // Someone left or was removed while this screen is open: drop them from the
+  // list, or leave the screen if it was us (removed by the admin).
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onMemberLeft = async (event) => {
+      if (event.groupId !== groupId) return;
+      if (event.userId === currentUserId) {
+        if (leavingRef.current) return;
+        AppAlert.alert('You are no longer in this group');
+        navigation.navigate('MainTabs');
+        return;
+      }
+      try {
+        setGroup(await fetchGroup(groupId));
+      } catch {
+        // The next focus reloads it.
+      }
+    };
+    socket.on('group:member-left', onMemberLeft);
+    return () => socket.off('group:member-left', onMemberLeft);
+  }, [socket, groupId, currentUserId, navigation]);
 
   if (loading || !group) {
     return (
@@ -59,7 +92,9 @@ const GroupDetailScreen = ({ route, navigation }) => {
     );
   }
 
-  const adminId = group.createdBy?._id ?? group.createdBy;
+  const adminId = group.admin ?? group.createdBy?._id ?? group.createdBy;
+  const iAmAdmin = adminId === currentUserId;
+  const others = group.members.filter((m) => m._id !== currentUserId);
   const memberCount = group.members?.length ?? 0;
   const tripLabel = group.totalDays
     ? `${group.totalDays}-day trip`
@@ -74,7 +109,51 @@ const GroupDetailScreen = ({ route, navigation }) => {
       member,
       groupId,
       isAdmin: member._id === adminId,
+      viewerIsAdmin: iAmAdmin,
     });
+  };
+
+  // Optimistic: flip the switch now, put it back if the server says no.
+  const toggleMuted = async (next) => {
+    setMuted(next);
+    try {
+      await setGroupMuted(groupId, next);
+    } catch (err) {
+      setMuted(!next);
+      AppAlert.alert('Could not update notifications', err.message);
+    }
+  };
+
+  const doLeave = async (adminSuccessorId) => {
+    setLeaving(true);
+    leavingRef.current = true;
+    try {
+      await leaveGroup(groupId, adminSuccessorId);
+      setPickingAdmin(false);
+      navigation.navigate('MainTabs');
+    } catch (err) {
+      AppAlert.alert('Could not leave group', err.message);
+    } finally {
+      setLeaving(false);
+      leavingRef.current = false;
+    }
+  };
+
+  const confirmLeave = () => {
+    // An admin with several members left behind chooses who takes over.
+    if (iAmAdmin && others.length > 1) {
+      setNewAdminId(null);
+      setPickingAdmin(true);
+      return;
+    }
+    const message =
+      iAmAdmin && others.length === 1
+        ? `${others[0].name} will become the group admin.`
+        : `You will no longer see "${group.name}" or its chat.`;
+    AppAlert.alert('Leave group?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Leave', style: 'destructive', onPress: () => doLeave() },
+    ]);
   };
 
   return (
@@ -172,21 +251,30 @@ const GroupDetailScreen = ({ route, navigation }) => {
             <Text style={styles.prefText}>Mute notifications</Text>
             <Switch
               value={muted}
-              onValueChange={setMuted}
+              onValueChange={toggleMuted}
               trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#22C55E' }}
               thumbColor="#FFFFFF"
             />
           </View>
 
-          <View style={[styles.prefRow, styles.prefRowBorder]}>
+          <TouchableOpacity
+            style={[styles.prefRow, styles.prefRowBorder]}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Contributions', { groupId, segment: 'Expenses' })}
+          >
             <View style={styles.prefIcon}>
               <Ionicons name="card-outline" size={16} color={dark.textMuted} />
             </View>
             <Text style={styles.prefText}>Shared expenses</Text>
             <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
-          </View>
+          </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.prefRow, styles.prefRowBorder]} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[styles.prefRow, styles.prefRowBorder]}
+            activeOpacity={0.7}
+            onPress={confirmLeave}
+            disabled={leaving}
+          >
             <View style={[styles.prefIcon, styles.leaveIcon]}>
               <Ionicons name="log-out-outline" size={16} color="#F97362" />
             </View>
@@ -195,6 +283,69 @@ const GroupDetailScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={pickingAdmin}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickingAdmin(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => !leaving && setPickingAdmin(false)}>
+          <Pressable style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Choose a new admin</Text>
+            <Text style={styles.sheetHint}>
+              You're the admin of "{group.name}". Pick who takes over before you leave.
+            </Text>
+
+            <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+              {others.map((member, index) => {
+                const selected = member._id === newAdminId;
+                return (
+                  <TouchableOpacity
+                    key={member._id}
+                    style={[styles.memberRow, index > 0 && styles.memberRowBorder]}
+                    activeOpacity={0.7}
+                    onPress={() => setNewAdminId(member._id)}
+                  >
+                    <Avatar name={member.name} size={36} solid />
+                    <Text style={[styles.memberName, styles.sheetMemberName]} numberOfLines={1}>
+                      {member.name}
+                    </Text>
+                    <Ionicons
+                      name={selected ? 'radio-button-on' : 'radio-button-off'}
+                      size={20}
+                      color={selected ? dark.accentGreen : dark.textMuted}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetCancel]}
+                activeOpacity={0.8}
+                onPress={() => setPickingAdmin(false)}
+                disabled={leaving}
+              >
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetLeave, !newAdminId && styles.sheetLeaveDisabled]}
+                activeOpacity={0.8}
+                onPress={() => doLeave(newAdminId)}
+                disabled={!newAdminId || leaving}
+              >
+                {leaving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.sheetLeaveText}>Make admin & leave</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </DarkScreen>
   );
 };
@@ -308,6 +459,35 @@ const styles = StyleSheet.create({
   leaveIcon: { backgroundColor: 'rgba(249,115,98,0.12)' },
   prefText: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600', marginLeft: spacing.sm + 4 },
   leaveText: { color: '#F97362' },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#0C1418',
+    borderTopLeftRadius: radius.lg + 8,
+    borderTopRightRadius: radius.lg + 8,
+    borderWidth: 1,
+    borderColor: dark.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sheetTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+  sheetHint: { color: dark.textMuted, fontSize: 13, marginTop: 4, marginBottom: spacing.sm },
+  sheetList: { maxHeight: 300 },
+  sheetMemberName: { flex: 1, marginLeft: spacing.sm + 4 },
+  sheetActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  sheetButton: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md - 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCancel: { backgroundColor: dark.surface, borderWidth: 1, borderColor: dark.border },
+  sheetCancelText: { color: dark.text, fontSize: 14, fontWeight: '700' },
+  sheetLeave: { backgroundColor: '#F97362' },
+  sheetLeaveDisabled: { opacity: 0.4 },
+  sheetLeaveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
 });
 
 export default GroupDetailScreen;

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { forgotPasswordRequest } from '../api/auth.api';
 import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
 import { spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -13,7 +14,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   const handleSendOtp = async () => {
     if (!email.trim()) {
-      Alert.alert('Missing email', 'Please enter your email address.');
+      AppAlert.alert('Missing email', 'Please enter your email address.');
       return;
     }
     setLoading(true);
@@ -21,11 +22,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
       const data = await forgotPasswordRequest(email.trim());
       // Backend returns the OTP in development since no mail provider is set up.
       if (data.devOtp) {
-        Alert.alert('Development OTP', `Your code is ${data.devOtp}`);
+        AppAlert.alert('Development OTP', `Your code is ${data.devOtp}`);
       }
       navigation.navigate('EnterOtp', { email: email.trim() });
     } catch (err) {
-      Alert.alert('Could not send code', err.message);
+      AppAlert.alert('Could not send code', err.message);
     } finally {
       setLoading(false);
     }

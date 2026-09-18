@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +24,7 @@ import { usd } from '../utils/format';
 import { tripFlag } from '../utils/tripFlag';
 import { categoryIcon } from '../utils/expenseCategory';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const EMPTY_HOME = {
   balance: { net: 0, youOwe: 0, owedToYou: 0, groupCount: 0 },
@@ -153,12 +153,12 @@ const HomeScreen = ({ navigation }) => {
     try {
       const groups = await fetchGroups();
       if (!groups.length) {
-        Alert.alert('No groups yet', 'Create or join a group to see contributions.');
+        AppAlert.alert('No groups yet', 'Create or join a group to see contributions.');
         return;
       }
       navigation.navigate('Contributions', { groupId: groups[0]._id });
     } catch (err) {
-      Alert.alert('Could not open contributions', err.message);
+      AppAlert.alert('Could not open contributions', err.message);
     }
   };
 

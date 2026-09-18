@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Linking,
   StyleSheet,
 } from 'react-native';
@@ -17,6 +16,7 @@ import GradientButton from '../components/GradientButton';
 import Avatar from '../components/Avatar';
 import { fetchTask, updateTask, deleteTask } from '../api/tasks.api';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const PRIORITY = {
   high: { label: 'HIGH PRIORITY', color: '#F87171' },
@@ -52,7 +52,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
           const data = await fetchTask(taskId);
           if (active) setTask(data);
         } catch (err) {
-          Alert.alert('Could not load task', err.message);
+          AppAlert.alert('Could not load task', err.message);
           navigation.goBack();
         }
       })();
@@ -68,7 +68,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
       setTask(updated);
     } catch (err) {
       if (revert) setTask(revert);
-      Alert.alert('Could not update task', err.message);
+      AppAlert.alert('Could not update task', err.message);
     }
   };
 
@@ -105,14 +105,14 @@ const TaskDetailScreen = ({ route, navigation }) => {
       });
       setTask(updated);
     } catch (err) {
-      Alert.alert('Could not update task', err.message);
+      AppAlert.alert('Could not update task', err.message);
     } finally {
       setBusy(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert('Delete task', `Delete "${task.title}"? This cannot be undone.`, [
+    AppAlert.alert('Delete task', `Delete "${task.title}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -122,7 +122,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
             await deleteTask(taskId);
             navigation.goBack();
           } catch (err) {
-            Alert.alert('Could not delete task', err.message);
+            AppAlert.alert('Could not delete task', err.message);
           }
         },
       },

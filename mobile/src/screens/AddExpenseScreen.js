@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from '../components/DarkScreen';
@@ -20,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { createExpense } from '../api/groups.api';
 import { dark, radius, spacing } from '../theme';
 import { usd } from '../utils/format';
+import AppAlert from '../components/AppAlert';
 
 const CATEGORIES = [
   { label: 'General', value: 'general' },
@@ -76,19 +76,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
   const submit = async () => {
     if (amount <= 0) {
-      Alert.alert('Enter an amount', 'The expense amount must be greater than zero.');
+      AppAlert.alert('Enter an amount', 'The expense amount must be greater than zero.');
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Add a description', 'Give the expense a short description.');
+      AppAlert.alert('Add a description', 'Give the expense a short description.');
       return;
     }
     if (!participants.length) {
-      Alert.alert('Pick people', 'Select at least one person to split between.');
+      AppAlert.alert('Pick people', 'Select at least one person to split between.');
       return;
     }
     if (splitMode === 'custom' && Math.abs(customTotal - amount) >= 0.01) {
-      Alert.alert(
+      AppAlert.alert(
         'Split does not add up',
         `Custom amounts total ${usd(customTotal)} but the expense is ${usd(amount)}.`
       );
@@ -114,7 +114,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
       });
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Could not add expense', err.message);
+      AppAlert.alert('Could not add expense', err.message);
     } finally {
       setSaving(false);
     }

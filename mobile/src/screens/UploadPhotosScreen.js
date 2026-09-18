@@ -5,7 +5,6 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +13,9 @@ import DarkScreen from '../components/DarkScreen';
 import GradientButton from '../components/GradientButton';
 import { uploadPhotoFile } from '../api/gallery.api';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
 
 const prettySize = (bytes) =>
   bytes ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : '';
@@ -30,7 +30,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
   const pickImages = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to upload pictures.');
+      AppAlert.alert('Permission needed', 'Allow photo library access to upload pictures.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -54,7 +54,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
       }));
 
     if (picked.length < result.assets.length) {
-      Alert.alert('Some photos skipped', 'Files over 15MB were left out.');
+      AppAlert.alert('Some photos skipped', 'Files over 10MB were left out.');
     }
     setFiles((prev) => [...prev, ...picked]);
   };
@@ -96,9 +96,9 @@ const UploadPhotosScreen = ({ route, navigation }) => {
 
     setUploading(false);
     if (failed) {
-      Alert.alert('Upload finished', `${failed} photo${failed === 1 ? '' : 's'} failed — try again.`);
+      AppAlert.alert('Upload finished', `${failed} photo${failed === 1 ? '' : 's'} failed — try again.`);
     } else {
-      Alert.alert('Uploaded!', 'Your photos are in the group gallery.', [
+      AppAlert.alert('Uploaded!', 'Your photos are in the group gallery.', [
         { text: 'OK', onPress: navigation.goBack },
       ]);
     }
@@ -132,7 +132,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
             <Ionicons name="cloud-upload-outline" size={24} color={dark.accentGreen} />
           </View>
           <Text style={styles.dropTitle}>Tap to browse your photos</Text>
-          <Text style={styles.dropMeta}>Supports JPG, PNG, HEIC (Max 15MB)</Text>
+          <Text style={styles.dropMeta}>Supports JPG, PNG, HEIC (Max 10MB)</Text>
         </TouchableOpacity>
 
         {files.length > 0 && (

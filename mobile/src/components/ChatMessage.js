@@ -244,4 +244,5 @@ const styles = StyleSheet.create({
   deleted: { color: dark.textMuted, fontSize: 12, fontStyle: 'italic' },
 });
 
-export default ChatMessage;
+// Memoised: a new message must not re-render every row already on screen.
+export default React.memo(ChatMessage);

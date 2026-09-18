@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchGroups, joinGroup } from '../api/groups.api';
@@ -16,6 +15,7 @@ import TextField from '../components/TextField';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing } from '../theme';
 import { initials } from '../utils/format';
+import AppAlert from '../components/AppAlert';
 
 const GroupsScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -28,7 +28,7 @@ const GroupsScreen = ({ navigation }) => {
     try {
       setGroups(await fetchGroups());
     } catch (err) {
-      Alert.alert('Could not load groups', err.message);
+      AppAlert.alert('Could not load groups', err.message);
     }
   }, []);
 
@@ -53,7 +53,7 @@ const GroupsScreen = ({ navigation }) => {
       await load();
       navigation.navigate('GroupDetail', { groupId: group._id, name: group.name });
     } catch (err) {
-      Alert.alert('Could not join group', err.message);
+      AppAlert.alert('Could not join group', err.message);
     } finally {
       setJoining(false);
     }

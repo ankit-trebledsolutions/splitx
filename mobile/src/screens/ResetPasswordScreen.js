@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { resetPasswordRequest } from '../api/auth.api';
 import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
 import { spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const ResetPasswordScreen = ({ route, navigation }) => {
   const { resetToken } = route.params;
@@ -15,11 +16,11 @@ const ResetPasswordScreen = ({ route, navigation }) => {
 
   const handleReset = async () => {
     if (password.length < 8) {
-      Alert.alert('Weak password', 'Password must be at least 8 characters.');
+      AppAlert.alert('Weak password', 'Password must be at least 8 characters.');
       return;
     }
     if (password !== confirm) {
-      Alert.alert('Passwords do not match', 'Both fields must be identical.');
+      AppAlert.alert('Passwords do not match', 'Both fields must be identical.');
       return;
     }
     setLoading(true);
@@ -27,7 +28,7 @@ const ResetPasswordScreen = ({ route, navigation }) => {
       await resetPasswordRequest(resetToken, password);
       navigation.navigate('PasswordChanged');
     } catch (err) {
-      Alert.alert('Could not reset password', err.message);
+      AppAlert.alert('Could not reset password', err.message);
     } finally {
       setLoading(false);
     }

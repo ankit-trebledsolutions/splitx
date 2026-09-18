@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from '../components/DarkScreen';
@@ -18,6 +17,7 @@ import GradientButton from '../components/GradientButton';
 import { useAuth } from '../context/AuthContext';
 import { profileDefaults } from '../data/profile';
 import { dark, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const EditProfileScreen = ({ navigation }) => {
   const { user, updateProfile } = useAuth();
@@ -74,7 +74,7 @@ const EditProfileScreen = ({ navigation }) => {
               style={styles.cameraBadge}
               activeOpacity={0.8}
               onPress={() =>
-                Alert.alert('Profile photo', 'Photo upload is not wired up yet.')
+                AppAlert.alert('Profile photo', 'Photo upload is not wired up yet.')
               }
             >
               <Ionicons name="camera" size={14} color="#04121C" />
@@ -83,7 +83,7 @@ const EditProfileScreen = ({ navigation }) => {
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Profile photo', 'Photo upload is not wired up yet.')}
+            onPress={() => AppAlert.alert('Profile photo', 'Photo upload is not wired up yet.')}
           >
             <Text style={styles.changePhoto}>Change Profile Photo</Text>
           </TouchableOpacity>

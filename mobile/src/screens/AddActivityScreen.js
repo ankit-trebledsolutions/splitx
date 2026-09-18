@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +14,7 @@ import DarkScreen from '../components/DarkScreen';
 import GradientButton from '../components/GradientButton';
 import { addItineraryActivity } from '../api/itinerary.api';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const dayDateLabel = (value) =>
   value
@@ -54,7 +54,7 @@ const AddActivityScreen = ({ route, navigation }) => {
       });
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Could not add activity', err.message);
+      AppAlert.alert('Could not add activity', err.message);
     } finally {
       setSaving(false);
     }

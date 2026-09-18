@@ -7,6 +7,7 @@ import { SocketProvider } from './src/context/SocketProvider';
 import { StreamVideoProvider } from './src/context/StreamVideoProvider';
 import { ActiveCallProvider } from './src/context/ActiveCallProvider';
 import RootNavigator from './src/navigation/RootNavigator';
+import { AppAlertHost } from './src/components/AppAlert';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           </StreamVideoProvider>
         </SocketProvider>
       </AuthProvider>
+      <AppAlertHost />
     </SafeAreaProvider>
   );
 }

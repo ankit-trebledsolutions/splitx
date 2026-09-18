@@ -5,13 +5,13 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { forgotPasswordRequest, verifyOtpRequest } from '../api/auth.api';
 import AuthLayout from '../components/AuthLayout';
 import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 45;
@@ -31,7 +31,7 @@ const EnterOtpScreen = ({ route, navigation }) => {
 
   const handleVerify = async () => {
     if (otp.length !== OTP_LENGTH) {
-      Alert.alert('Incomplete code', `Enter the ${OTP_LENGTH}-digit code.`);
+      AppAlert.alert('Incomplete code', `Enter the ${OTP_LENGTH}-digit code.`);
       return;
     }
     setLoading(true);
@@ -39,7 +39,7 @@ const EnterOtpScreen = ({ route, navigation }) => {
       const { resetToken } = await verifyOtpRequest(email, otp);
       navigation.navigate('ResetPassword', { resetToken });
     } catch (err) {
-      Alert.alert('Verification failed', err.message);
+      AppAlert.alert('Verification failed', err.message);
     } finally {
       setLoading(false);
     }
@@ -49,12 +49,12 @@ const EnterOtpScreen = ({ route, navigation }) => {
     try {
       const data = await forgotPasswordRequest(email);
       if (data.devOtp) {
-        Alert.alert('Development OTP', `Your code is ${data.devOtp}`);
+        AppAlert.alert('Development OTP', `Your code is ${data.devOtp}`);
       }
       setOtp('');
       setSecondsLeft(RESEND_SECONDS);
     } catch (err) {
-      Alert.alert('Could not resend code', err.message);
+      AppAlert.alert('Could not resend code', err.message);
     }
   };
 
@@ -111,7 +111,7 @@ const EnterOtpScreen = ({ route, navigation }) => {
         linkText="Resend"
         onPress={() =>
           secondsLeft > 0
-            ? Alert.alert('Please wait', `You can resend the code in ${timerLabel}.`)
+            ? AppAlert.alert('Please wait', `You can resend the code in ${timerLabel}.`)
             : handleResend()
         }
       />

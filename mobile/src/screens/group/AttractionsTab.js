@@ -5,11 +5,11 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { dark, radius, spacing } from '../../theme';
+import AppAlert from '../../components/AppAlert';
 
 // "Nearby attractions" list with per-user bookmark toggles, per the mockup.
 const AttractionsTab = ({ attractions, loading, currentUserId, onToggleSave, onDelete }) => {
@@ -83,7 +83,7 @@ const AttractionsTab = ({ attractions, loading, currentUserId, onToggleSave, onD
           <TouchableOpacity
             style={styles.mapLink}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Map View', 'The attractions map is coming soon.')}
+            onPress={() => AppAlert.alert('Map View', 'The attractions map is coming soon.')}
           >
             <Ionicons name="map-outline" size={13} color={dark.accentGreen} />
             <Text style={styles.mapLinkText}>Map View</Text>

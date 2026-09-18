@@ -12,17 +12,20 @@ import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
 import Avatar, { avatarColor } from '../components/Avatar';
 import GradientButton from '../components/GradientButton';
-import { fetchGroups } from '../api/groups.api';
+import { fetchGroups, removeMember } from '../api/groups.api';
 import { dark, radius, spacing } from '../theme';
 import { presenceFrom, phoneFor } from '../utils/presence';
 import { useGroupPresence } from '../hooks/useGroupPresence';
 import { initials } from '../utils/format';
+import AppAlert from '../components/AppAlert';
 
 // Profile page for another group member (never opened for yourself).
 const MemberProfileScreen = ({ route, navigation }) => {
-  const { member, groupId, isAdmin } = route.params;
+  // isAdmin: the person being viewed is the admin. viewerIsAdmin: we are.
+  const { member, groupId, isAdmin, viewerIsAdmin } = route.params;
 
   const [commonGroups, setCommonGroups] = useState(null);
+  const [removing, setRemoving] = useState(false);
   const onlineIds = useGroupPresence(groupId);
   const presence = presenceFrom(onlineIds.has(member._id), member.lastSeenAt);
 
@@ -49,6 +52,24 @@ const MemberProfileScreen = ({ route, navigation }) => {
       };
     }, [groupId, member._id])
   );
+
+  const doRemove = async () => {
+    setRemoving(true);
+    try {
+      await removeMember(groupId, member._id);
+      navigation.goBack();
+    } catch (err) {
+      AppAlert.alert('Could not remove member', err.message);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const confirmRemove = () =>
+    AppAlert.alert('Remove from group?', `${member.name} will lose access to this group and its chat.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: doRemove },
+    ]);
 
   return (
     <DarkScreen>
@@ -150,11 +171,26 @@ const MemberProfileScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        <GradientButton title="Send Message" style={styles.sendButton} onPress={() => {}} />
+        <GradientButton
+          title="Send Message"
+          style={styles.sendButton}
+          onPress={() => navigation.navigate('DirectChat', { peer: member })}
+        />
 
-        <TouchableOpacity style={styles.removeButton} activeOpacity={0.8}>
-          <Text style={styles.removeButtonText}>Remove from Group</Text>
-        </TouchableOpacity>
+        {viewerIsAdmin && (
+          <TouchableOpacity
+            style={styles.removeButton}
+            activeOpacity={0.8}
+            onPress={confirmRemove}
+            disabled={removing}
+          >
+            {removing ? (
+              <ActivityIndicator color="#F97362" size="small" />
+            ) : (
+              <Text style={styles.removeButtonText}>Remove from Group</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </DarkScreen>
   );

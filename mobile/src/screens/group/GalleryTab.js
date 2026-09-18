@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,93 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
+  Modal,
+  Linking,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { avatarColor } from '../../components/Avatar';
 import { API_ORIGIN } from '../../api/client';
 import { dark, radius, spacing } from '../../theme';
 import { initials } from '../../utils/format';
+import AppAlert from '../../components/AppAlert';
+import {
+  loadSavedPhotoIds,
+  savePhotoToGallery,
+  SavePermissionError,
+} from '../../utils/saveToGallery';
 
 const NUM_COLUMNS = 3;
+const GRID_GAP = spacing.sm;
+const GRID_PADDING = spacing.md;
 const RECENT_MS = 24 * 60 * 60 * 1000; // green "new" dot for photos < 1 day old
 
-// Emoji-tile photo grid with per-member filter chips, per the Gallery mockup.
+const absolute = (url) => (url ? (url.startsWith('http') ? url : `${API_ORIGIN}${url}`) : null);
+
+// Full-size image: what gets downloaded and shown full-screen.
+const uriOf = (photo) => absolute(photo.imageUrl);
+// Small square for the grid, so opening the gallery doesn't pull every full
+// photo over the network. Older photos have none and fall back to the original.
+const thumbOf = (photo) => absolute(photo.thumbUrl) ?? uriOf(photo);
+
+/**
+ * Photo grid with per-member filter chips, per the Gallery mockup.
+ *
+ * Other members' photos carry a download icon: tapping the tile saves the
+ * image to the phone's own gallery (WhatsApp-style), after which the icon
+ * becomes a tick and tapping opens the photo full-screen instead.
+ */
 const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto }) => {
   const [filter, setFilter] = useState('all');
+  const [savedIds, setSavedIds] = useState(() => new Set());
+  const [savingIds, setSavingIds] = useState(() => new Set());
+  const [viewing, setViewing] = useState(null);
+
+  // Fixed tile size: a row with one or two photos must not stretch them to fill it.
+  const { width } = useWindowDimensions();
+  const tileSize = Math.floor(
+    (width - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS
+  );
+
+  useEffect(() => {
+    let active = true;
+    loadSavedPhotoIds().then((ids) => active && setSavedIds(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const savePhoto = useCallback(async (photo) => {
+    const uri = uriOf(photo);
+    if (!uri) return;
+    setSavingIds((prev) => new Set(prev).add(photo._id));
+    try {
+      await savePhotoToGallery(photo._id, uri);
+      setSavedIds((prev) => new Set(prev).add(photo._id));
+    } catch (err) {
+      if (err instanceof SavePermissionError) {
+        AppAlert.alert(
+          'Allow photo access',
+          'Splix needs permission to add photos to your gallery.',
+          err.canAskAgain
+            ? [{ text: 'OK' }]
+            : [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ]
+        );
+      } else {
+        AppAlert.alert('Could not save photo', err.message);
+      }
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photo._id);
+        return next;
+      });
+    }
+  }, []);
 
   // One chip per member who has uploaded, with their photo count.
   const uploaders = useMemo(() => {
@@ -54,21 +126,34 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
     const uploaderName = item.uploadedBy?.name ?? '';
     const isMine = item.uploadedBy?._id === currentUserId;
 
-    const imageUri = item.imageUrl
-      ? item.imageUrl.startsWith('http')
-        ? item.imageUrl
-        : `${API_ORIGIN}${item.imageUrl}`
-      : null;
+    const imageUri = uriOf(item);
+    const isSaving = savingIds.has(item._id);
+    // Your own uploads are already on your phone, so they skip the download step.
+    const needsDownload = Boolean(imageUri) && !isMine && !savedIds.has(item._id);
+
+    const onPress = () => {
+      if (isSaving) return;
+      if (needsDownload) savePhoto(item);
+      else if (imageUri) setViewing(item);
+      else if (item.caption) AppAlert.alert(uploaderName || 'Photo', item.caption);
+    };
 
     return (
       <TouchableOpacity
-        style={[styles.tile, { backgroundColor: item.color || '#173A33' }]}
+        style={[
+          styles.tile,
+          { width: tileSize, height: tileSize, backgroundColor: item.color || '#173A33' },
+        ]}
         activeOpacity={0.85}
-        onPress={() => item.caption && Alert.alert(uploaderName || 'Photo', item.caption)}
+        onPress={onPress}
         onLongPress={() => isMine && onDeletePhoto?.(item)}
       >
         {imageUri ? (
-          <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image
+            source={{ uri: thumbOf(item) }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
         ) : (
           <Text style={styles.tileEmoji}>{item.emoji || '🖼️'}</Text>
         )}
@@ -77,7 +162,23 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
           <Text style={styles.uploaderChipText}>{initials(uploaderName)}</Text>
         </View>
 
-        {isRecent && <View style={styles.recentDot} />}
+        {/* Top-right corner: download / saving / saved for other members' photos,
+            otherwise the "new" dot. */}
+        {imageUri && !isMine ? (
+          <View style={[styles.downloadBadge, !needsDownload && styles.downloadBadgeDone]}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color={dark.text} />
+            ) : (
+              <Ionicons
+                name={needsDownload ? 'arrow-down' : 'checkmark'}
+                size={14}
+                color={needsDownload ? dark.text : '#04241A'}
+              />
+            )}
+          </View>
+        ) : (
+          isRecent && <View style={styles.recentDot} />
+        )}
 
         {item.taggedMembers?.length ? (
           <View style={styles.peopleBadge}>
@@ -90,6 +191,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
   };
 
   return (
+    <>
     <FlatList
       data={visible}
       key={NUM_COLUMNS}
@@ -106,7 +208,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
               style={styles.faceScan}
               activeOpacity={0.8}
               onPress={() =>
-                Alert.alert('Face Scan', 'Find photos you appear in — coming soon.')
+                AppAlert.alert('Face Scan', 'Find photos you appear in — coming soon.')
               }
             >
               <Ionicons name="scan-outline" size={15} color="#B79CFF" />
@@ -159,12 +261,59 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhoto 
         </Text>
       }
     />
+
+    <Modal
+      visible={Boolean(viewing)}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setViewing(null)}
+    >
+      {viewing && (
+        <View style={styles.viewer}>
+          <Image source={{ uri: uriOf(viewing) }} style={styles.viewerImage} resizeMode="contain" />
+
+          <View style={styles.viewerBar}>
+            <TouchableOpacity
+              style={styles.viewerButton}
+              activeOpacity={0.8}
+              onPress={() => setViewing(null)}
+            >
+              <Ionicons name="close" size={20} color={dark.text} />
+            </TouchableOpacity>
+            <View style={styles.viewerTitle}>
+              <Text style={styles.viewerName} numberOfLines={1}>
+                {viewing.uploadedBy?._id === currentUserId ? 'You' : viewing.uploadedBy?.name}
+              </Text>
+              {viewing.caption ? (
+                <Text style={styles.viewerCaption} numberOfLines={2}>
+                  {viewing.caption}
+                </Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={styles.viewerButton}
+              activeOpacity={0.8}
+              disabled={savingIds.has(viewing._id)}
+              onPress={() => savePhoto(viewing)}
+            >
+              {savingIds.has(viewing._id) ? (
+                <ActivityIndicator size="small" color={dark.text} />
+              ) : (
+                <Ionicons name="download-outline" size={19} color={dark.text} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { paddingHorizontal: spacing.md, paddingBottom: 100 },
+  list: { paddingHorizontal: GRID_PADDING, paddingBottom: 100 },
   empty: {
     color: dark.textMuted,
     fontSize: 13,
@@ -228,10 +377,8 @@ const styles = StyleSheet.create({
   chipTextActive: { color: dark.accentGreen },
   chipCount: { color: dark.textMuted, fontSize: 10, fontWeight: '700' },
 
-  gridRow: { gap: spacing.sm, marginBottom: spacing.sm },
+  gridRow: { gap: GRID_GAP, marginBottom: GRID_GAP },
   tile: {
-    flex: 1,
-    aspectRatio: 1,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -256,6 +403,47 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: dark.accentGreen,
   },
+  downloadBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadBadgeDone: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
+
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', justifyContent: 'center' },
+  viewerImage: { width: '100%', height: '100%' },
+  viewerBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 4,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xl + spacing.md,
+    paddingBottom: spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  viewerButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerTitle: { flex: 1 },
+  viewerName: { color: dark.text, fontSize: 15, fontWeight: '700' },
+  viewerCaption: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
   peopleBadge: {
     position: 'absolute',
     bottom: 6,

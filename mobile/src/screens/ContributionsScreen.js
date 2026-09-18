@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +17,7 @@ import { fetchGroup, fetchExpenses, fetchContributions } from '../api/groups.api
 import { useAuth } from '../context/AuthContext';
 import { dark, radius, spacing } from '../theme';
 import { usd } from '../utils/format';
+import AppAlert from '../components/AppAlert';
 
 const SEGMENTS = ['Overview', 'Expenses', 'Tasks'];
 
@@ -84,11 +84,14 @@ const StatBar = ({ ratio, color }) => (
 );
 
 const ContributionsScreen = ({ route, navigation }) => {
-  const { groupId } = route.params;
+  // `segment` lets other screens deep-link to a tab, e.g. Group Info -> Expenses.
+  const { groupId, segment: initialSegment } = route.params;
   const { user } = useAuth();
   const currentUserId = user?._id;
 
-  const [segment, setSegment] = useState('Overview');
+  const [segment, setSegment] = useState(
+    SEGMENTS.includes(initialSegment) ? initialSegment : 'Overview'
+  );
   const [group, setGroup] = useState(null);
   const [data, setData] = useState(null);
   const [expenses, setExpenses] = useState([]);
@@ -109,7 +112,7 @@ const ContributionsScreen = ({ route, navigation }) => {
           setData(contributions);
           setExpenses(expenseData);
         } catch (err) {
-          Alert.alert('Could not load contributions', err.message);
+          AppAlert.alert('Could not load contributions', err.message);
         } finally {
           if (active) setLoading(false);
         }

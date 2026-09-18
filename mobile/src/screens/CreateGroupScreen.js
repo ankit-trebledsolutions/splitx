@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import SelectField from '../components/SelectField';
@@ -8,6 +8,7 @@ import DateField from '../components/DateField';
 import GradientButton from '../components/GradientButton';
 import { createGroup } from '../api/groups.api';
 import { spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 export const GROUP_TYPES = [
   { label: 'Trip', value: 'trip' },
@@ -51,7 +52,7 @@ const CreateGroupScreen = ({ navigation }) => {
       });
       navigation.replace('GroupInvite', { group });
     } catch (err) {
-      Alert.alert('Could not create group', err.message);
+      AppAlert.alert('Could not create group', err.message);
     } finally {
       setLoading(false);
     }

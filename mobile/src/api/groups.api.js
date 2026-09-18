@@ -20,6 +20,21 @@ export const joinGroup = async (inviteCode) => {
   return data.data.group;
 };
 
+// newAdminId is only needed when the admin leaves a group of three or more.
+export const leaveGroup = async (groupId, newAdminId) => {
+  await client.post(`/groups/${groupId}/leave`, newAdminId ? { newAdminId } : {});
+};
+
+// Admin only.
+export const removeMember = async (groupId, memberId) => {
+  await client.delete(`/groups/${groupId}/members/${memberId}`);
+};
+
+export const setGroupMuted = async (groupId, muted) => {
+  const { data } = await client.put(`/groups/${groupId}/mute`, { muted });
+  return data.data.muted;
+};
+
 export const fetchBalances = async (groupId) => {
   const { data } = await client.get(`/groups/${groupId}/balances`);
   return data.data;

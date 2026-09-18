@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
@@ -8,6 +8,7 @@ import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
 import GoogleIcon from '../assets/google.svg';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const LoginScreen = ({ navigation }) => {
   const { login, loginWithGoogle } = useAuth();
@@ -18,14 +19,14 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert('Missing details', 'Please enter your email and password.');
+      AppAlert.alert('Missing details', 'Please enter your email and password.');
       return;
     }
     setLoading(true);
     try {
       await login(email.trim(), password);
     } catch (err) {
-      Alert.alert('Login failed', err.message);
+      AppAlert.alert('Login failed', err.message);
     } finally {
       setLoading(false);
     }
@@ -37,14 +38,14 @@ const LoginScreen = ({ navigation }) => {
       await loginWithGoogle();
     } catch (err) {
       // Closing the account picker isn't an error worth an alert.
-      if (!err.cancelled) Alert.alert('Google sign-in failed', err.message);
+      if (!err.cancelled) AppAlert.alert('Google sign-in failed', err.message);
     } finally {
       setGoogleLoading(false);
     }
   };
 
   const socialComingSoon = (provider) =>
-    Alert.alert(provider, `${provider} sign-in is coming soon.`);
+    AppAlert.alert(provider, `${provider} sign-in is coming soon.`);
 
   const busy = loading || googleLoading;
 

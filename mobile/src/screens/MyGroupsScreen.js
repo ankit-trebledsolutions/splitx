@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +16,7 @@ import AiItineraryModal from '../components/AiItineraryModal';
 import { fetchGroups } from '../api/groups.api';
 import { initials } from '../utils/format';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const MyGroupsScreen = ({ navigation, route }) => {
   const [groups, setGroups] = useState([]);
@@ -28,7 +28,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
     try {
       setGroups(await fetchGroups());
     } catch (err) {
-      Alert.alert('Could not load groups', err.message);
+      AppAlert.alert('Could not load groups', err.message);
     }
   }, []);
 
@@ -178,7 +178,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
         onAccept={() => {
           const group = itineraryFor;
           dismissItinerary();
-          Alert.alert(
+          AppAlert.alert(
             'Itinerary',
             `AI itinerary planning for "${group?.name}" is coming soon.`
           );

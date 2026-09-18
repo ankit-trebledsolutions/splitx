@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { dark, spacing } from '../theme';
+import AppAlert from './AppAlert';
 
-const showDoc = (name) => Alert.alert(name, `${name} will be available soon.`);
+const showDoc = (name) => AppAlert.alert(name, `${name} will be available soon.`);
 
 // "I agree to the Terms of Service and Privacy Policy" row with a round
 // checkbox, shown under the sign-up fields.

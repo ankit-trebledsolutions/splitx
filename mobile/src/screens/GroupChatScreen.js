@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -12,7 +12,7 @@ import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
 import NewReminderSheet from '../components/NewReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
-import ChatTab from './group/ChatTab';
+import ChatTab, { COMPOSER_HEIGHT, composerBottomPadding } from './group/ChatTab';
 import ExpensesTab from './group/ExpensesTab';
 import TasksTab from './group/TasksTab';
 import RemindersTab from './group/RemindersTab';
@@ -23,6 +23,8 @@ import StaysTab from './group/StaysTab';
 import { useAuth } from '../context/AuthContext';
 import { useActiveCall } from '../context/ActiveCallProvider';
 import { useSocket } from '../context/SocketProvider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
@@ -38,6 +40,7 @@ import {
 import { fetchStays, createStay, updateStay, deleteStay } from '../api/stays.api';
 import { detectTask } from '../utils/taskDetect';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const TABS = [
   { key: 'chat', label: 'Chat', icon: 'chatbubble-outline' },
@@ -64,6 +67,9 @@ const defaultRemindAt = (dueAt) => {
   return (base.getTime() < Date.now() ? new Date(Date.now() + 60 * 60 * 1000) : base).toISOString();
 };
 
+// Messages per request: the first page on open, and each older page on scroll-up.
+const MESSAGE_PAGE = 50;
+
 const GroupChatScreen = ({ route, navigation }) => {
   const { groupId, initialTab } = route.params;
   const { user } = useAuth();
@@ -82,6 +88,14 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [attractions, setAttractions] = useState([]);
   const [stays, setStays] = useState([]);
   const [loading, setLoading] = useState(true);
+  // The chat has its own flag so it appears as soon as messages land, without
+  // waiting for the other tabs' data.
+  const [messagesLoading, setMessagesLoading] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const hasOlder = useRef(true);
+  const fetchingOlder = useRef(false);
+  const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
 
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [daySheetOpen, setDaySheetOpen] = useState(false);
@@ -117,7 +131,12 @@ const GroupChatScreen = ({ route, navigation }) => {
         stayData,
       ] = await Promise.all([
         fetchGroup(groupId),
-        fetchMessages(groupId),
+        fetchMessages(groupId, { limit: MESSAGE_PAGE }).then((page) => {
+          hasOlder.current = page.length >= MESSAGE_PAGE;
+          setMessages(page);
+          setMessagesLoading(false);
+          return page;
+        }),
         fetchExpenses(groupId),
         fetchTasks(groupId),
         fetchReminders(groupId),
@@ -127,7 +146,6 @@ const GroupChatScreen = ({ route, navigation }) => {
         fetchStays(groupId),
       ]);
       setGroup(groupData);
-      setMessages(messageData);
       setExpenses(expenseData);
       setTasks(taskData);
       setReminders(reminderData);
@@ -136,11 +154,35 @@ const GroupChatScreen = ({ route, navigation }) => {
       setAttractions(attractionData);
       setStays(stayData);
     } catch (err) {
-      Alert.alert('Could not load group', err.message);
+      AppAlert.alert('Could not load group', err.message);
     } finally {
       setLoading(false);
+      setMessagesLoading(false);
     }
   }, [groupId]);
+
+  // Scrolling up to the oldest loaded message pulls in the page before it.
+  const loadOlderMessages = useCallback(async () => {
+    if (fetchingOlder.current || !hasOlder.current || !messages.length) return;
+    fetchingOlder.current = true;
+    setLoadingOlder(true);
+    try {
+      const older = await fetchMessages(groupId, {
+        before: messages[0].createdAt,
+        limit: MESSAGE_PAGE,
+      });
+      hasOlder.current = older.length >= MESSAGE_PAGE;
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => m._id));
+        return [...older.filter((m) => !known.has(m._id)), ...prev];
+      });
+    } catch {
+      // Scrolling up again retries.
+    } finally {
+      fetchingOlder.current = false;
+      setLoadingOlder(false);
+    }
+  }, [groupId, messages]);
 
   useFocusEffect(
     useCallback(() => {
@@ -198,13 +240,24 @@ const GroupChatScreen = ({ route, navigation }) => {
       }
     })();
 
+    // Removed by the admin (or left on another device) while the chat is open.
+    const onMemberLeft = (event) => {
+      if (event.groupId !== groupId || event.userId !== currentUserId) return;
+      // Not focused means Group Info is on top and handles it (e.g. we just left).
+      if (!navigation.isFocused()) return;
+      AppAlert.alert('You are no longer in this group');
+      navigation.navigate('MainTabs');
+    };
+
     socket.on('message:new', onMessage);
     socket.on('typing', onTyping);
+    socket.on('group:member-left', onMemberLeft);
     return () => {
       socket.off('message:new', onMessage);
       socket.off('typing', onTyping);
+      socket.off('group:member-left', onMemberLeft);
     };
-  }, [socket, connected, groupId, currentUserId]);
+  }, [socket, connected, groupId, currentUserId, navigation]);
 
   // Drop any pending typing timers when leaving the screen.
   useEffect(() => () => Object.values(typingTimers.current).forEach(clearTimeout), []);
@@ -247,7 +300,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       // The server also pushes this back over the socket; keep whichever lands first.
       setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [...prev, message]));
     } catch (err) {
-      Alert.alert('Could not send', err.message);
+      AppAlert.alert('Could not send', err.message);
     }
   };
 
@@ -275,7 +328,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       if (!connected) setMessages(await fetchMessages(groupId));
       setSavedTask(task);
     } catch (err) {
-      Alert.alert('Could not save task', err.message);
+      AppAlert.alert('Could not save task', err.message);
     }
   };
 
@@ -294,7 +347,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       if (!connected) setMessages(await fetchMessages(groupId));
       return reminder;
     } catch (err) {
-      Alert.alert('Could not set reminder', err.message);
+      AppAlert.alert('Could not set reminder', err.message);
       return null;
     }
   };
@@ -334,7 +387,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       setTasks((prev) => prev.map((t) => (t._id === updated._id ? updated : t)));
     } catch (err) {
       setTasks((prev) => prev.map((t) => (t._id === task._id ? task : t))); // roll back
-      Alert.alert('Could not update task', err.message);
+      AppAlert.alert('Could not update task', err.message);
     }
   };
 
@@ -348,7 +401,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       setReminders((prev) => prev.map((r) => (r._id === updated._id ? updated : r)));
     } catch (err) {
       setReminders((prev) => prev.map((r) => (r._id === reminder._id ? reminder : r)));
-      Alert.alert('Could not update reminder', err.message);
+      AppAlert.alert('Could not update reminder', err.message);
     }
   };
 
@@ -369,7 +422,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       );
       await refreshMessages();
     } catch (err) {
-      Alert.alert('Could not add day', err.message);
+      AppAlert.alert('Could not add day', err.message);
     }
   };
 
@@ -394,7 +447,7 @@ const GroupChatScreen = ({ route, navigation }) => {
   };
 
   const handleDeletePhoto = (photo) => {
-    Alert.alert('Delete photo', 'Remove this photo from the gallery?', [
+    AppAlert.alert('Delete photo', 'Remove this photo from the gallery?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -404,7 +457,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             await deletePhoto(photo._id);
             setPhotos((prev) => prev.filter((p) => p._id !== photo._id));
           } catch (err) {
-            Alert.alert('Could not delete photo', err.message);
+            AppAlert.alert('Could not delete photo', err.message);
           }
         },
       },
@@ -418,7 +471,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       setAttractions((prev) => [...prev, attraction]);
       await refreshMessages();
     } catch (err) {
-      Alert.alert('Could not add attraction', err.message);
+      AppAlert.alert('Could not add attraction', err.message);
     }
   };
 
@@ -436,12 +489,12 @@ const GroupChatScreen = ({ route, navigation }) => {
       setAttractions((prev) => prev.map((a) => (a._id === updated._id ? updated : a)));
     } catch (err) {
       setAttractions((prev) => prev.map((a) => (a._id === attraction._id ? attraction : a)));
-      Alert.alert('Could not update bookmark', err.message);
+      AppAlert.alert('Could not update bookmark', err.message);
     }
   };
 
   const handleDeleteAttraction = (attraction) => {
-    Alert.alert('Delete attraction', `Remove ${attraction.name}?`, [
+    AppAlert.alert('Delete attraction', `Remove ${attraction.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -451,7 +504,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             await deleteAttraction(attraction._id);
             setAttractions((prev) => prev.filter((a) => a._id !== attraction._id));
           } catch (err) {
-            Alert.alert('Could not delete attraction', err.message);
+            AppAlert.alert('Could not delete attraction', err.message);
           }
         },
       },
@@ -467,7 +520,7 @@ const GroupChatScreen = ({ route, navigation }) => {
       );
       await refreshMessages();
     } catch (err) {
-      Alert.alert('Could not add stay', err.message);
+      AppAlert.alert('Could not add stay', err.message);
     }
   };
 
@@ -478,12 +531,12 @@ const GroupChatScreen = ({ route, navigation }) => {
       setStays((prev) => prev.map((s) => (s._id === updated._id ? updated : s)));
       await refreshMessages();
     } catch (err) {
-      Alert.alert('Could not update stay', err.message);
+      AppAlert.alert('Could not update stay', err.message);
     }
   };
 
   const handleDeleteStay = (stay) => {
-    Alert.alert('Delete stay', `Remove ${stay.name}?`, [
+    AppAlert.alert('Delete stay', `Remove ${stay.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -493,7 +546,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             await deleteStay(stay._id);
             setStays((prev) => prev.filter((s) => s._id !== stay._id));
           } catch (err) {
-            Alert.alert('Could not delete stay', err.message);
+            AppAlert.alert('Could not delete stay', err.message);
           }
         },
       },
@@ -605,7 +658,11 @@ const GroupChatScreen = ({ route, navigation }) => {
       {tab === 'chat' && (
         <ChatTab
           messages={messages}
-          loading={loading}
+          loading={messagesLoading}
+          loadingOlder={loadingOlder}
+          onLoadOlder={loadOlderMessages}
+          onOpenCamera={openUploadPhotos}
+          fabVisible={!suggestion}
           currentUserId={currentUserId}
           suggestion={suggestion}
           onDismissSuggestion={dismissSuggestion}
@@ -670,14 +727,21 @@ const GroupChatScreen = ({ route, navigation }) => {
         <StaysTab
           stays={stays}
           loading={loading}
-          organiserId={group?.createdBy?._id ?? group?.createdBy}
+          organiserId={group?.admin ?? group?.createdBy?._id ?? group?.createdBy}
           onToggleStatus={handleToggleStayStatus}
           onDelete={handleDeleteStay}
         />
       )}
 
-      {tab !== 'chat' || !suggestion ? (
-        <View style={styles.fabWrap}>
+      {/* In the chat the button floats above the composer so it never covers
+          Send, and steps aside entirely while the keyboard is up. */}
+      {(tab !== 'chat' || !suggestion) && !(tab === 'chat' && keyboardVisible) ? (
+        <View
+          style={[
+            styles.fabWrap,
+            tab === 'chat' && { bottom: composerBottomPadding(insets) + COMPOSER_HEIGHT + 14 },
+          ]}
+        >
           {actionsOpen && (
             <View style={styles.actionMenu}>
               {[

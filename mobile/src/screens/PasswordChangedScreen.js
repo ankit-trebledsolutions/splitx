@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import AuthLayout from '../components/AuthLayout';
 import GradientButton from '../components/GradientButton';
 import SuccessBadge from '../components/SuccessBadge';
 import AuthFooter from '../components/AuthFooter';
 import { dark, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const PasswordChangedScreen = ({ navigation }) => (
   <AuthLayout
@@ -24,7 +25,7 @@ const PasswordChangedScreen = ({ navigation }) => (
       text="Need help?"
       linkText="Contact Support"
       linkColor={dark.accentGreen}
-      onPress={() => Alert.alert('Support', 'Contact us at support@splix.app')}
+      onPress={() => AppAlert.alert('Support', 'Contact us at support@splix.app')}
     />
   </AuthLayout>
 );

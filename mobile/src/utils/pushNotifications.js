@@ -70,7 +70,8 @@ export const unregisterFromPush = async () => {
 
 // Where tapping a push should land, from the `data` the backend attaches.
 export const routeForPush = (data = {}) => {
-  const { type, groupId, entityId } = data;
+  const { type, groupId, entityId, conversationId } = data;
+  if (type === 'dm' && conversationId) return ['DirectChat', { conversationId }];
   if (type === 'expense' && entityId) return ['ExpenseDetail', { expenseId: entityId }];
   if (type === 'task' && entityId) return ['TaskDetail', { taskId: entityId }];
   if (groupId) return ['GroupDetail', { groupId }];

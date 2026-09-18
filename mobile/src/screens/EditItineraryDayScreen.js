@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +19,7 @@ import {
   removeItineraryActivity,
 } from '../api/itinerary.api';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const dateLabel = (date) =>
   date ? new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Set date';
@@ -77,13 +77,13 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
       await removeItineraryActivity(day._id, activity._id);
     } catch (err) {
       setActivities(before);
-      Alert.alert('Could not delete activity', err.message);
+      AppAlert.alert('Could not delete activity', err.message);
     }
   };
 
   const save = async () => {
     if (title.trim().length < 1) {
-      Alert.alert('Day name required', 'Give this day a name before saving.');
+      AppAlert.alert('Day name required', 'Give this day a name before saving.');
       return;
     }
     // Keep endTime/location/note from the original rows; only time/title are
@@ -108,7 +108,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
       });
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Could not save day', err.message);
+      AppAlert.alert('Could not save day', err.message);
     } finally {
       setSaving(false);
     }
@@ -239,7 +239,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
             style={styles.deleteDay}
             activeOpacity={0.8}
             onPress={() =>
-              Alert.alert('Delete day', `Delete Day ${day.dayNumber} · ${title}?`, [
+              AppAlert.alert('Delete day', `Delete Day ${day.dayNumber} · ${title}?`, [
                 { text: 'Cancel', style: 'cancel' },
                 {
                   text: 'Delete',
@@ -249,7 +249,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
                       await deleteItineraryDay(day._id);
                       navigation.goBack();
                     } catch (err) {
-                      Alert.alert('Could not delete day', err.message);
+                      AppAlert.alert('Could not delete day', err.message);
                     }
                   },
                 },

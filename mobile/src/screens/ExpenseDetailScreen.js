@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchExpense, settleExpense, deleteExpense } from '../api/groups.api';
 import { dark, radius, spacing } from '../theme';
 import { usd, formatDate, formatTime } from '../utils/format';
+import AppAlert from '../components/AppAlert';
 
 const CATEGORY_LABEL = {
   general: 'General',
@@ -44,7 +44,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
     try {
       setExpense(await fetchExpense(expenseId));
     } catch (err) {
-      Alert.alert('Could not load expense', err.message);
+      AppAlert.alert('Could not load expense', err.message);
     } finally {
       setLoading(false);
     }
@@ -77,14 +77,14 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
     try {
       setExpense(await settleExpense(expense._id, targetUserId));
     } catch (err) {
-      Alert.alert('Could not settle', err.message);
+      AppAlert.alert('Could not settle', err.message);
     } finally {
       setSettling(false);
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert('Delete expense', `Delete "${expense.description}"?`, [
+    AppAlert.alert('Delete expense', `Delete "${expense.description}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -94,7 +94,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
             await deleteExpense(expense._id);
             navigation.goBack();
           } catch (err) {
-            Alert.alert('Could not delete', err.message);
+            AppAlert.alert('Could not delete', err.message);
           }
         },
       },

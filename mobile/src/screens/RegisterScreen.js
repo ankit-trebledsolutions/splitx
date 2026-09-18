@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
@@ -8,6 +8,7 @@ import TermsCheckbox from '../components/TermsCheckbox';
 import AuthFooter from '../components/AuthFooter';
 import GoogleIcon from '../assets/google.svg';
 import { dark, radius, spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const RegisterScreen = ({ navigation }) => {
   const { register, loginWithGoogle } = useAuth();
@@ -22,19 +23,19 @@ const RegisterScreen = ({ navigation }) => {
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password) {
-      Alert.alert('Missing details', 'Please fill in all fields.');
+      AppAlert.alert('Missing details', 'Please fill in all fields.');
       return;
     }
     if (password.length < 8) {
-      Alert.alert('Weak password', 'Password must be at least 8 characters.');
+      AppAlert.alert('Weak password', 'Password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPass) {
-      Alert.alert('Passwords do not match', 'Both password fields must be identical.');
+      AppAlert.alert('Passwords do not match', 'Both password fields must be identical.');
       return;
     }
     if (!agreed) {
-      Alert.alert(
+      AppAlert.alert(
         'Terms required',
         'Please agree to the Terms of Service and Privacy Policy to continue.'
       );
@@ -44,7 +45,7 @@ const RegisterScreen = ({ navigation }) => {
     try {
       await register(name.trim(), email.trim(), password);
     } catch (err) {
-      Alert.alert('Registration failed', err.message);
+      AppAlert.alert('Registration failed', err.message);
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,7 @@ const RegisterScreen = ({ navigation }) => {
     try {
       await loginWithGoogle();
     } catch (err) {
-      if (!err.cancelled) Alert.alert('Google sign-up failed', err.message);
+      if (!err.cancelled) AppAlert.alert('Google sign-up failed', err.message);
     } finally {
       setGoogleLoading(false);
     }

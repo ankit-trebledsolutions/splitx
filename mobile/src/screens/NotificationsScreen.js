@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +19,7 @@ import {
 } from '../api/notifications.api';
 import { dark, radius, spacing } from '../theme';
 import { timeAgo } from '../utils/format';
+import AppAlert from '../components/AppAlert';
 
 // Icon tile + accent per notification type.
 const TYPE_STYLE = {
@@ -64,7 +64,7 @@ const NotificationsScreen = ({ navigation }) => {
           const data = await fetchNotifications();
           if (active) setNotifications(data);
         } catch (err) {
-          Alert.alert('Could not load notifications', err.message);
+          AppAlert.alert('Could not load notifications', err.message);
         } finally {
           if (active) setLoading(false);
         }
@@ -98,7 +98,7 @@ const NotificationsScreen = ({ navigation }) => {
       await clearNotification(item._id);
     } catch (err) {
       setNotifications((prev) => [item, ...prev]); // restore on failure
-      Alert.alert('Could not clear notification', err.message);
+      AppAlert.alert('Could not clear notification', err.message);
     }
   };
 
