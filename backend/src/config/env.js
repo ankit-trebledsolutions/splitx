@@ -31,8 +31,21 @@ if (!cloudinary && isProduction) {
   console.warn('[storage] Cloudinary is not configured: uploaded photos will be lost on the next deploy');
 }
 
+// Outgoing email (Resend). Without a key, emails are printed to the console
+// instead, which is fine for development but means nobody receives codes.
+const email = {
+  resendApiKey: process.env.RESEND_API_KEY || '',
+  // Must be an address on a domain verified in Resend. Their shared test sender
+  // only delivers to the Resend account owner's own inbox.
+  from: process.env.EMAIL_FROM || 'Splix <onboarding@resend.dev>',
+};
+if (!email.resendApiKey && isProduction) {
+  console.warn('[email] RESEND_API_KEY is not set: verification and reset codes will NOT reach users');
+}
+
 module.exports = {
   cloudinary,
+  email,
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),

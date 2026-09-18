@@ -84,6 +84,7 @@ const createExpense = async (userId, groupId, payload) => {
 const getExpenseForMember = async (expenseId, userId) => {
   const expense = await Expense.findById(expenseId)
     .populate('paidBy', 'name email')
+    .populate('createdBy', 'name email')
     .populate('splits.user', 'name email')
     .populate('group', 'name groupType');
   if (!expense) throw ApiError.notFound('Expense not found');

@@ -13,6 +13,7 @@ const supportRoutes = require('./support.routes');
 const streamRoutes = require('./stream.routes');
 const homeRoutes = require('./home.routes');
 const directRoutes = require('./direct.routes');
+const tripRoutes = require('./trip.routes');
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use('/support', supportRoutes);
 router.use('/stream', streamRoutes);
 router.use('/home', homeRoutes);
 router.use('/conversations', directRoutes);
+router.use('/trips', tripRoutes);
 
 module.exports = router;

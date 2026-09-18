@@ -30,7 +30,10 @@ const errorHandler = (err, _req, res, _next) => {
     if (env.nodeEnv === 'production') message = 'Internal server error';
   }
 
-  res.status(statusCode).json({ success: false, message });
+  // err.code is also set by Mongo/Multer errors (numbers, LIMIT_*); only pass on
+  // the app's own string codes from ApiError.
+  const extra = err.isOperational && typeof err.code === 'string' ? { code: err.code, ...err.data } : {};
+  res.status(statusCode).json({ success: false, message, ...extra });
 };
 
 module.exports = { notFound, errorHandler };

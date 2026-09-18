@@ -18,7 +18,7 @@ const notifyGroup = async ({ groupId, actorId, type, title, body, amount = null,
     const recipients = group.members.filter((m) => !m.equals(actorId));
     if (!recipients.length) return;
     await Notification.insertMany(
-      recipients.map((user) => ({ user, group: groupId, type, title, body, amount }))
+      recipients.map((user) => ({ user, group: groupId, type, title, body, amount, entityId }))
     );
     // Members who muted the group still get the in-app entry, just no device push.
     const unmuted = recipients.filter((m) => !group.mutedBy.some((muted) => muted.equals(m)));

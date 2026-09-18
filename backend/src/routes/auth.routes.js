@@ -38,6 +38,13 @@ const verifyOtpSchema = {
   }),
 };
 
+const resendCodeSchema = {
+  body: z.object({
+    email: z.string().email('A valid email is required'),
+    purpose: z.enum(['verify-email', 'reset-password']),
+  }),
+};
+
 const resetPasswordSchema = {
   body: z.object({
     resetToken: z.string().min(1, 'Reset token is required'),
@@ -46,9 +53,12 @@ const resetPasswordSchema = {
 };
 
 router.post('/register', validate(registerSchema), controller.register);
+router.post('/verify-email', validate(verifyOtpSchema), controller.verifyEmail);
+router.post('/resend-code', validate(resendCodeSchema), controller.resendCode);
 router.post('/login', validate(loginSchema), controller.login);
 router.post('/google', validate(googleSchema), controller.googleLogin);
 router.get('/me', protect, controller.me);
+router.get('/invite-code', protect, controller.inviteCode);
 router.post('/forgot-password', validate(forgotPasswordSchema), controller.forgotPassword);
 router.post('/verify-otp', validate(verifyOtpSchema), controller.verifyOtp);
 router.post('/reset-password', validate(resetPasswordSchema), controller.resetPassword);
