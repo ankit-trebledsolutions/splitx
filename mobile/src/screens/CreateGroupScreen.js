@@ -50,7 +50,7 @@ const CreateGroupScreen = ({ navigation }) => {
           ? { totalDays, startDate: startDate.toISOString(), location: location.trim() }
           : {}),
       });
-      navigation.replace('GroupInvite', { group });
+      navigation.replace('GroupInvite', { group, isNew: true });
     } catch (err) {
       AppAlert.alert('Could not create group', err.message);
     } finally {

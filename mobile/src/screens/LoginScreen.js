@@ -26,6 +26,17 @@ const LoginScreen = ({ navigation }) => {
     try {
       await login(email.trim(), password);
     } catch (err) {
+      // Right password, but they never entered their sign-up code. The server
+      // has emailed a fresh one; pick up where they left off.
+      if (err.code === 'EMAIL_NOT_VERIFIED') {
+        navigation.navigate('EnterOtp', {
+          email: err.details.email,
+          purpose: 'verify-email',
+          retryAfter: err.details.retryAfter,
+          devOtp: err.details.devOtp,
+        });
+        return;
+      }
       AppAlert.alert('Login failed', err.message);
     } finally {
       setLoading(false);
@@ -52,7 +63,7 @@ const LoginScreen = ({ navigation }) => {
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to access your splix">
       <TextField
-        label="Email or Username"
+        label="Email"
         value={email}
         onChangeText={setEmail}
         placeholder="name@email.com"

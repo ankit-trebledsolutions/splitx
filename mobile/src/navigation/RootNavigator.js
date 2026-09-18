@@ -13,7 +13,7 @@ import PasswordChangedScreen from '../screens/PasswordChangedScreen';
 import MainTabs from './MainTabs';
 import GroupActionScreen from '../screens/GroupActionScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
-import GroupInviteScreen from '../screens/GroupInviteScreen';
+import InviteFriendsScreen from '../screens/InviteFriendsScreen';
 import GroupChatScreen from '../screens/GroupChatScreen';
 import DirectChatScreen from '../screens/DirectChatScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
@@ -22,6 +22,7 @@ import AddExpenseScreen from '../screens/AddExpenseScreen';
 import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import NotificationDetailScreen from '../screens/NotificationDetailScreen';
 import EditItineraryDayScreen from '../screens/EditItineraryDayScreen';
 import AddActivityScreen from '../screens/AddActivityScreen';
 import UploadPhotosScreen from '../screens/UploadPhotosScreen';
@@ -75,8 +76,13 @@ const RootNavigator = () => {
           />
           <Stack.Screen
             name="GroupInvite"
-            component={GroupInviteScreen}
+            component={InviteFriendsScreen}
             options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="InviteFriends"
+            component={InviteFriendsScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="GroupChat"
@@ -116,6 +122,11 @@ const RootNavigator = () => {
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NotificationDetail"
+            component={NotificationDetailScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

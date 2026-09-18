@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOKEN_KEY } from '../api/client';
-import { loginRequest, registerRequest, meRequest, googleLoginRequest } from '../api/auth.api';
+import {
+  loginRequest,
+  registerRequest,
+  verifyEmailRequest,
+  meRequest,
+  googleLoginRequest,
+} from '../api/auth.api';
 import { signInWithGoogle, signOutOfGoogle } from '../utils/googleSignIn';
 import { unregisterFromPush } from '../utils/pushNotifications';
 
@@ -34,10 +40,18 @@ export const AuthProvider = ({ children }) => {
     setUser(loggedIn);
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
-    const { user: created, token } = await registerRequest({ name, email, password });
+  // Creates the account and emails a code. There is no session yet: that comes
+  // from verifyEmail once the code is entered. Resolves to { email, retryAfter, devOtp? }.
+  const register = useCallback(
+    (name, email, password) => registerRequest({ name, email, password }),
+    []
+  );
+
+  // Entering the right code finishes sign-up and logs the person in.
+  const verifyEmail = useCallback(async (email, otp) => {
+    const { user: verified, token } = await verifyEmailRequest(email, otp);
     await AsyncStorage.setItem(TOKEN_KEY, token);
-    setUser(created);
+    setUser(verified);
   }, []);
 
   // Google covers both sign-up and log-in: the backend finds the account by
@@ -65,8 +79,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, loginWithGoogle, logout, updateProfile }),
-    [user, isLoading, login, register, loginWithGoogle, logout, updateProfile]
+    () => ({
+      user,
+      isLoading,
+      login,
+      register,
+      verifyEmail,
+      loginWithGoogle,
+      logout,
+      updateProfile,
+    }),
+    [user, isLoading, login, register, verifyEmail, loginWithGoogle, logout, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

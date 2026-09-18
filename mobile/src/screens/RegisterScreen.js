@@ -43,7 +43,13 @@ const RegisterScreen = ({ navigation }) => {
     }
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password);
+      const sent = await register(name.trim(), email.trim(), password);
+      navigation.navigate('EnterOtp', {
+        email: sent.email,
+        purpose: 'verify-email',
+        retryAfter: sent.retryAfter,
+        devOtp: sent.devOtp,
+      });
     } catch (err) {
       AppAlert.alert('Registration failed', err.message);
     } finally {
@@ -76,7 +82,7 @@ const RegisterScreen = ({ navigation }) => {
         autoComplete="name"
       />
       <TextField
-        label="Email or Username"
+        label="Email"
         value={email}
         onChangeText={setEmail}
         placeholder="name@email.com"

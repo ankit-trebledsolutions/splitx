@@ -14,6 +14,23 @@ export const usd = (amount = 0) =>
     maximumFractionDigits: 2,
   })}`;
 
+// "2 – 10 Sep" / "28 Sep – 3 Oct" / "2 Sep" / "28 Dec 2026 – 3 Jan 2027"
+export const formatDateRange = (startValue, endValue) => {
+  const start = new Date(startValue);
+  const end = new Date(endValue ?? startValue);
+  const thisYear = new Date().getFullYear();
+  const showYear = start.getFullYear() !== thisYear || end.getFullYear() !== thisYear;
+  const part = (date, withMonth) =>
+    date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      ...(withMonth ? { month: 'short' } : {}),
+      ...(withMonth && showYear ? { year: 'numeric' } : {}),
+    });
+  if (start.toDateString() === end.toDateString()) return part(start, true);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  return `${part(start, !sameMonth)} – ${part(end, true)}`;
+};
+
 export const formatTime = (value) =>
   new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 

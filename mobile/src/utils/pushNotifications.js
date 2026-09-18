@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { registerPushToken, removePushToken } from '../api/notifications.api';
+import { routeForNotification } from './notificationRoute';
 import { dark } from '../theme';
 
 // Remembered so logout can unregister this device without asking Expo again.
@@ -68,12 +69,13 @@ export const unregisterFromPush = async () => {
   }
 };
 
-// Where tapping a push should land, from the `data` the backend attaches.
-export const routeForPush = (data = {}) => {
-  const { type, groupId, entityId, conversationId } = data;
-  if (type === 'dm' && conversationId) return ['DirectChat', { conversationId }];
-  if (type === 'expense' && entityId) return ['ExpenseDetail', { expenseId: entityId }];
-  if (type === 'task' && entityId) return ['TaskDetail', { taskId: entityId }];
-  if (groupId) return ['GroupDetail', { groupId }];
-  return ['Notifications'];
-};
+// Where tapping a push should land. A push is treated as the notification it
+// mirrors (its `data` plus the visible title and body), so it goes exactly
+// where tapping the same entry in the in-app list would.
+export const routeForPush = (content = {}) =>
+  routeForNotification({
+    ...content.data,
+    title: content.title,
+    body: content.body,
+    createdAt: new Date().toISOString(),
+  }) ?? ['Notifications'];

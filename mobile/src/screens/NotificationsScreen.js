@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { routeForNotification } from '../utils/notificationRoute';
 import DarkScreen from '../components/DarkScreen';
 import SwipeableRow from '../components/SwipeableRow';
 import {
@@ -80,16 +81,18 @@ const NotificationsScreen = ({ navigation }) => {
     [notifications, filter]
   );
 
-  const handleOpen = async (item) => {
+  // Tapping marks it read and goes to whatever it is about: the expense
+  // summary, the task, or the right tab of the group.
+  const handleOpen = (item) => {
+    const route = routeForNotification(item);
+    if (route) navigation.navigate(...route);
+
     if (item.read) return;
     setNotifications((prev) =>
       prev.map((n) => (n._id === item._id ? { ...n, read: true } : n))
     );
-    try {
-      await markNotificationRead(item._id);
-    } catch {
-      // Read state is cosmetic; the next fetch resolves any drift.
-    }
+    // Read state is cosmetic; the next fetch resolves any drift.
+    markNotificationRead(item._id).catch(() => {});
   };
 
   const handleDismiss = async (item) => {

@@ -50,9 +50,14 @@ client.interceptors.request.use(async (config) => {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message || error.message || 'Something went wrong';
-    return Promise.reject(new Error(message));
+    const body = error.response?.data;
+    const message = body?.message || error.message || 'Something went wrong';
+    const failure = new Error(message);
+    failure.status = error.response?.status;
+    // e.g. 'EMAIL_NOT_VERIFIED', with whatever details the server sent along.
+    failure.code = body?.code;
+    failure.details = body;
+    return Promise.reject(failure);
   }
 );
 

@@ -18,7 +18,10 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "blockedPermissions": [
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "extra": {
       "eas": {
@@ -58,6 +61,12 @@
           "photosPermission": "Splix saves photos from your group galleries to your phone.",
           "isAccessMediaLocationEnabled": false,
           "granularPermissions": []
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Splix shows your contacts so you can invite friends to your groups. They never leave your phone."
         }
       ]
     ]

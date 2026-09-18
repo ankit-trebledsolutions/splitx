@@ -25,7 +25,7 @@ const usePushNotifications = ({ userId, ready }) => {
     if (handledId.current === identifier) return;
     handledId.current = identifier;
 
-    navigation.navigate(...routeForPush(content.data));
+    navigation.navigate(...routeForPush(content));
   }, [ready, response, navigation]);
 };
 

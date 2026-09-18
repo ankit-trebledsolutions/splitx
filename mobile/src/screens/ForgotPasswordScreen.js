@@ -20,12 +20,23 @@ const ForgotPasswordScreen = ({ navigation }) => {
     setLoading(true);
     try {
       const data = await forgotPasswordRequest(email.trim());
-      // Backend returns the OTP in development since no mail provider is set up.
-      if (data.devOtp) {
-        AppAlert.alert('Development OTP', `Your code is ${data.devOtp}`);
-      }
-      navigation.navigate('EnterOtp', { email: email.trim() });
+      navigation.navigate('EnterOtp', {
+        email: email.trim().toLowerCase(),
+        purpose: 'reset-password',
+        retryAfter: data.retryAfter,
+        devOtp: data.devOtp,
+      });
     } catch (err) {
+      // A code went out moments ago: it is still valid, so carry on to the code
+      // screen rather than leaving them stuck here.
+      if (err.code === 'OTP_COOLDOWN') {
+        navigation.navigate('EnterOtp', {
+          email: email.trim().toLowerCase(),
+          purpose: 'reset-password',
+          retryAfter: err.details.retryAfter,
+        });
+        return;
+      }
       AppAlert.alert('Could not send code', err.message);
     } finally {
       setLoading(false);
@@ -35,7 +46,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   return (
     <AuthLayout
       title="Forgot Password"
-      subtitle="Enter your email address to receive a password reset link"
+      subtitle="Enter your email address and we'll send you a 6-digit code to reset your password"
     >
       <TextField
         label="Email Address"
