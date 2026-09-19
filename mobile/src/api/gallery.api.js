@@ -14,6 +14,13 @@ export const deletePhoto = async (photoId) => {
   await client.delete(`/photos/${photoId}`);
 };
 
+// Multi-select delete. Resolves to the ids that were really removed: the
+// server only deletes the caller's own uploads and skips the rest.
+export const deletePhotos = async (photoIds) => {
+  const { data } = await client.post('/photos/bulk-delete', { photoIds });
+  return data.data.deletedIds;
+};
+
 /**
  * Multipart upload of a picked image. `file` is { uri, name, type } from
  * expo-image-picker; onProgress receives 0..1.

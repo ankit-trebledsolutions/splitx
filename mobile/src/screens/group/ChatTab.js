@@ -8,17 +8,51 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Pressable,
+  Keyboard,
+  Linking,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ChatMessage from '../../components/ChatMessage';
+import ChatMessage, { USER_TYPES } from '../../components/ChatMessage';
 import TypingDots from '../../components/TypingDots';
 import { avatarColor } from '../../components/Avatar';
 import useKeyboardVisible from '../../hooks/useKeyboardVisible';
 import useKeyboardLift from '../../hooks/useKeyboardLift';
 import { dark, radius, spacing } from '../../theme';
 import { formatDayDivider } from '../../utils/format';
+import ImageViewer from '../../components/ImageViewer';
+import AppAlert from '../../components/AppAlert';
+import {
+  absoluteUrl,
+  canUseVoiceNotes,
+  messageSnippet,
+  pickChatDocuments,
+  pickChatPhotos,
+  PickerPermissionError,
+} from '../../utils/attachments';
+import { savePhotoToGallery, SavePermissionError } from '../../utils/saveToGallery';
+import { loadSavedFileIds, saveFileToPhone, SaveCancelledError } from '../../utils/saveToPhone';
+import { copyText } from '../../utils/clipboard';
+import SwipeToReply from '../../components/SwipeToReply';
+import MessageActionsSheet from '../../components/MessageActionsSheet';
+
+// Needs the expo-audio native module, which older installed builds don't have.
+const VoiceRecorderBar = canUseVoiceNotes()
+  ? require('../../components/VoiceRecorderBar').default
+  : null;
+
+const ATTACH_OPTIONS = [
+  { key: 'photos', icon: 'images-outline', tint: '#2DD4BF', label: 'Photos', pick: pickChatPhotos },
+  {
+    key: 'document',
+    icon: 'document-text-outline',
+    tint: '#4A7DF7',
+    label: 'Document',
+    pick: pickChatDocuments,
+  },
+];
 
 // Height of the composer bar above its bottom padding: 10 top padding + 42 controls.
 // The parent uses it to float its "+" button just above the bar.
@@ -31,6 +65,9 @@ const Root = IS_IOS ? KeyboardAvoidingView : View;
 
 // How far up (px) the reader has to be before the "jump to latest" button shows.
 const JUMP_BUTTON_AFTER = 400;
+
+// How many older pages to load looking for a quoted message before giving up.
+const MAX_PAGES_TO_FIND = 6;
 
 /**
  * Chat feed + composer. The suggest banner is driven by the parent so the
@@ -54,7 +91,12 @@ const ChatTab = ({
   onDismissSuggestion,
   onAddSuggestionToTasks,
   onRemindSuggestion,
+  // (text, replyTo): replyTo is the message being answered, or null.
   onSend,
+  // (file, { durationMs, replyTo }) for a picked photo or document, or a recorded voice note.
+  onSendAttachment,
+  // "Delete for everyone" on one of my own messages; the parent confirms nothing, we do.
+  onDeleteMessage,
   onTyping,
   typingUsers = [],
   onOpenExpense,
@@ -65,7 +107,39 @@ const ChatTab = ({
   const [sending, setSending] = useState(false);
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const [unseen, setUnseen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [viewing, setViewing] = useState(null);
+  const [savingImage, setSavingImage] = useState(false);
+  // The message being answered (shown above the composer) and the one whose
+  // long-press sheet is open.
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [actionsFor, setActionsFor] = useState(null);
+  // Voice notes and documents already copied to this phone / downloading now.
+  const [savedFileIds, setSavedFileIds] = useState(() => new Set());
+  const [savingFileIds, setSavingFileIds] = useState(() => new Set());
   const listRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    loadSavedFileIds().then((ids) => active && setSavedFileIds(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Takes the pending reply, clearing the bar: whatever is sent next carries it.
+  const takeReply = () => {
+    const reply = replyingTo;
+    setReplyingTo(null);
+    return reply;
+  };
+
+  const startReply = useCallback((message) => {
+    setReplyingTo(message);
+    inputRef.current?.focus();
+  }, []);
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
   const { lift, onLayout } = useKeyboardLift();
@@ -98,6 +172,56 @@ const ChatTab = ({
     setUnseen(false);
   }, []);
 
+  // Tapping the quote above a reply: scroll to the message it answers and tint
+  // it for a moment. If that message is further back than what is loaded, older
+  // pages are pulled in until it turns up.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const loadOlderRef = useRef(onLoadOlder);
+  loadOlderRef.current = onLoadOlder;
+  const [highlightId, setHighlightId] = useState(null);
+  const highlightTimer = useRef(null);
+  const jumping = useRef(false);
+  useEffect(() => () => clearTimeout(highlightTimer.current), []);
+
+  const jumpToMessage = useCallback(async (messageId) => {
+    if (!messageId || jumping.current) return;
+    jumping.current = true;
+    try {
+      let index = rowsRef.current.findIndex((row) => row._id === messageId);
+      for (let page = 0; index < 0 && page < MAX_PAGES_TO_FIND; page += 1) {
+        const before = rowsRef.current.length;
+        // eslint-disable-next-line no-await-in-loop
+        await loadOlderRef.current?.();
+        // Give the new page a moment to reach the list.
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        if (rowsRef.current.length === before) break; // nothing older left
+        index = rowsRef.current.findIndex((row) => row._id === messageId);
+      }
+      if (index < 0) {
+        AppAlert.alert('Message not found', 'The original message is too far back to show.');
+        return;
+      }
+      listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true });
+      setHighlightId(messageId);
+      clearTimeout(highlightTimer.current);
+      highlightTimer.current = setTimeout(() => setHighlightId(null), 1800);
+    } finally {
+      jumping.current = false;
+    }
+  }, []);
+
+  // Rows vary in height, so a far-off index may not be measured yet: scroll to
+  // roughly the right place, then try again once those rows have rendered.
+  const onScrollToIndexFailed = useCallback(({ index, averageItemLength }) => {
+    listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+    setTimeout(
+      () => listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }),
+      150
+    );
+  }, []);
+
   const onScroll = useCallback((event) => {
     const away = event.nativeEvent.contentOffset.y > JUMP_BUTTON_AFTER;
     if (away === awayRef.current) return;
@@ -114,10 +238,143 @@ const ChatTab = ({
     setDraft('');
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
     try {
-      await onSend(text);
+      await onSend(text, takeReply());
     } finally {
       setSending(false);
     }
+  };
+
+  // Attach menu: open the chosen picker and send whatever comes back, one
+  // message per file, the way WhatsApp does.
+  const attach = async (option) => {
+    setAttachOpen(false);
+    try {
+      const { files, skipped } = await option.pick();
+      if (skipped) AppAlert.alert('Some files skipped', 'Files over 10MB were left out.');
+      if (!files.length) return;
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      // Of several files, the first one is the reply.
+      const replyTo = takeReply();
+      files.forEach((file, index) => onSendAttachment?.(file, { replyTo: index === 0 ? replyTo : null }));
+    } catch (err) {
+      AppAlert.alert(
+        err instanceof PickerPermissionError ? 'Permission needed' : 'Could not attach',
+        err.message
+      );
+    }
+  };
+
+  const startRecording = () => {
+    if (!VoiceRecorderBar) {
+      AppAlert.alert('Update needed', 'Install the latest build of Splix to send voice notes.');
+      return;
+    }
+    setAttachOpen(false);
+    Keyboard.dismiss();
+    setRecording(true);
+  };
+
+  const sendVoiceNote = ({ durationMs, ...file }) => {
+    setRecording(false);
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    onSendAttachment?.(file, { durationMs, replyTo: takeReply() });
+  };
+
+  const openFile = useCallback((message) => {
+    const url = absoluteUrl(message.attachment?.url);
+    if (url) Linking.openURL(url).catch((err) => AppAlert.alert('Could not open file', err.message));
+  }, []);
+
+  // Voice notes and documents: keep a copy on the phone (see saveToPhone).
+  const saveFile = useCallback(async (message) => {
+    const url = absoluteUrl(message.attachment?.url);
+    if (!url) return;
+    setSavingFileIds((prev) => new Set(prev).add(message._id));
+    try {
+      await saveFileToPhone(message._id, url, message.attachment);
+      setSavedFileIds((prev) => new Set(prev).add(message._id));
+    } catch (err) {
+      if (!(err instanceof SaveCancelledError)) AppAlert.alert('Could not save file', err.message);
+    } finally {
+      setSavingFileIds((prev) => {
+        const next = new Set(prev);
+        next.delete(message._id);
+        return next;
+      });
+    }
+  }, []);
+
+  // A photo from the chat into the phone's own gallery: from the full-screen
+  // viewer's download button, or straight from the long-press sheet.
+  const saveImage = async (message) => {
+    const uri = absoluteUrl(message?.attachment?.url);
+    if (!uri) return;
+    setSavingImage(true);
+    try {
+      await savePhotoToGallery(message._id, uri);
+      setViewing(null);
+      AppAlert.alert('Photo saved', 'It is in your phone’s gallery now.');
+    } catch (err) {
+      setViewing(null);
+      if (err instanceof SavePermissionError) {
+        AppAlert.alert(
+          'Allow photo access',
+          'Splix needs permission to add photos to your gallery.',
+          err.canAskAgain
+            ? [{ text: 'OK' }]
+            : [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ]
+        );
+      } else {
+        AppAlert.alert('Could not save photo', err.message);
+      }
+    } finally {
+      setSavingImage(false);
+    }
+  };
+
+  const confirmDelete = (message) =>
+    AppAlert.alert('Delete message?', 'It will be removed for everyone in the group.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete for everyone', style: 'destructive', onPress: () => onDeleteMessage?.(message) },
+    ]);
+
+  // What the long-press sheet offers for a message.
+  const actionsOf = (message) => {
+    if (!message) return [];
+    const mine = message.sender?._id === currentUserId;
+    const isFile = message.type === 'audio' || message.type === 'file';
+    return [
+      { key: 'reply', icon: 'arrow-undo-outline', label: 'Reply', onPress: () => startReply(message) },
+      message.text && {
+        key: 'copy',
+        icon: 'copy-outline',
+        label: 'Copy',
+        onPress: () => copyText(message.text),
+      },
+      message.type === 'image' && {
+        key: 'save-image',
+        icon: 'download-outline',
+        label: 'Save to phone gallery',
+        onPress: () => saveImage(message),
+      },
+      isFile &&
+        !savedFileIds.has(message._id) && {
+          key: 'save-file',
+          icon: 'download-outline',
+          label: 'Save to phone',
+          onPress: () => saveFile(message),
+        },
+      mine && {
+        key: 'delete',
+        icon: 'trash-outline',
+        label: 'Delete',
+        destructive: true,
+        onPress: () => confirmDelete(message),
+      },
+    ].filter(Boolean);
   };
 
   // The parent passes fresh closures every render; routing them through a ref
@@ -139,17 +396,41 @@ const ChatTab = ({
           </View>
         );
       }
-      return (
+      const row = (
         <ChatMessage
           message={item}
           currentUserId={currentUserId}
+          saved={savedFileIds.has(item._id)}
+          saving={savingFileIds.has(item._id)}
           onOpenExpense={openExpense}
           onOpenTask={openTask}
           onOpenReminders={openReminders}
+          onOpenImage={setViewing}
+          onOpenFile={openFile}
+          onSaveFile={saveFile}
+          onLongPress={setActionsFor}
+          onOpenQuote={jumpToMessage}
+          highlighted={highlightId === item._id}
         />
       );
+      // Only what people wrote can be answered: not cards, system lines,
+      // deleted messages or uploads still on their way.
+      const canReply = USER_TYPES.includes(item.type) && !item.pending && !item.deletedAt;
+      return canReply ? <SwipeToReply onReply={() => startReply(item)}>{row}</SwipeToReply> : row;
     },
-    [currentUserId, openExpense, openTask, openReminders]
+    [
+      currentUserId,
+      openExpense,
+      openTask,
+      openReminders,
+      openFile,
+      saveFile,
+      startReply,
+      jumpToMessage,
+      highlightId,
+      savedFileIds,
+      savingFileIds,
+    ]
   );
 
   return (
@@ -180,6 +461,7 @@ const ChatTab = ({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             onScroll={onScroll}
+            onScrollToIndexFailed={onScrollToIndexFailed}
             scrollEventThrottle={64}
             onEndReached={onLoadOlder}
             onEndReachedThreshold={0.4}
@@ -254,19 +536,79 @@ const ChatTab = ({
         />
       )}
 
+      {/* Tapping anywhere outside the attach menu closes it. Drawn before the
+          menu and composer so those stay on top and keep their own touches. */}
+      {attachOpen && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setAttachOpen(false)} />
+      )}
+
+      {attachOpen && (
+        <View style={styles.attachMenu}>
+          {ATTACH_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              style={styles.attachItem}
+              activeOpacity={0.8}
+              onPress={() => attach(option)}
+            >
+              <View style={[styles.attachIcon, { backgroundColor: `${option.tint}26` }]}>
+                <Ionicons name={option.icon} size={20} color={option.tint} />
+              </View>
+              <Text style={styles.attachLabel}>{option.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* The message being answered; whatever is sent next (text, file or
+          voice note) goes out as a reply to it. */}
+      {replyingTo && (
+        <View style={styles.replyBar}>
+          <Ionicons name="arrow-undo" size={15} color={dark.accentGreen} />
+          <View style={styles.replyBody}>
+            <Text style={styles.replyName} numberOfLines={1}>
+              Replying to{' '}
+              {replyingTo.sender?._id === currentUserId ? 'yourself' : replyingTo.sender?.name}
+            </Text>
+            <Text style={styles.replyText} numberOfLines={1}>
+              {messageSnippet(replyingTo)}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={styles.hitSlop}>
+            <Ionicons name="close" size={17} color={dark.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Clear the gesture bar when resting at the bottom; sit tight on the keyboard otherwise. */}
+      {recording ? (
+        <VoiceRecorderBar
+          style={{ paddingBottom: composerBottomPadding(insets) }}
+          onSend={sendVoiceNote}
+          onCancel={() => setRecording(false)}
+        />
+      ) : (
       <View
         style={[
           styles.composer,
           { paddingBottom: keyboardVisible ? spacing.sm + 2 : composerBottomPadding(insets) },
         ]}
       >
-        <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-          <Ionicons name="attach" size={20} color={dark.textMuted} />
+        <TouchableOpacity
+          style={[styles.iconButton, attachOpen && styles.iconButtonActive]}
+          activeOpacity={0.7}
+          onPress={() => setAttachOpen((open) => !open)}
+        >
+          <Ionicons
+            name={attachOpen ? 'close' : 'attach'}
+            size={20}
+            color={attachOpen ? dark.accentGreen : dark.textMuted}
+          />
         </TouchableOpacity>
 
         <View style={styles.inputWrap}>
           <TextInput
+            ref={inputRef}
             style={styles.input}
             value={draft}
             onChangeText={(value) => {
@@ -290,12 +632,33 @@ const ChatTab = ({
             <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={onOpenCamera}>
               <Ionicons name="camera-outline" size={19} color={dark.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={startRecording}>
               <Ionicons name="mic-outline" size={19} color={dark.textMuted} />
             </TouchableOpacity>
           </>
         )}
       </View>
+      )}
+
+      <ImageViewer
+        image={
+          viewing && {
+            uri: absoluteUrl(viewing.attachment?.url),
+            title: viewing.sender?._id === currentUserId ? 'You' : viewing.sender?.name,
+            caption: viewing.text,
+          }
+        }
+        onClose={() => setViewing(null)}
+        onSave={() => saveImage(viewing)}
+        saving={savingImage}
+      />
+
+      <MessageActionsSheet
+        visible={Boolean(actionsFor)}
+        preview={messageSnippet(actionsFor)}
+        actions={actionsOf(actionsFor)}
+        onClose={() => setActionsFor(null)}
+      />
     </Root>
   );
 };
@@ -427,6 +790,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: dark.card2,
+    borderLeftWidth: 3,
+    borderLeftColor: dark.accentGreen,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: spacing.sm,
+  },
+  replyBody: { flex: 1 },
+  replyName: { color: dark.accentGreen, fontSize: 11, fontWeight: '800' },
+  replyText: { color: dark.textMuted, fontSize: 12, marginTop: 1 },
+  iconButtonActive: { borderColor: dark.accentGreen },
+  attachMenu: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    alignSelf: 'flex-start',
+    marginLeft: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: dark.card2,
+    borderWidth: 1,
+    borderColor: dark.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  attachItem: { alignItems: 'center', gap: 6 },
+  attachIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachLabel: { color: dark.text, fontSize: 11, fontWeight: '600' },
   inputWrap: {
     flex: 1,
     flexDirection: 'row',

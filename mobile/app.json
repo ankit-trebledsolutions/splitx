@@ -68,7 +68,14 @@
         {
           "contactsPermission": "Splix shows your contacts so you can invite friends to your groups. They never leave your phone."
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Splix uses the microphone to record voice notes and for group calls."
+        }
+      ],
+      "expo-asset"
     ]
   }
 }

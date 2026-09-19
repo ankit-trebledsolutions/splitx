@@ -26,11 +26,11 @@ import { useSocket } from '../context/SocketProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import { fetchGroup, fetchExpenses } from '../api/groups.api';
-import { fetchMessages, sendMessage } from '../api/chat.api';
+import { fetchMessages, sendMessage, sendAttachment, deleteMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
 import { fetchReminders, createReminder, updateReminder } from '../api/reminders.api';
 import { fetchItinerary, createItineraryDay } from '../api/itinerary.api';
-import { fetchPhotos, deletePhoto } from '../api/gallery.api';
+import { fetchPhotos, deletePhotos } from '../api/gallery.api';
 import {
   fetchAttractions,
   createAttraction,
@@ -92,6 +92,13 @@ const GroupChatScreen = ({ route, navigation }) => {
   // waiting for the other tabs' data.
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // My attachments still uploading. Kept apart from `messages` so their
+  // phone-clock timestamps never feed paging or the reconnect catch-up.
+  const [pendingUploads, setPendingUploads] = useState([]);
+  const feed = useMemo(
+    () => (pendingUploads.length ? [...messages, ...pendingUploads] : messages),
+    [messages, pendingUploads]
+  );
   const hasOlder = useRef(true);
   const fetchingOlder = useRef(false);
   const insets = useSafeAreaInsets();
@@ -184,6 +191,31 @@ const GroupChatScreen = ({ route, navigation }) => {
     }
   }, [groupId, messages]);
 
+  // After "delete for everyone", mine or someone else's: swap in the emptied
+  // placeholder, and mark any reply that quotes the message the same way.
+  const applyDeleted = useCallback((deleted) => {
+    if (!deleted?._id) return;
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m._id === deleted._id) return deleted;
+        if (m.replyTo?._id === deleted._id) {
+          return { ...m, replyTo: { ...m.replyTo, text: '', deletedAt: deleted.deletedAt } };
+        }
+        return m;
+      })
+    );
+  }, []);
+
+  // Photos sent in the chat are listed in the gallery too, so that tab is
+  // refreshed whenever one goes out or comes in.
+  const refreshPhotos = useCallback(async () => {
+    try {
+      setPhotos(await fetchPhotos(groupId));
+    } catch {
+      // The next focus reloads it.
+    }
+  }, [groupId]);
+
   useFocusEffect(
     useCallback(() => {
       loadAll();
@@ -209,6 +241,12 @@ const GroupChatScreen = ({ route, navigation }) => {
       const g = message.group?._id ?? message.group;
       if (String(g) !== String(groupId)) return;
       appendUnique(message);
+      if (message.type === 'image') refreshPhotos();
+    };
+
+    const onMessageDeleted = ({ message } = {}) => {
+      const g = message?.group?._id ?? message?.group;
+      if (String(g) === String(groupId)) applyDeleted(message);
     };
 
     const hideTyping = (userId) => {
@@ -250,21 +288,23 @@ const GroupChatScreen = ({ route, navigation }) => {
     };
 
     socket.on('message:new', onMessage);
+    socket.on('message:deleted', onMessageDeleted);
     socket.on('typing', onTyping);
     socket.on('group:member-left', onMemberLeft);
     return () => {
       socket.off('message:new', onMessage);
+      socket.off('message:deleted', onMessageDeleted);
       socket.off('typing', onTyping);
       socket.off('group:member-left', onMemberLeft);
     };
-  }, [socket, connected, groupId, currentUserId, navigation]);
+  }, [socket, connected, groupId, currentUserId, navigation, applyDeleted, refreshPhotos]);
 
   // Drop any pending typing timers when leaving the screen.
   useEffect(() => () => Object.values(typingTimers.current).forEach(clearTimeout), []);
 
   // Offer a task whenever the newest chat message reads like a to-do.
   useEffect(() => {
-    const last = [...messages].reverse().find((m) => m.type === 'text');
+    const last = [...messages].reverse().find((m) => m.type === 'text' && !m.deletedAt);
     if (!last || handledSuggestions.current.has(last._id)) {
       setSuggestion(null);
       return;
@@ -294,13 +334,51 @@ const GroupChatScreen = ({ route, navigation }) => {
     setSuggestion(null);
   };
 
-  const handleSend = async (text) => {
+  const handleDeleteMessage = async (message) => {
     try {
-      const message = await sendMessage(groupId, text);
+      applyDeleted(await deleteMessage(groupId, message._id));
+    } catch (err) {
+      AppAlert.alert('Could not delete', err.message);
+    }
+  };
+
+  const handleSend = async (text, replyTo) => {
+    try {
+      const message = await sendMessage(groupId, text, replyTo?._id);
       // The server also pushes this back over the socket; keep whichever lands first.
       setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [...prev, message]));
     } catch (err) {
       AppAlert.alert('Could not send', err.message);
+    }
+  };
+
+  // A photo, document or voice note. It shows in the feed straight away from
+  // the file on the phone, marked pending, and is swapped for the server's
+  // message once the upload lands (or dropped again if it fails).
+  const handleSendAttachment = async (file, { durationMs, replyTo } = {}) => {
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const type = file.type?.startsWith('image/') ? 'image' : file.type?.startsWith('audio/') ? 'audio' : 'file';
+    setPendingUploads((prev) => [
+      ...prev,
+      {
+        _id: localId,
+        pending: true,
+        type,
+        text: '',
+        sender: { _id: currentUserId, name: user?.name },
+        createdAt: new Date().toISOString(),
+        attachment: { localUri: file.uri, name: file.name, size: file.size, durationMs },
+        replyTo: replyTo ?? null,
+      },
+    ]);
+    try {
+      const message = await sendAttachment(groupId, file, { durationMs, replyTo: replyTo?._id });
+      setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [...prev, message]));
+      if (type === 'image') refreshPhotos();
+    } catch (err) {
+      AppAlert.alert('Could not send', `${file.name}: ${err.message}`);
+    } finally {
+      setPendingUploads((prev) => prev.filter((m) => m._id !== localId));
     }
   };
 
@@ -446,22 +524,24 @@ const GroupChatScreen = ({ route, navigation }) => {
     if (task?._id) navigation.navigate('TaskDetail', { taskId: task._id });
   };
 
-  const handleDeletePhoto = (photo) => {
-    AppAlert.alert('Delete photo', 'Remove this photo from the gallery?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deletePhoto(photo._id);
-            setPhotos((prev) => prev.filter((p) => p._id !== photo._id));
-          } catch (err) {
-            AppAlert.alert('Could not delete photo', err.message);
-          }
-        },
-      },
-    ]);
+  // The gallery has already asked "are you sure?". Resolves to true once the
+  // photos are gone, so it knows to leave selection mode.
+  const handleDeletePhotos = async (toDelete) => {
+    try {
+      const deletedIds = new Set(await deletePhotos(toDelete.map((p) => p._id)));
+      setPhotos((prev) => prev.filter((p) => !deletedIds.has(p._id)));
+      const kept = toDelete.length - deletedIds.size;
+      if (kept) {
+        AppAlert.alert(
+          'Some photos were kept',
+          `${kept} photo${kept === 1 ? '' : 's'} could not be deleted. Only the person who uploaded a photo can delete it.`
+        );
+      }
+      return true;
+    } catch (err) {
+      AppAlert.alert('Could not delete', err.message);
+      return false;
+    }
   };
 
   const handleAddAttraction = async (payload) => {
@@ -657,7 +737,7 @@ const GroupChatScreen = ({ route, navigation }) => {
 
       {tab === 'chat' && (
         <ChatTab
-          messages={messages}
+          messages={feed}
           loading={messagesLoading}
           loadingOlder={loadingOlder}
           onLoadOlder={loadOlderMessages}
@@ -669,6 +749,8 @@ const GroupChatScreen = ({ route, navigation }) => {
           onAddSuggestionToTasks={() => openTaskSheet(suggestion)}
           onRemindSuggestion={handleRemindFromSuggestion}
           onSend={handleSend}
+          onSendAttachment={handleSendAttachment}
+          onDeleteMessage={handleDeleteMessage}
           onTyping={handleTyping}
           typingUsers={Object.values(typingUsers)}
           onOpenExpense={openExpense}
@@ -709,7 +791,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           loading={loading}
           currentUserId={currentUserId}
           onAddPhoto={openUploadPhotos}
-          onDeletePhoto={handleDeletePhoto}
+          onDeletePhotos={handleDeletePhotos}
         />
       )}
 

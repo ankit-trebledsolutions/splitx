@@ -288,7 +288,7 @@ const HomeScreen = ({ navigation }) => {
               key={trip._id}
               style={styles.tripCard}
               activeOpacity={0.85}
-              onPress={() => navigation.navigate('GroupDetail', { groupId: trip._id })}
+              onPress={() => navigation.navigate('GroupChat', { groupId: trip._id, name: trip.name })}
             >
               <Text style={styles.flag}>{tripFlag(trip.location)}</Text>
               <Text style={styles.tripName} numberOfLines={1}>
