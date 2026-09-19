@@ -359,13 +359,45 @@ Delete an expense.
 
 ### `GET /groups/:groupId/messages`
 
-Response: `{ "data": { "messages": [ ... ] } }`. Messages include system/activity entries (`type`) as well as plain `text` messages, with `sender` populated.
+Response: `{ "data": { "messages": [ ... ] } }`. Messages include system/activity entries (`type`) as well as plain `text` messages and `image` / `audio` / `file` messages with an `attachment` (see the upload endpoint below), with `sender` populated.
 
 ### `POST /groups/:groupId/messages`
 
 | Body field | Type | Rules |
 | --- | --- | --- |
 | `text` | string | required, 1–2000 chars |
+| `replyTo` | ObjectId | optional; the message being answered. Must be a `text` / `image` / `audio` / `file` message in the same group (`400` otherwise) |
+
+A reply comes back with `replyTo` populated just enough to draw the quote: `{ _id, type, text, sender, attachment: { name, durationMs }, deletedAt }`.
+
+### `DELETE /groups/:groupId/messages/:messageId`
+
+"Delete for everyone". Sender only (`403` otherwise), and only for `text` / `image` / `audio` / `file` messages (`400` for system lines and activity cards).
+
+The message is not removed: it stays in the feed as a placeholder with `deletedAt` set, `text` emptied and `attachment` null, so replies that quote it still resolve. Its file is deleted from storage, unless it is a photo the group gallery still lists. The updated message is returned and pushed to the group over the socket as **`message:deleted`** (`{ message }`).
+
+### `POST /groups/:groupId/messages/upload`
+
+Sends a photo, voice note or document into the chat. `multipart/form-data` with a single file field named **`file`**, any mimetype, max **10 MB** (`413` above that); the caller must be a group member.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `file` | file | required |
+| `text` | string | optional caption, ≤2000 chars |
+| `durationMs` | number | optional; length of a voice note, so the app can show it without downloading the audio |
+| `replyTo` | ObjectId | optional; as on the text endpoint |
+
+An `image` message is also added to the group gallery (a photo row pointing at the same stored file, with no "added a photo" line or notification). The file is only deleted from storage once both the message and the gallery photo are gone.
+
+The message `type` is taken from the file's mimetype: `image/*` → `image`, `audio/*` → `audio`, anything else → `file`. The file goes to the same storage provider as gallery photos (under `splix/groups/<groupId>/chat/`). The created message is returned and pushed to the group over the socket (`message:new`) like any other, and carries:
+
+| `attachment` field | Meaning |
+| --- | --- |
+| `url` | the file itself |
+| `thumbUrl` | small square preview for `image` messages; equals `url` otherwise |
+| `name`, `mimeType`, `size` | as uploaded (`size` in bytes) |
+| `durationMs` | voice notes only, `0` otherwise |
+| `storageProvider` | `cloudinary` or `local` |
 
 ---
 
@@ -525,6 +557,18 @@ Absolute URLs (`https://…`) are used as-is; relative ones (`/uploads/…`) are
 ### `DELETE /photos/:photoId`
 
 Uploader only. Also deletes the image from the storage provider.
+
+### `POST /photos/bulk-delete`
+
+Multi-select delete from the gallery.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `photoIds` | ObjectId[] | required, 1–100 ids |
+
+Same rule as the single delete, applied per photo: only the caller's own uploads are removed (and their images deleted from storage). Ids that belong to someone else, or don't exist, are skipped rather than failing the batch.
+
+Response: `{ "data": { "deletedIds": [ ... ] } }` — the photos that were actually deleted.
 
 ---
 
