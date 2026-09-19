@@ -46,4 +46,9 @@ const deletePhoto = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Photo deleted' });
 });
 
-module.exports = { listPhotos, addPhoto, uploadPhoto, deletePhoto };
+const deletePhotos = asyncHandler(async (req, res) => {
+  const deletedIds = await photoService.deletePhotos(req.body.photoIds, req.user._id);
+  res.json({ success: true, data: { deletedIds } });
+});
+
+module.exports = { listPhotos, addPhoto, uploadPhoto, deletePhoto, deletePhotos };

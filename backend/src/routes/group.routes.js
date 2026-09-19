@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
-const { photoUpload } = require('../middleware/upload');
+const { photoUpload, chatUpload } = require('../middleware/upload');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
 const messageController = require('../controllers/message.controller');
@@ -80,8 +80,13 @@ const createExpenseSchema = {
 
 const sendMessageSchema = {
   params: z.object({ groupId: objectId }),
-  body: z.object({ text: z.string().min(1, 'Message cannot be empty').max(2000) }),
+  body: z.object({
+    text: z.string().min(1, 'Message cannot be empty').max(2000),
+    replyTo: objectId.optional(),
+  }),
 };
+
+const messageParams = { params: z.object({ groupId: objectId, messageId: objectId }) };
 
 const createTaskSchema = {
   params: z.object({ groupId: objectId }),
@@ -200,6 +205,13 @@ router.get('/:groupId/expenses', validate(groupParams), expenseController.listEx
 
 router.get('/:groupId/messages', validate(groupParams), messageController.listMessages);
 router.post('/:groupId/messages', validate(sendMessageSchema), messageController.sendMessage);
+router.post(
+  '/:groupId/messages/upload',
+  validate(groupParams),
+  chatUpload.single('file'),
+  messageController.sendAttachment
+);
+router.delete('/:groupId/messages/:messageId', validate(messageParams), messageController.deleteMessage);
 
 router.get('/:groupId/tasks', validate(groupParams), taskController.listTasks);
 router.post('/:groupId/tasks', validate(createTaskSchema), taskController.createTask);

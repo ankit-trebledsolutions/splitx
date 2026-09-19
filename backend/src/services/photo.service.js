@@ -3,7 +3,7 @@ const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
 const notificationService = require('./notification.service');
-const storage = require('../storage');
+const storedFileService = require('./storedFile.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [
@@ -63,6 +63,14 @@ const getPhotoForMember = async (photoId, userId) => {
   return photo;
 };
 
+// A photo that came from the chat shares its file with that message, so the
+// file only goes once the message is gone too (see storedFile.service).
+const fileOf = (url, stored) => ({
+  url,
+  key: stored?.storageKey,
+  provider: stored?.storageProvider,
+});
+
 const deletePhoto = async (photoId, userId) => {
   const photo = await getPhotoForMember(photoId, userId);
   if (!photo.uploadedBy._id.equals(userId)) {
@@ -71,7 +79,36 @@ const deletePhoto = async (photoId, userId) => {
   // storageKey is hidden from normal reads, so fetch it just for the clean-up.
   const stored = await Photo.findById(photoId).select('+storageKey storageProvider');
   await photo.deleteOne();
-  await storage.remove(stored?.storageKey, stored?.storageProvider);
+  await storedFileService.removeIfUnused(fileOf(photo.imageUrl, stored));
 };
 
-module.exports = { listPhotos, addPhoto, getPhotoForMember, deletePhoto };
+/**
+ * Multi-select delete. Same rule as deletePhoto, applied per photo: only the
+ * caller's own uploads go, in groups they still belong to. Anything else in
+ * the list is left alone rather than failing the whole batch; the returned ids
+ * tell the app what was actually removed.
+ */
+const deletePhotos = async (photoIds, userId) => {
+  const photos = await Photo.find({ _id: { $in: photoIds }, uploadedBy: userId }).select(
+    '+storageKey storageProvider group imageUrl'
+  );
+
+  const groupIds = [...new Set(photos.map((p) => p.group.toString()))];
+  const memberOf = new Set();
+  for (const groupId of groupIds) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await groupService.getGroupForMember(groupId, userId);
+      memberOf.add(groupId);
+    } catch {
+      // Not a member any more: those photos stay.
+    }
+  }
+
+  const deletable = photos.filter((p) => memberOf.has(p.group.toString()));
+  await Photo.deleteMany({ _id: { $in: deletable.map((p) => p._id) } });
+  await Promise.all(deletable.map((p) => storedFileService.removeIfUnused(fileOf(p.imageUrl, p))));
+  return deletable.map((p) => p._id);
+};
+
+module.exports = { listPhotos, addPhoto, getPhotoForMember, deletePhoto, deletePhotos };
