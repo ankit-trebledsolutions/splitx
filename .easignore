@@ -1,0 +1,33 @@
+# What EAS Build must NOT upload. EAS archives the whole repo from this folder,
+# and once this file exists it is used INSTEAD of every .gitignore, so anything
+# that has to stay off EAS is listed here, even if a .gitignore already has it.
+#
+# Why it exists: mobile/.gitignore was not being applied to the upload, so the
+# local mobile/android folder went up with every build. EAS then built from that
+# stale folder and handed back a .tar.gz holding two APKs: the real release one
+# and the *debug* one from this PC, which opens on the Expo dev launcher ("scan
+# a QR code") instead of the app.
+
+# Generated native projects: EAS runs `expo prebuild` itself from app.json.
+/mobile/android
+/mobile/ios
+
+# Secrets. The Firebase *admin* key is a server credential; the app build only
+# needs google-services.json, which stays.
+splix-*-firebase-adminsdk-*.json
+.env
+.env.*
+!.env.example
+
+# Not needed to build the app.
+/backend
+/API.md
+/README.md
+.claude/
+/mobile/%ProgramData%
+
+# Dependencies, caches, build output.
+node_modules/
+.expo/
+dist/
+*.log
