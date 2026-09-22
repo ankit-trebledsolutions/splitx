@@ -38,14 +38,21 @@ const notifyGroup = async ({ groupId, actorId, type, title, body, amount = null,
 };
 
 /**
- * Notify one person directly, for things that are about them rather than a
- * group they can see (e.g. being removed from it). No group is attached, so
- * tapping the push opens the notification list instead of a group they've lost.
+ * Notify one person directly, for things that are about them rather than the
+ * whole group (being removed from it, their AI itinerary finishing).
+ *
+ * groupId: pass it only when the person can still open that group, so tapping
+ * the push lands there. Left out (as for a removal), no group is attached and
+ * the tap opens the notification list instead of a group they've lost.
  */
-const notifyUser = async ({ userId, type, title, body }) => {
+const notifyUser = async ({ userId, type, title, body, groupId = null }) => {
   try {
-    await Notification.create({ user: userId, type, title, body });
-    pushService.sendToUsers([userId], { title, body, data: { type } });
+    await Notification.create({ user: userId, group: groupId, type, title, body });
+    pushService.sendToUsers([userId], {
+      title,
+      body,
+      data: { type, ...(groupId ? { groupId: groupId.toString() } : {}) },
+    });
   } catch (err) {
     console.error('notifyUser failed:', err.message);
   }

@@ -3,6 +3,8 @@ const { z } = require('zod');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
 const { photoUpload, chatUpload } = require('../middleware/upload');
+const aiLimiter = require('../middleware/aiLimiter');
+const { TIME_12H } = require('../utils/itineraryTime');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
 const messageController = require('../controllers/message.controller');
@@ -149,6 +151,48 @@ const createItineraryDaySchema = {
   }),
 };
 
+// The AI planner's form. Every choice is an enum and the one free-text field is
+// short, which keeps what reaches the prompt small and predictable.
+// destination, startDate and days are only used where the group has no value
+// of its own (see resolveTrip in aiItinerary.service).
+const generateItinerarySchema = {
+  params: z.object({ groupId: objectId }),
+  body: z.object({
+    destination: z.string().trim().min(2).max(120).optional(),
+    startDate: z.coerce.date().nullish(),
+    days: z.number().int().min(1).max(14).optional(),
+    // Large groups are welcome; the server plans for at most 50 people.
+    groupSize: z.number().int().min(1).max(1000).optional(),
+    travellers: z.enum(['friends', 'couple', 'family_kids', 'with_elders', 'solo']),
+    interests: z
+      .array(
+        z.enum([
+          'sightseeing',
+          'food',
+          'nature',
+          'adventure',
+          'shopping',
+          'nightlife',
+          'spiritual',
+          'history',
+          'relaxing',
+        ])
+      )
+      .min(1)
+      .max(9),
+    pace: z.enum(['relaxed', 'balanced', 'packed']),
+    budget: z.enum(['budget', 'mid', 'premium']),
+    transport: z.enum(['own_car', 'cab', 'public_transport', 'walking']),
+    arrivalTime: z.string().regex(TIME_12H, 'Arrival time must look like 9:30 AM').nullish(),
+    departureTime: z.string().regex(TIME_12H, 'Departure time must look like 9:30 AM').nullish(),
+    food: z.enum(['vegetarian', 'non_veg', 'vegan', 'jain']).nullish(),
+    notes: z.string().trim().max(300).optional().default(''),
+    dayStart: z.enum(['early', 'normal', 'late']).optional().default('normal'),
+    accessibility: z.enum(['none', 'limited_walking', 'wheelchair']).optional().default('none'),
+    replace: z.boolean().optional().default(false),
+  }),
+};
+
 const addPhotoSchema = {
   params: z.object({ groupId: objectId }),
   body: z.object({
@@ -194,6 +238,7 @@ router.post('/', validate(createGroupSchema), groupController.createGroup);
 router.get('/', groupController.listGroups);
 router.post('/join', validate(joinGroupSchema), groupController.joinGroup);
 router.get('/:groupId', validate(groupParams), groupController.getGroup);
+router.delete('/:groupId', validate(groupParams), groupController.deleteGroup);
 router.post('/:groupId/leave', validate(leaveGroupSchema), groupController.leaveGroup);
 router.delete('/:groupId/members/:memberId', validate(removeMemberSchema), groupController.removeMember);
 router.put('/:groupId/mute', validate(muteGroupSchema), groupController.setMuted);
@@ -221,6 +266,13 @@ router.post('/:groupId/reminders', validate(createReminderSchema), reminderContr
 
 router.get('/:groupId/itinerary', validate(groupParams), itineraryController.listDays);
 router.post('/:groupId/itinerary', validate(createItineraryDaySchema), itineraryController.createDay);
+router.get('/:groupId/itinerary/generate', validate(groupParams), itineraryController.getGeneration);
+router.post(
+  '/:groupId/itinerary/generate',
+  aiLimiter,
+  validate(generateItinerarySchema),
+  itineraryController.startGeneration
+);
 
 router.get('/:groupId/photos', validate(groupParams), photoController.listPhotos);
 router.post('/:groupId/photos', validate(addPhotoSchema), photoController.addPhoto);

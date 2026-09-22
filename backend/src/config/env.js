@@ -43,9 +43,37 @@ if (!email.resendApiKey && isProduction) {
   console.warn('[email] RESEND_API_KEY is not set: verification and reset codes will NOT reach users');
 }
 
+// AI itinerary planning (OpenAI). Deliberately optional, like Google sign-in:
+// without a key the API still boots and the planner answers "not configured".
+const OPENAI_OFFICIAL = 'https://api.openai.com/v1';
+// A value that is not a number falls back to the default. NaN compares false
+// with every count, so a typo in a cap would otherwise switch that cap off.
+const intEnv = (key, fallback) => {
+  const value = parseInt(process.env[key], 10);
+  return Number.isNaN(value) ? fallback : value;
+};
+const openai = {
+  apiKey: process.env.OPENAI_API_KEY || '',
+  model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
+  // Tried once when OpenAI says the main model does not exist for this key.
+  fallbackModel: process.env.OPENAI_FALLBACK_MODEL || 'gpt-5.4-mini',
+  // Per attempt. A whole job gets this plus a minute before it is given up on.
+  timeoutMs: intEnv('OPENAI_TIMEOUT_MS', 90000),
+  // Tests only. Ignored in production so the key can never be sent elsewhere.
+  baseUrl: isProduction ? OPENAI_OFFICIAL : process.env.OPENAI_BASE_URL || OPENAI_OFFICIAL,
+  // Spend control: paid runs allowed per rolling 24 hours.
+  userDailyCap: intEnv('AI_ITINERARY_USER_DAILY_CAP', 5),
+  groupDailyCap: intEnv('AI_ITINERARY_GROUP_DAILY_CAP', 3),
+  globalDailyCap: intEnv('AI_ITINERARY_GLOBAL_DAILY_CAP', 200),
+};
+if (!openai.apiKey && isProduction) {
+  console.warn('[ai] OPENAI_API_KEY is not set: AI itinerary planning answers "not configured"');
+}
+
 module.exports = {
   cloudinary,
   email,
+  openai,
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),

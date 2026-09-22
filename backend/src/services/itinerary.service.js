@@ -1,8 +1,12 @@
 const ItineraryDay = require('../models/ItineraryDay');
 const ApiError = require('../utils/ApiError');
+const { sortByTime } = require('../utils/itineraryTime');
+// Called as realtime.emitToGroup(...), never destructured, so tests can swap the function.
+const realtime = require('../realtime/socket');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
 const notificationService = require('./notification.service');
+const aiItineraryService = require('./aiItinerary.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [{ path: 'createdBy', select: USER_FIELDS }];
@@ -10,21 +14,13 @@ const POPULATE = [{ path: 'createdBy', select: USER_FIELDS }];
 const memberName = (group, userId) =>
   group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
 
-// "10:30 AM" -> minutes since midnight; unparseable times sort last.
-const timeToMinutes = (value = '') => {
-  const match = /^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(String(value).trim());
-  if (!match) return Number.MAX_SAFE_INTEGER;
-  let hours = parseInt(match[1], 10);
-  const minutes = match[2] ? parseInt(match[2], 10) : 0;
-  const meridiem = match[3]?.toUpperCase();
-  if (meridiem === 'PM' && hours !== 12) hours += 12;
-  if (meridiem === 'AM' && hours === 12) hours = 0;
-  return hours * 60 + minutes;
-};
+// Null-safe: a day whose creator's account is gone has no createdBy to compare.
+const sameId = (a, b) => a != null && b != null && String(a) === String(b);
 
-// Keep every day's schedule in chronological order regardless of insertion order.
-const sortByTime = (activities = []) =>
-  [...activities].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+// Tells every member's open Itinerary tab to refetch. No days in the payload:
+// the normal GET is always consistent, whoever made the change.
+const announceChange = (groupId) =>
+  realtime.emitToGroup(String(groupId), 'itinerary:updated', { groupId: String(groupId) });
 
 const listDays = async (groupId, userId) => {
   await groupService.getGroupForMember(groupId, userId);
@@ -33,6 +29,7 @@ const listDays = async (groupId, userId) => {
 
 const createDay = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
+  await aiItineraryService.assertNotGenerating(groupId);
 
   let dayNumber = payload.dayNumber;
   if (!dayNumber) {
@@ -53,6 +50,7 @@ const createDay = async (userId, groupId, payload) => {
   });
 
   await day.populate(POPULATE);
+  announceChange(groupId);
   await messageService.postSystem(
     groupId,
     `${memberName(group, userId)} added Day ${dayNumber} · ${day.title} to the itinerary`
@@ -69,45 +67,118 @@ const createDay = async (userId, groupId, payload) => {
   return day;
 };
 
-const getDayForMember = async (dayId, userId) => {
+// The day plus the group it belongs to, for callers that need the group's admin.
+const loadDayForMember = async (dayId, userId) => {
   const day = await ItineraryDay.findById(dayId).populate(POPULATE);
   if (!day) throw ApiError.notFound('Itinerary day not found');
-  await groupService.getGroupForMember(day.group, userId);
-  return day;
+  const group = await groupService.getGroupForMember(day.group, userId);
+  return { day, group };
+};
+
+const getDayForMember = async (dayId, userId) => (await loadDayForMember(dayId, userId)).day;
+
+// Every write starts here: the day, for a member, while no AI run owns the itinerary.
+const getDayForEdit = async (dayId, userId) => {
+  const loaded = await loadDayForMember(dayId, userId);
+  await aiItineraryService.assertNotGenerating(loaded.day.group);
+  return loaded;
 };
 
 const updateDay = async (dayId, userId, payload) => {
-  const day = await getDayForMember(dayId, userId);
+  const { day } = await getDayForEdit(dayId, userId);
   for (const field of ['title', 'date']) {
     if (payload[field] !== undefined) day[field] = payload[field];
   }
-  if (payload.activities !== undefined) day.activities = sortByTime(payload.activities);
+  if (payload.activities !== undefined) {
+    // An activity keeps its _id across a save only when that id really is one
+    // of this day's (and is sent once). Anything else gets a fresh id, so a
+    // client can never plant an id of its choosing.
+    const kept = new Set();
+    day.activities = sortByTime(
+      payload.activities.map(({ _id, ...activity }) => {
+        const id = _id?.toLowerCase();
+        if (!id || kept.has(id) || !day.activities.id(id)) return activity;
+        kept.add(id);
+        return { _id: id, ...activity };
+      })
+    );
+  }
   await day.save();
+  announceChange(day.group);
   return day.populate(POPULATE);
 };
 
 const addActivity = async (dayId, userId, activity) => {
-  const day = await getDayForMember(dayId, userId);
+  const { day } = await getDayForEdit(dayId, userId);
   day.activities = sortByTime([...day.activities, activity]);
   await day.save();
+  announceChange(day.group);
   return day.populate(POPULATE);
 };
 
+/**
+ * Edits one activity in place; an empty string clears a field. With a
+ * `targetDayId` other than its own day, the activity moves there and keeps its
+ * _id. Resolves to { day, targetDay }: the day it was in and, after a move, the
+ * day it is in now (null otherwise).
+ */
+const updateActivity = async (dayId, activityId, userId, { targetDayId, ...fields }) => {
+  const { day } = await getDayForEdit(dayId, userId);
+  const activity = day.activities.id(activityId);
+  if (!activity) throw ApiError.notFound('Activity not found');
+
+  if (!targetDayId || sameId(targetDayId, day._id)) {
+    activity.set(fields);
+    day.activities = sortByTime(day.activities);
+    await day.save();
+    announceChange(day.group);
+    return { day: await day.populate(POPULATE), targetDay: null };
+  }
+
+  const targetDay = await ItineraryDay.findOne({ _id: targetDayId, group: day.group }).populate(POPULATE);
+  if (!targetDay) {
+    throw new ApiError(400, 'That day is not part of this itinerary.', { code: 'INVALID_TARGET_DAY' });
+  }
+  // Target first, source second: a crash in between leaves the activity on
+  // both days, which a member can fix, rather than on neither.
+  targetDay.activities = sortByTime([...targetDay.activities, { ...activity.toObject(), ...fields }]);
+  await targetDay.save();
+  activity.deleteOne();
+  await day.save();
+  announceChange(day.group);
+  return { day: await day.populate(POPULATE), targetDay: await targetDay.populate(POPULATE) };
+};
+
 const removeActivity = async (dayId, activityId, userId) => {
-  const day = await getDayForMember(dayId, userId);
+  const { day } = await getDayForEdit(dayId, userId);
   const activity = day.activities.id(activityId);
   if (!activity) throw ApiError.notFound('Activity not found');
   activity.deleteOne();
   await day.save();
+  announceChange(day.group);
   return day.populate(POPULATE);
 };
 
+// The day's creator or the group admin. AI-planned days all belong to whoever
+// asked for the plan, so creator-only would lock everyone else out of them.
 const deleteDay = async (dayId, userId) => {
-  const day = await getDayForMember(dayId, userId);
-  if (!day.createdBy._id.equals(userId)) {
-    throw ApiError.forbidden('Only the member who added this day can delete it');
+  const { day, group } = await getDayForEdit(dayId, userId);
+  if (!sameId(day.createdBy?._id, userId) && !sameId(group.adminId, userId)) {
+    throw new ApiError(403, 'Only the group admin or the member who added this day can delete it.', {
+      code: 'DAY_DELETE_FORBIDDEN',
+    });
   }
   await day.deleteOne();
+  announceChange(day.group);
 };
 
-module.exports = { listDays, createDay, getDayForMember, updateDay, addActivity, removeActivity, deleteDay };
+module.exports = {
+  listDays,
+  createDay,
+  getDayForMember,
+  updateDay,
+  addActivity,
+  updateActivity,
+  removeActivity,
+  deleteDay,
+};
