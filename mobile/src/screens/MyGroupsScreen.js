@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import DarkScreen from '../components/DarkScreen';
 import SearchField from '../components/SearchField';
 import AiItineraryModal from '../components/AiItineraryModal';
 import { fetchGroups } from '../api/groups.api';
+import { fetchItineraryGeneration } from '../api/itinerary.api';
 import { initials } from '../utils/format';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
@@ -23,6 +24,14 @@ const MyGroupsScreen = ({ navigation, route }) => {
   const [query, setQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [itineraryFor, setItineraryFor] = useState(null);
+
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -38,13 +47,27 @@ const MyGroupsScreen = ({ navigation, route }) => {
     }, [load])
   );
 
-  // Offer the AI itinerary once, right after a trip group is created.
+  // Offer the AI itinerary once, right after a trip group is created. The
+  // server is asked first, so nobody is offered a planner that then says it
+  // isn't set up; anything but a clear yes skips the offer without a word.
   const { newGroupId, offerItinerary } = route.params ?? {};
+  const offerCheckedFor = useRef(null);
   useEffect(() => {
-    if (!offerItinerary || !newGroupId) return;
+    if (!offerItinerary || !newGroupId || offerCheckedFor.current === newGroupId) return;
     const group = groups.find((g) => g._id === newGroupId);
-    if (group) setItineraryFor(group);
-  }, [offerItinerary, newGroupId, groups]);
+    if (!group) return;
+    // `groups` reloads on every focus and re-runs this effect; ask only once.
+    offerCheckedFor.current = newGroupId;
+    fetchItineraryGeneration(newGroupId)
+      .then(({ configured }) => configured === true)
+      .catch(() => false)
+      .then((available) => {
+        if (!mounted.current) return;
+        // The modal draws over any screen, so it only opens while this one is showing.
+        if (available && navigation.isFocused()) setItineraryFor(group);
+        else navigation.setParams({ offerItinerary: false });
+      });
+  }, [offerItinerary, newGroupId, groups, navigation]);
 
   const dismissItinerary = () => {
     setItineraryFor(null);
@@ -178,10 +201,11 @@ const MyGroupsScreen = ({ navigation, route }) => {
         onAccept={() => {
           const group = itineraryFor;
           dismissItinerary();
-          AppAlert.alert(
-            'Itinerary',
-            `AI itinerary planning for "${group?.name}" is coming soon.`
-          );
+          navigation.navigate('AiItineraryPrefs', {
+            groupId: group._id,
+            groupName: group.name,
+            from: 'groups',
+          });
         }}
         onSkip={dismissItinerary}
       />
