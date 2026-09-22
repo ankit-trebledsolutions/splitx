@@ -24,7 +24,9 @@ const updateDaySchema = {
   body: z.object({
     title: z.string().min(1).max(120).optional(),
     date: z.coerce.date().nullish(),
-    activities: z.array(activitySchema).optional(),
+    // Sending back an activity's _id keeps that id across the save; without it
+    // the activity counts as new. Ids that are not this day's are ignored.
+    activities: z.array(activitySchema.extend({ _id: objectId.optional() })).optional(),
   }),
 };
 
@@ -37,9 +39,27 @@ const activityParams = {
   params: z.object({ dayId: objectId, activityId: objectId }),
 };
 
+// Any subset of an activity's fields. An empty string clears a field (title
+// excepted). targetDayId moves the activity to another day of the same group.
+const updateActivitySchema = {
+  params: z.object({ dayId: objectId, activityId: objectId }),
+  body: z
+    .object({
+      time: z.string().max(20).optional(),
+      endTime: z.string().max(20).optional(),
+      title: z.string().min(1, 'Activity title is required').max(200).optional(),
+      location: z.string().max(200).optional(),
+      icon: z.string().max(40).optional(),
+      note: z.string().max(300).optional(),
+      targetDayId: objectId.optional(),
+    })
+    .refine((body) => Object.keys(body).length > 0, 'Nothing to update'),
+};
+
 router.patch('/:dayId', validate(updateDaySchema), controller.updateDay);
 router.delete('/:dayId', validate(dayParams), controller.deleteDay);
 router.post('/:dayId/activities', validate(addActivitySchema), controller.addActivity);
+router.patch('/:dayId/activities/:activityId', validate(updateActivitySchema), controller.updateActivity);
 router.delete('/:dayId/activities/:activityId', validate(activityParams), controller.removeActivity);
 
 module.exports = router;

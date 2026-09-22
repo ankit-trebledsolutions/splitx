@@ -8,16 +8,31 @@ import { dark } from '../theme';
 const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-const NewItineraryDaySheet = ({ visible, nextDayNumber = 1, onClose, onSubmit }) => {
+// Noon keeps the calendar day stable when the ISO string crosses time zones
+// (the same rule DateField follows). Stepping a noon date by whole days keeps
+// it at noon, so pinning the starting value is enough. A missing or unreadable
+// value falls back to today.
+const atNoon = (value) => {
+  const given = value ? new Date(value) : null;
+  const date = given && !Number.isNaN(given.getTime()) ? given : new Date();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+};
+
+//   defaultDate: the calendar day this day number falls on (Date or ISO
+//     string), worked out by the parent from the trip's dates. Today if absent.
+const NewItineraryDaySheet = ({ visible, nextDayNumber = 1, defaultDate, onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(new Date());
+  const [date, setDate] = useState(() => atNoon(defaultDate));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Reset only when the sheet opens. `defaultDate` is left out of the deps on
+  // purpose: the parent may build a new Date on every render, and resetting on
+  // that would wipe the title while it is being typed.
   useEffect(() => {
     if (!visible) return;
     setTitle('');
-    setDate(new Date());
+    setDate(atNoon(defaultDate));
     setError('');
     setSaving(false);
   }, [visible]);

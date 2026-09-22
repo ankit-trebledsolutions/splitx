@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,22 @@ import {
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from '../components/DarkScreen';
 import GradientButton from '../components/GradientButton';
-import { addItineraryActivity } from '../api/itinerary.api';
+import SelectField from '../components/SelectField';
+import {
+  addItineraryActivity,
+  fetchItinerary,
+  updateItineraryActivity,
+} from '../api/itinerary.api';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+import { isValidTimeText, normalizeTimeText } from '../utils/time';
 
 const dayDateLabel = (value) =>
   value
@@ -25,40 +32,116 @@ const dayDateLabel = (value) =>
       })
     : 'No date set';
 
-// Full-screen "Add Activity" form, per the add-new-activity mockup. Opened
-// from Edit Day Details → "+ Add New Activity".
+// Full-screen activity form, per the add-new-activity mockup. Edit Day Details
+// opens it two ways: "+ Add New Activity" for a new one, and a row's edit
+// button, which passes that `activity` in the route params. With an activity
+// this is the editor: the fields start from the saved values, the DATE box
+// becomes a DAY picker that can move the activity to another day, and it saves
+// through the per-activity PATCH.
 const AddActivityScreen = ({ route, navigation }) => {
-  const { day } = route.params;
+  const { day, activity } = route.params;
+  const editing = Boolean(activity);
 
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
-  const [startTime, setStartTime] = useState('10:30 AM');
-  const [endTime, setEndTime] = useState('12:00 PM');
-  const [notes, setNotes] = useState('');
+  const [name, setName] = useState(activity?.title ?? '');
+  const [location, setLocation] = useState(activity?.location ?? '');
+  // An existing activity keeps exactly the times it has. The "10:30 AM" and
+  // "12:00 PM" starters are for new ones only: on an edit they would quietly
+  // give an open-ended activity an end time.
+  const [startTime, setStartTime] = useState(editing ? activity.time ?? '' : '10:30 AM');
+  const [endTime, setEndTime] = useState(editing ? activity.endTime ?? '' : '12:00 PM');
+  const [notes, setNotes] = useState(activity?.note ?? '');
+  const [days, setDays] = useState([day]);
+  const [dayId, setDayId] = useState(day._id);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // The DAY picker needs every day of the trip, and the route only carries
+  // this one. Until the list arrives (or if it never does) the picker offers
+  // just the current day, and everything else on the form still saves.
+  useEffect(() => {
+    if (!editing) return undefined;
+    let active = true;
+    (async () => {
+      try {
+        const all = await fetchItinerary(day.group?._id ?? day.group);
+        if (active && all.some((d) => d._id === day._id)) setDays(all);
+      } catch {
+        // Moving to another day is simply not offered this time.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [editing, day]);
+
+  const chosenDay = days.find((d) => d._id === dayId) ?? day;
+  const dayOptions = days.map((d) => ({
+    value: d._id,
+    label: `Day ${d.dayNumber} · ${d.title}`,
+  }));
+  const startTimeOk = isValidTimeText(startTime);
+  const endTimeOk = isValidTimeText(endTime);
+
   const submit = async () => {
-    if (name.trim().length < 2) {
+    // A new activity needs a real name. An existing one only must not end up
+    // empty, so a one-letter title saved from Edit Day can still be edited here.
+    if (name.trim().length < (editing ? 1 : 2)) {
       setError('Give the activity a name');
+      return;
+    }
+    if (!startTimeOk || !endTimeOk) {
+      AppAlert.alert('Check the time', 'Use a time like 9:30 AM, or leave it empty.');
       return;
     }
     setSaving(true);
     try {
-      await addItineraryActivity(day._id, {
-        title: name.trim(),
-        location: location.trim() || undefined,
-        time: startTime.trim() || undefined,
-        endTime: endTime.trim() || undefined,
-        note: notes.trim() || undefined,
-      });
+      if (editing) {
+        // Every field goes up, because '' is how one is cleared: that is the
+        // only way to take an end time, a location or a note off an activity.
+        await updateItineraryActivity(day._id, activity._id, {
+          title: name.trim(),
+          location: location.trim(),
+          time: normalizeTimeText(startTime),
+          endTime: normalizeTimeText(endTime),
+          note: notes.trim(),
+          ...(dayId !== day._id ? { targetDayId: dayId } : {}),
+        });
+      } else {
+        await addItineraryActivity(day._id, {
+          title: name.trim(),
+          location: location.trim() || undefined,
+          time: normalizeTimeText(startTime) || undefined,
+          endTime: normalizeTimeText(endTime) || undefined,
+          note: notes.trim() || undefined,
+        });
+      }
       navigation.goBack();
     } catch (err) {
-      AppAlert.alert('Could not add activity', err.message);
+      const failed = editing ? 'Could not save activity' : 'Could not add activity';
+      if (err.status === 404) {
+        // The day or the activity no longer exists (deleted, or swapped out by
+        // an AI replan), so nothing on this form can be saved any more: go
+        // back once the alert is read. Anything else can be retried from here.
+        AppAlert.alert(failed, err.message, [{ text: 'OK', onPress: navigation.goBack }], {
+          cancelable: false,
+        });
+      } else {
+        AppAlert.alert(failed, err.message);
+      }
     } finally {
       setSaving(false);
     }
   };
+
+  // The inside of the DATE box is the same either way. When editing, the box is
+  // also the trigger of the day dropdown, and a small chevron says so.
+  const dayBox = (
+    <>
+      <Ionicons name="calendar-outline" size={15} color={dark.textMuted} />
+      <Text style={styles.dateText}>{dayDateLabel(chosenDay.date)}</Text>
+      <Text style={styles.dayChipText}>DAY {chosenDay.dayNumber}</Text>
+    </>
+  );
 
   return (
     <DarkScreen>
@@ -70,7 +153,7 @@ const AddActivityScreen = ({ route, navigation }) => {
           <TouchableOpacity onPress={navigation.goBack} activeOpacity={0.7} hitSlop={styles.hitSlop}>
             <Ionicons name="arrow-back" size={22} color={dark.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Activity</Text>
+          <Text style={styles.headerTitle}>{editing ? 'Edit Activity' : 'Add Activity'}</Text>
         </View>
 
         <ScrollView
@@ -106,17 +189,35 @@ const AddActivityScreen = ({ route, navigation }) => {
             />
           </View>
 
-          <Text style={styles.label}>DATE</Text>
-          <View style={styles.fieldBox}>
-            <Ionicons name="calendar-outline" size={15} color={dark.textMuted} />
-            <Text style={styles.dateText}>{dayDateLabel(day.date)}</Text>
-            <Text style={styles.dayChipText}>DAY {day.dayNumber}</Text>
-          </View>
+          <Text style={styles.label}>{editing ? 'DAY' : 'DATE'}</Text>
+          {editing ? (
+            <SelectField
+              label="Day"
+              value={dayId}
+              options={dayOptions}
+              onChange={setDayId}
+              renderTrigger={({ open }) => (
+                <TouchableOpacity
+                  style={styles.fieldBox}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    open();
+                  }}
+                >
+                  {dayBox}
+                  <Ionicons name="chevron-down" size={14} color={dark.textMuted} />
+                </TouchableOpacity>
+              )}
+            />
+          ) : (
+            <View style={styles.fieldBox}>{dayBox}</View>
+          )}
 
           <View style={styles.timeRow}>
             <View style={styles.timeColumn}>
               <Text style={styles.label}>START TIME</Text>
-              <View style={styles.fieldBox}>
+              <View style={[styles.fieldBox, startTimeOk ? null : styles.fieldBoxError]}>
                 <Ionicons name="time-outline" size={15} color={dark.accentGreen} />
                 <TextInput
                   style={[styles.fieldInput, styles.startTimeInput]}
@@ -130,7 +231,7 @@ const AddActivityScreen = ({ route, navigation }) => {
 
             <View style={styles.timeColumn}>
               <Text style={styles.label}>END TIME</Text>
-              <View style={styles.fieldBox}>
+              <View style={[styles.fieldBox, endTimeOk ? null : styles.fieldBoxError]}>
                 <Ionicons name="time-outline" size={15} color={dark.textMuted} />
                 <TextInput
                   style={styles.fieldInput}
@@ -158,7 +259,11 @@ const AddActivityScreen = ({ route, navigation }) => {
         </ScrollView>
 
         <View style={styles.footer}>
-          <GradientButton title="Add Activity" onPress={submit} loading={saving} />
+          <GradientButton
+            title={editing ? 'Save changes' : 'Add Activity'}
+            onPress={submit}
+            loading={saving}
+          />
         </View>
       </KeyboardAvoidingView>
     </DarkScreen>

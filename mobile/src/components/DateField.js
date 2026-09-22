@@ -12,7 +12,19 @@ const sameDay = (a, b) => a && b && startOfDay(a).getTime() === startOfDay(b).ge
 
 // Date picker styled to match SelectField: a field that opens a month calendar sheet.
 //   value: Date | null      minDate: earliest selectable day (optional)
-const DateField = ({ label, value, onChange, placeholder = 'Select a date', minDate, error, style }) => {
+//   renderTrigger: optional ({ open, value }) => element, for a screen that
+//     already draws its own date box and only wants the calendar behind it.
+//     Call `open` to show the calendar.
+const DateField = ({
+  label,
+  value,
+  onChange,
+  placeholder = 'Select a date',
+  minDate,
+  error,
+  style,
+  renderTrigger,
+}) => {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => startOfDay(value ?? new Date()));
 
@@ -48,21 +60,30 @@ const DateField = ({ label, value, onChange, placeholder = 'Select a date', minD
     setOpen(false);
   };
 
+  // A caller's own trigger stands in for the label, the field and the error
+  // line, and brings its own spacing: nothing of the default look is drawn
+  // around it. Without one, this renders exactly as it always has.
   return (
-    <View style={[styles.wrapper, style]}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+    <View style={renderTrigger ? style : [styles.wrapper, style]}>
+      {renderTrigger ? (
+        renderTrigger({ open: show, value })
+      ) : (
+        <>
+          {label ? <Text style={styles.label}>{label}</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.field, error && styles.fieldError]}
-        activeOpacity={0.8}
-        onPress={show}
-      >
-        <Text style={[styles.value, !value && styles.placeholder]}>
-          {value ? formatDate(value) : placeholder}
-        </Text>
-        <Ionicons name="calendar-outline" size={18} color={dark.textMuted} />
-      </TouchableOpacity>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+          <TouchableOpacity
+            style={[styles.field, error && styles.fieldError]}
+            activeOpacity={0.8}
+            onPress={show}
+          >
+            <Text style={[styles.value, !value && styles.placeholder]}>
+              {value ? formatDate(value) : placeholder}
+            </Text>
+            <Ionicons name="calendar-outline" size={18} color={dark.textMuted} />
+          </TouchableOpacity>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+        </>
+      )}
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
