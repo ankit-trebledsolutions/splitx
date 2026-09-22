@@ -278,6 +278,25 @@ const removeFromGroup = (userId, groupId) => {
   }
 };
 
+/**
+ * The admin deleted the group: tell everyone who has it open so their screens
+ * can close, then empty the room. `deletedBy` lets the admin's own devices tell
+ * "I did this" from "this was done to me".
+ */
+const closeGroup = (groupId, { name, deletedBy }) => {
+  if (!io) return;
+  const gid = String(groupId);
+  const room = groupRoom(gid);
+  io.to(room).emit('group:deleted', { groupId: gid, name, deletedBy: String(deletedBy) });
+  // Copied first: leaving the room edits the very set being walked.
+  for (const socketId of [...(io.sockets.adapter.rooms.get(room) ?? [])]) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (!socket) continue;
+    socket.data.groupIds?.delete(gid);
+    socket.leave(room);
+  }
+};
+
 const close = () => new Promise((resolve) => (io ? io.close(() => resolve()) : resolve()));
 
 module.exports = {
@@ -286,5 +305,6 @@ module.exports = {
   emitToUser,
   isViewingConversation,
   removeFromGroup,
+  closeGroup,
   close,
 };

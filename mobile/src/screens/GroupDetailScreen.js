@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
-import { fetchGroup, leaveGroup, setGroupMuted } from '../api/groups.api';
+import { fetchGroup, leaveGroup, deleteGroup, setGroupMuted } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketProvider';
 import { dark, radius, spacing } from '../theme';
@@ -37,6 +38,13 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [leaving, setLeaving] = useState(false);
   // True while our own leave request is in flight, so its echo isn't mistaken for a removal.
   const leavingRef = useRef(false);
+  // The "⋮" menu (admin only) and the delete confirmation it leads to.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Same idea as leavingRef: our own delete also comes back as a socket event.
+  const deletingRef = useRef(false);
+  const insets = useSafeAreaInsets();
   const { socket } = useSocket();
 
   useFocusEffect(
@@ -78,8 +86,18 @@ const GroupDetailScreen = ({ route, navigation }) => {
         // The next focus reloads it.
       }
     };
+    // The admin deleted the group while another member has this screen open.
+    const onGroupDeleted = (event) => {
+      if (event.groupId !== groupId || deletingRef.current) return;
+      AppAlert.alert('Group deleted', `"${event.name}" was deleted by its admin.`);
+      navigation.navigate('MainTabs');
+    };
     socket.on('group:member-left', onMemberLeft);
-    return () => socket.off('group:member-left', onMemberLeft);
+    socket.on('group:deleted', onGroupDeleted);
+    return () => {
+      socket.off('group:member-left', onMemberLeft);
+      socket.off('group:deleted', onGroupDeleted);
+    };
   }, [socket, groupId, currentUserId, navigation]);
 
   if (loading || !group) {
@@ -139,6 +157,24 @@ const GroupDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const doDelete = async () => {
+    setDeleting(true);
+    deletingRef.current = true;
+    try {
+      await deleteGroup(groupId);
+      setConfirmingDelete(false);
+      navigation.navigate('MainTabs');
+    } catch (err) {
+      // Only on failure: after a success the screen is on its way out, and the
+      // socket echo of our own delete must keep being ignored until it is gone.
+      deletingRef.current = false;
+      setDeleting(false);
+      setConfirmingDelete(false);
+      // Once the sheet has closed: two modals at the same moment fight on iOS.
+      setTimeout(() => AppAlert.alert('Could not delete group', err.message), 250);
+    }
+  };
+
   const confirmLeave = () => {
     // An admin with several members left behind chooses who takes over.
     if (iAmAdmin && others.length > 1) {
@@ -163,9 +199,19 @@ const GroupDetailScreen = ({ route, navigation }) => {
           <Ionicons name="chevron-back" size={18} color={dark.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group Info</Text>
-        <TouchableOpacity style={styles.headerIcon} activeOpacity={0.7}>
-          <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
-        </TouchableOpacity>
+        {/* Everything in the menu is admin-only, so other members get a spacer
+            that keeps the title centred rather than dots that open nothing. */}
+        {iAmAdmin ? (
+          <TouchableOpacity
+            style={styles.headerIcon}
+            activeOpacity={0.7}
+            onPress={() => setMenuOpen(true)}
+          >
+            <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerIconGhost} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -285,6 +331,91 @@ const GroupDetailScreen = ({ route, navigation }) => {
       </ScrollView>
 
       <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <View style={[styles.menu, { top: insets.top + 50 }]}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setMenuOpen(false);
+                // Let the menu finish closing: two modals swapping in the same
+                // frame can leave iOS showing neither.
+                setTimeout(() => setConfirmingDelete(true), 250);
+              }}
+            >
+              <Ionicons name="trash-outline" size={17} color="#F97362" />
+              <Text style={styles.menuItemDanger}>Delete group</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={confirmingDelete}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => !deleting && setConfirmingDelete(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => !deleting && setConfirmingDelete(false)}>
+          <Pressable style={styles.sheet}>
+            <View style={styles.dangerBadge}>
+              <Ionicons name="warning-outline" size={24} color="#F97362" />
+            </View>
+            <Text style={styles.sheetTitle}>Delete "{group.name}"?</Text>
+            <Text style={styles.sheetHint}>
+              This deletes the group for all {memberCount} member{memberCount === 1 ? '' : 's'}, not
+              just you. Everything in it is removed for good:
+            </Text>
+
+            {[
+              ['chatbubbles-outline', 'The whole chat, with its photos, files and voice notes'],
+              ['cash-outline', 'All expenses and balances, including any that are not settled'],
+              ['checkbox-outline', 'Tasks and reminders'],
+              ['map-outline', 'The itinerary, stays and attractions'],
+              ['images-outline', 'Every photo in the gallery'],
+            ].map(([icon, label]) => (
+              <View key={icon} style={styles.lossRow}>
+                <Ionicons name={icon} size={15} color={dark.textMuted} />
+                <Text style={styles.lossText}>{label}</Text>
+              </View>
+            ))}
+
+            <Text style={styles.dangerNote}>This cannot be undone.</Text>
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetCancel]}
+                activeOpacity={0.8}
+                onPress={() => setConfirmingDelete(false)}
+                disabled={deleting}
+              >
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetLeave]}
+                activeOpacity={0.8}
+                onPress={doDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.sheetLeaveText}>Delete group</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
         visible={pickingAdmin}
         transparent
         animationType="fade"
@@ -371,6 +502,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+  headerIconGhost: { width: 36, height: 36 },
+
+  // Drops down from the "⋮" button in the header's top-right corner.
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  menu: {
+    position: 'absolute',
+    right: spacing.md,
+    minWidth: 190,
+    backgroundColor: dark.card2,
+    borderWidth: 1,
+    borderColor: dark.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xs,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 6,
+  },
+  menuItemDanger: { color: '#F97362', fontSize: 14, fontWeight: '700' },
+
+  dangerBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(249,115,98,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  lossRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, marginTop: spacing.sm },
+  lossText: { flex: 1, color: dark.text, fontSize: 13, lineHeight: 18 },
+  dangerNote: { color: '#F97362', fontSize: 13, fontWeight: '700', marginTop: spacing.md },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 

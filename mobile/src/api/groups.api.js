@@ -25,6 +25,12 @@ export const leaveGroup = async (groupId, newAdminId) => {
   await client.post(`/groups/${groupId}/leave`, newAdminId ? { newAdminId } : {});
 };
 
+// Admin only, and final: the group goes with its chat, expenses, tasks,
+// itinerary, gallery and everything else in it, for every member.
+export const deleteGroup = async (groupId) => {
+  await client.delete(`/groups/${groupId}`);
+};
+
 // Admin only.
 export const removeMember = async (groupId, memberId) => {
   await client.delete(`/groups/${groupId}/members/${memberId}`);

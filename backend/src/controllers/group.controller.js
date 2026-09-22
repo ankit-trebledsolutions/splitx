@@ -1,5 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const groupService = require('../services/group.service');
+const groupDeletionService = require('../services/groupDeletion.service');
 
 const createGroup = asyncHandler(async (req, res) => {
   const group = await groupService.createGroup(req.user._id, req.body);
@@ -24,6 +25,12 @@ const joinGroup = asyncHandler(async (req, res) => {
 const leaveGroup = asyncHandler(async (req, res) => {
   await groupService.leaveGroup(req.params.groupId, req.user._id, req.body);
   res.json({ success: true, message: 'Left group' });
+});
+
+// Admin only. Everything in the group goes with it, for every member.
+const deleteGroup = asyncHandler(async (req, res) => {
+  await groupDeletionService.deleteGroup(req.params.groupId, req.user._id);
+  res.json({ success: true, message: 'Group deleted' });
 });
 
 const removeMember = asyncHandler(async (req, res) => {
@@ -52,6 +59,7 @@ module.exports = {
   getGroup,
   joinGroup,
   leaveGroup,
+  deleteGroup,
   removeMember,
   setMuted,
   getBalances,
