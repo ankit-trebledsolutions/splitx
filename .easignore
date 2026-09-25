@@ -20,6 +20,7 @@ splix-*-firebase-adminsdk-*.json
 !.env.example
 
 # Not needed to build the app.
+/admin
 /backend
 /API.md
 /README.md
