@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { ROLES, ROLE_LIST, ACCESS_LEVEL_LIST } = require('../config/permissions');
 
 const otpSchema = new mongoose.Schema(
   {
@@ -57,6 +58,27 @@ const userSchema = new mongoose.Schema(
     // is kept. One slot serves both purposes: asking for a new code of either
     // kind replaces the old one.
     otp: { type: otpSchema, select: false, default: undefined },
+
+    // --- Admin panel -------------------------------------------------------
+    // Everyone signing up through the mobile app is a plain `user`. Admin
+    // accounts are only ever made from the admin panel or the seed script.
+    role: { type: String, enum: ROLE_LIST, default: ROLES.USER, index: true },
+    // Per-module access, for `admin` accounts only: `super_admin` bypasses it
+    // and `user` never has entries. A Map so modules can be added without a
+    // migration — the keys are src/config/permissions.js MODULE_LIST.
+    // No default: mobile accounts stay free of an empty Map they never use.
+    permissions: {
+      type: Map,
+      of: { type: String, enum: ACCESS_LEVEL_LIST },
+      default: undefined,
+    },
+    // False suspends an account: it keeps its groups and expenses but can no
+    // longer sign in. Unlike `emailVerified` above, a default is safe here —
+    // Mongoose applying `true` to documents written before this field existed
+    // is exactly right, since those accounts were never suspended.
+    isActive: { type: Boolean, default: true },
+    // Last successful sign-in, shown in the admin user list.
+    lastLoginAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -74,7 +96,7 @@ userSchema.methods.comparePassword = function comparePassword(candidate) {
 };
 
 userSchema.methods.toJSON = function toJSON() {
-  const obj = this.toObject();
+  const obj = this.toObject({ flattenMaps: true });
   delete obj.password;
   delete obj.otp;
   // Older accounts have no flag and are treated as verified everywhere.

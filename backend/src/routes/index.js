@@ -14,6 +14,7 @@ const streamRoutes = require('./stream.routes');
 const homeRoutes = require('./home.routes');
 const directRoutes = require('./direct.routes');
 const tripRoutes = require('./trip.routes');
+const adminRoutes = require('./admin.routes');
 
 const router = Router();
 
@@ -33,5 +34,8 @@ router.use('/stream', streamRoutes);
 router.use('/home', homeRoutes);
 router.use('/conversations', directRoutes);
 router.use('/trips', tripRoutes);
+// Admin panel. Guarded inside by adminProtect rather than `protect`: the panel
+// is a browser holding a cookie, the app is a client holding a Bearer token.
+router.use('/admin', adminRoutes);
 
 module.exports = router;

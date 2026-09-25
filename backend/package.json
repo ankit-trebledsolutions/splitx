@@ -8,7 +8,9 @@
     "dev": "nodemon src/server.js",
     "lint": "eslint src",
     "test": "node --test",
-    "smoke:ai": "node scripts/smoke-ai-itinerary.js"
+    "smoke:ai": "node scripts/smoke-ai-itinerary.js",
+    "seed:admin": "node scripts/seed-super-admin.js",
+    "dev:local": "node scripts/dev-local.js"
   },
   "engines": {
     "node": ">=18"

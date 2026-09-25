@@ -70,6 +70,15 @@ if (!openai.apiKey && isProduction) {
   console.warn('[ai] OPENAI_API_KEY is not set: AI itinerary planning answers "not configured"');
 }
 
+// Admin panel. The panel is a browser on a different origin to the API, and it
+// authenticates with a cookie, so its origins must be listed explicitly —
+// a wildcard is not allowed alongside credentials. The mobile app is
+// unaffected: it sends no cookies and no Origin header.
+const adminOrigins = (process.env.ADMIN_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 module.exports = {
   cloudinary,
   email,
@@ -79,6 +88,12 @@ module.exports = {
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),
   jwtSecret: required('JWT_SECRET', 'dev-only-secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  adminOrigins,
+  // Admin sessions are shorter-lived than the mobile app's: a panel that can
+  // delete accounts should not stay signed in for a week by default.
+  adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '8h',
+  // "Remember me" on the admin sign-in form.
+  adminJwtRememberExpiresIn: process.env.ADMIN_JWT_REMEMBER_EXPIRES_IN || '30d',
   // Stream (video calling) — no dev fallback: these are real credentials.
   streamApiKey: required('STREAM_API_KEY'),
   streamApiSecret: required('STREAM_API_SECRET'),
