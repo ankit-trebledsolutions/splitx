@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TOKEN_KEY } from '../api/client';
+import { TOKEN_KEY, setAccountSuspendedHandler } from '../api/client';
 import {
   loginRequest,
   registerRequest,
@@ -16,6 +16,10 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Why the session ended, when it was not the person's own doing. Survives the
+  // trip back to the sign-in screen so they are told what happened instead of
+  // finding themselves logged out for no visible reason.
+  const [suspendedNotice, setSuspendedNotice] = useState(null);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -78,6 +82,38 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  /**
+   * Signing out when the server has already stopped accepting this account.
+   *
+   * Deliberately not `logout()`: that first calls unregisterFromPush, which is
+   * an authenticated request. For a blocked account it is refused, which would
+   * announce the block again and leave the person stuck on a screen that no
+   * longer works. Nothing here talks to the server.
+   */
+  const forceSignOut = useCallback(async (reason) => {
+    setSuspendedNotice(reason || 'Your account has been blocked by an administrator.');
+    try {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      await signOutOfGoogle();
+    } finally {
+      // Last, because RootNavigator swaps to the sign-in stack the moment this
+      // is null — and the storage above must already be clear by then, or a
+      // restored session would put them straight back.
+      setUser(null);
+    }
+  }, []);
+
+  // Any request answering ACCOUNT_SUSPENDED ends the session, wherever in the
+  // app the person happens to be.
+  useEffect(() => {
+    setAccountSuspendedHandler((message) => {
+      forceSignOut(message);
+    });
+    return () => setAccountSuspendedHandler(null);
+  }, [forceSignOut]);
+
+  const clearSuspendedNotice = useCallback(() => setSuspendedNotice(null), []);
+
   const value = useMemo(
     () => ({
       user,
@@ -88,8 +124,21 @@ export const AuthProvider = ({ children }) => {
       loginWithGoogle,
       logout,
       updateProfile,
+      suspendedNotice,
+      clearSuspendedNotice,
     }),
-    [user, isLoading, login, register, verifyEmail, loginWithGoogle, logout, updateProfile]
+    [
+      user,
+      isLoading,
+      login,
+      register,
+      verifyEmail,
+      loginWithGoogle,
+      logout,
+      updateProfile,
+      suspendedNotice,
+      clearSuspendedNotice,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

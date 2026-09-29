@@ -47,6 +47,19 @@ client.interceptors.request.use(async (config) => {
   return config;
 });
 
+// An administrator can block an account at any moment, and the server then
+// refuses every request from it (see backend middleware/auth.js). That can
+// land while the person is mid-screen, so it is announced once from here and
+// AuthContext does the signing out — doing it here would mean pulling the auth
+// layer into the HTTP layer, and every screen catching it would mean every
+// screen remembering to.
+export const ACCOUNT_SUSPENDED = 'ACCOUNT_SUSPENDED';
+
+let accountSuspendedHandler = null;
+export const setAccountSuspendedHandler = (handler) => {
+  accountSuspendedHandler = handler;
+};
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -57,6 +70,9 @@ client.interceptors.response.use(
     // e.g. 'EMAIL_NOT_VERIFIED', with whatever details the server sent along.
     failure.code = body?.code;
     failure.details = body;
+
+    if (failure.code === ACCOUNT_SUSPENDED) accountSuspendedHandler?.(message);
+
     return Promise.reject(failure);
   }
 );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -9,13 +9,23 @@ import AuthFooter from '../components/AuthFooter';
 import GoogleIcon from '../assets/google.svg';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+import { ACCOUNT_SUSPENDED } from '../api/client';
 
 const LoginScreen = ({ navigation }) => {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, suspendedNotice, clearSuspendedNotice } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Arriving here because an administrator blocked the account, rather than by
+  // signing out. Without this they would simply find themselves back at the
+  // sign-in screen with no idea why.
+  useEffect(() => {
+    if (!suspendedNotice) return;
+    AppAlert.alert('Account blocked', suspendedNotice);
+    clearSuspendedNotice();
+  }, [suspendedNotice, clearSuspendedNotice]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -37,6 +47,9 @@ const LoginScreen = ({ navigation }) => {
         });
         return;
       }
+      // The interceptor has already raised this one and sent us here with a
+      // notice, so a second "Login failed" alert on top would just be noise.
+      if (err.code === ACCOUNT_SUSPENDED) return;
       AppAlert.alert('Login failed', err.message);
     } finally {
       setLoading(false);
@@ -49,6 +62,7 @@ const LoginScreen = ({ navigation }) => {
       await loginWithGoogle();
     } catch (err) {
       // Closing the account picker isn't an error worth an alert.
+      if (err.code === ACCOUNT_SUSPENDED) return; // Announced by the notice above.
       if (!err.cancelled) AppAlert.alert('Google sign-in failed', err.message);
     } finally {
       setGoogleLoading(false);
