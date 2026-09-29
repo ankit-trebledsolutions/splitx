@@ -2,6 +2,8 @@ const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../middleware/validate');
 const controller = require('../controllers/admin.controller');
+const emailTemplates = require('../controllers/emailTemplate.controller');
+const { TEMPLATE_KEYS } = require('../emails/defaults');
 const {
   adminProtect,
   requirePermission,
@@ -20,6 +22,8 @@ const router = Router();
 
 const canReadUsers = requirePermission(PERMISSIONS.USER_MANAGEMENT, ACCESS_LEVEL.READ);
 const canWriteUsers = requirePermission(PERMISSIONS.USER_MANAGEMENT, ACCESS_LEVEL.READ_WRITE);
+const canReadEmails = requirePermission(PERMISSIONS.EMAIL_TEMPLATE, ACCESS_LEVEL.READ);
+const canWriteEmails = requirePermission(PERMISSIONS.EMAIL_TEMPLATE, ACCESS_LEVEL.READ_WRITE);
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -70,6 +74,24 @@ const updateUserSchema = {
     })
     .refine((body) => Object.keys(body).length > 0, 'Nothing to update'),
 };
+
+// Templates are addressed by what they are (`welcome`), not by a database id:
+// the list of emails is fixed in code, and most have no document at all.
+const templateKey = z.object({ key: z.enum(TEMPLATE_KEYS, { message: 'Unknown email template' }) });
+
+// Lengths match models/EmailTemplate.js. Whether the content makes sense —
+// placeholders that exist, a code email that still has its code — is judged in
+// the service, where the answer depends on which email it is.
+const templateContent = z.object({
+  subject: z.string().max(200, 'The subject is too long (200 characters at most)'),
+  preheader: z.string().max(200, 'The preview line is too long (200 characters at most)').default(''),
+  body: z.string().max(100000, 'The design is too large'),
+  text: z.string().max(20000, 'The plain-text version is too long'),
+  reason: z.string().max(300, 'The footer line is too long (300 characters at most)').default(''),
+});
+
+// No draft means "the version that is saved".
+const draftSchema = z.object({ draft: templateContent.optional() }).default({});
 
 // --- Sign in / sign out -----------------------------------------------------
 // Open routes: no session exists yet. The limiter is the only brake.
@@ -151,6 +173,70 @@ router.delete(
   canWriteUsers,
   validate({ params: z.object({ id: objectId }) }),
   controller.deleteUser
+);
+
+// --- Email templates --------------------------------------------------------
+// There is no create and no delete. Every template is an email some code
+// sends: one made in the panel would never go out, and one deleted would still
+// be sent, in its built-in design. Editing, switching off and resetting are the
+// actions that mean something.
+router.get(
+  '/email-templates',
+  adminReadLimiter,
+  canReadEmails,
+  validate({ query: paginationSchema.omit({ role: true }) }),
+  emailTemplates.list
+);
+
+router.get(
+  '/email-templates/:key',
+  adminReadLimiter,
+  canReadEmails,
+  validate({ params: templateKey }),
+  emailTemplates.get
+);
+
+router.put(
+  '/email-templates/:key',
+  adminWriteLimiter,
+  canWriteEmails,
+  validate({ params: templateKey, body: templateContent }),
+  emailTemplates.update
+);
+
+router.patch(
+  '/email-templates/:key/active',
+  adminWriteLimiter,
+  canWriteEmails,
+  validate({ params: templateKey, body: z.object({ isActive: z.boolean() }) }),
+  emailTemplates.setActive
+);
+
+router.post(
+  '/email-templates/:key/reset',
+  adminWriteLimiter,
+  canWriteEmails,
+  validate({ params: templateKey }),
+  emailTemplates.reset
+);
+
+// A POST because it carries the unsaved draft, but it changes nothing, so read
+// access and the read limiter are the right guards: the editor asks for a
+// fresh preview every time the typing pauses.
+router.post(
+  '/email-templates/:key/preview',
+  adminReadLimiter,
+  canReadEmails,
+  validate({ params: templateKey, body: draftSchema }),
+  emailTemplates.preview
+);
+
+router.post(
+  '/email-templates/:key/test',
+  adminWriteLimiter,
+  canWriteEmails,
+  validate({ params: templateKey, body: draftSchema }),
+  emailTemplates.sendTest
 );
 
 module.exports = router;

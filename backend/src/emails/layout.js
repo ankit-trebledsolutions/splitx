@@ -138,6 +138,8 @@ const layout = ({ preheader, body, reason }) => `<!DOCTYPE html>
 </html>`;
 
 module.exports = {
+  theme,
+  FONT,
   layout,
   heading,
   paragraph,
