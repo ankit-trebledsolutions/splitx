@@ -48,4 +48,41 @@ const adminWriteLimiter = rateLimit({
   handler: jsonHandler('Too many changes at once. Slow down a moment.'),
 });
 
-module.exports = { adminLoginLimiter, adminReadLimiter, adminWriteLimiter };
+/**
+ * For changes that ask for the admin's password again (the API keys).
+ *
+ * Only wrong passwords are counted. What this stops is a stolen session being
+ * used to guess the password that stands between it and the keys: ten wrong
+ * tries, then a quarter of an hour. A key the provider refused, or a typing
+ * mistake in one, is not a guess at anything and must not lock an admin out of
+ * fixing it.
+ *
+ * The route handler says which it was by calling markWrongPassword.
+ * `overrides` exists for tests, which need a small limit and no skip.
+ */
+const markWrongPassword = (req) => {
+  req.wrongPassword = true;
+};
+
+const buildSensitiveLimiter = (overrides = {}) =>
+  rateLimit({
+    ...base,
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (req) => !req.wrongPassword,
+    keyGenerator: (req) => String(req.user._id),
+    handler: jsonHandler('Too many wrong passwords. Try again in a few minutes.'),
+    ...overrides,
+  });
+
+const adminSensitiveLimiter = buildSensitiveLimiter();
+
+module.exports = {
+  adminLoginLimiter,
+  adminReadLimiter,
+  adminWriteLimiter,
+  adminSensitiveLimiter,
+  buildSensitiveLimiter,
+  markWrongPassword,
+};

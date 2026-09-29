@@ -82,6 +82,11 @@ test('every admin endpoint refuses an anonymous caller', async () => {
       ['POST', '/api/v1/admin/email-templates/welcome/reset'],
       ['POST', '/api/v1/admin/email-templates/welcome/preview'],
       ['POST', '/api/v1/admin/email-templates/welcome/test'],
+      ['GET', '/api/v1/admin/integrations'],
+      ['GET', '/api/v1/admin/integrations/changes'],
+      ['POST', '/api/v1/admin/integrations/resend/test'],
+      ['PUT', '/api/v1/admin/integrations/resend'],
+      ['POST', '/api/v1/admin/integrations/resend/reset'],
     ];
 
     for (const [method, path] of attempts) {

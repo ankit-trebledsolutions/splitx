@@ -1,14 +1,18 @@
 const { v2: cloudinary } = require('cloudinary');
-const env = require('../config/env');
+const integrations = require('../integrations/store');
 
-if (env.cloudinary) {
-  cloudinary.config({
-    cloud_name: env.cloudinary.cloudName,
-    api_key: env.cloudinary.apiKey,
-    api_secret: env.cloudinary.apiSecret,
+// Sent with every call instead of being set once for the whole library: the
+// keys can be changed in the admin panel while the server runs.
+const account = () => {
+  const keys = integrations.cloudinary();
+  if (!keys) throw new Error('Cloudinary is not set up');
+  return {
+    cloud_name: keys.cloudName,
+    api_key: keys.apiKey,
+    api_secret: keys.apiSecret,
     secure: true,
-  });
-}
+  };
+};
 
 // Grid tiles are small squares; Cloudinary resizes on the fly from the URL and
 // caches the result, so nothing extra is stored. g_auto keeps faces in frame.
@@ -38,7 +42,8 @@ const uploadOptions = (file, folder) =>
 
 const upload = (file, { folder = 'splix' } = {}) =>
   new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(uploadOptions(file, folder), (err, result) => {
+    const options = { ...uploadOptions(file, folder), ...account() };
+    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
       if (err) return reject(new Error(err.message || 'Upload failed'));
       const image = result.resource_type === 'image';
       return resolve({
@@ -57,7 +62,7 @@ const upload = (file, { folder = 'splix' } = {}) =>
 // invalidate: also clears Cloudinary's CDN copies, so a deleted file is really gone.
 const remove = async (key) => {
   const [, resourceType = 'image', publicId = key] = /^(video|raw):(.+)$/.exec(key) ?? [];
-  await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
+  await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true, ...account() });
 };
 
 module.exports = { upload, remove };

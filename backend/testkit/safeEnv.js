@@ -41,6 +41,8 @@ Object.assign(process.env, {
   CLOUDINARY_API_KEY: '',
   CLOUDINARY_API_SECRET: '',
   RESEND_API_KEY: '',
+  // Locks nothing real: only what the tests themselves store.
+  SETTINGS_ENCRYPTION_KEY: 'test-only-settings-key-0123456789abcdef',
   // Not a key: the fake OpenAI server (scripts/fake-openai.js) reads it as the scenario to play.
   OPENAI_API_KEY: 'fake-ok',
   // Port 9 is "discard": nothing answers there. Tests point this at their own fake server.

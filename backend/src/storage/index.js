@@ -1,4 +1,4 @@
-const env = require('../config/env');
+const integrations = require('../integrations/store');
 const cloudinaryStorage = require('./cloudinary.storage');
 const localStorage = require('./local.storage');
 
@@ -24,12 +24,14 @@ const providers = {
 };
 
 // Cloudinary once its keys are present; the local uploads folder otherwise, so
-// the API still runs on a machine that has no storage account set up.
-const activeName = env.cloudinary ? 'cloudinary' : 'local';
+// the API still runs on a machine that has no storage account set up. Decided
+// per upload: the keys can arrive, or change, while the server runs.
+const activeName = () => (integrations.cloudinary() ? 'cloudinary' : 'local');
 
 const upload = async (file, options) => {
-  const stored = await providers[activeName].upload(file, options);
-  return { ...stored, provider: activeName };
+  const name = activeName();
+  const stored = await providers[name].upload(file, options);
+  return { ...stored, provider: name };
 };
 
 const remove = async (key, providerName) => {
@@ -43,4 +45,10 @@ const remove = async (key, providerName) => {
   }
 };
 
-module.exports = { upload, remove, activeProvider: activeName };
+module.exports = {
+  upload,
+  remove,
+  get activeProvider() {
+    return activeName();
+  },
+};

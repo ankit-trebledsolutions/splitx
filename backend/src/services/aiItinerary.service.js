@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const env = require('../config/env');
+const integrations = require('../integrations/store');
 const ItineraryJob = require('../models/ItineraryJob');
 const ItineraryDay = require('../models/ItineraryDay');
 const Group = require('../models/Group');
@@ -209,13 +210,13 @@ const assertWithinCaps = async (userId, groupId) => {
     {
       scope: 'user',
       filter: { requestedBy: userId },
-      cap: env.openai.userDailyCap,
+      cap: integrations.openai().userDailyCap,
       message: "You have reached today's AI planning limit. Try again tomorrow.",
     },
     {
       scope: 'group',
       filter: { group: groupId },
-      cap: env.openai.groupDailyCap,
+      cap: integrations.openai().groupDailyCap,
       message: "This group has reached today's AI planning limit. Try again tomorrow.",
     },
   ];
@@ -228,7 +229,7 @@ const assertWithinCaps = async (userId, groupId) => {
     }
   }
   // The whole server's budget. Nothing the person can wait out, so it reads as "unavailable".
-  if ((await ItineraryJob.countDocuments(counted)) >= env.openai.globalDailyCap) throw unavailable();
+  if ((await ItineraryJob.countDocuments(counted)) >= integrations.openai().globalDailyCap) throw unavailable();
 };
 
 // True when every write the driver refused was refused for a duplicate key.

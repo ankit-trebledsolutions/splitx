@@ -1,22 +1,28 @@
-const env = require('../config/env');
+const integrations = require('../integrations/store');
 const emailTemplates = require('./emailTemplate.service');
 
 /**
  * Sends Splix's emails through Resend (https://resend.com), over its plain
  * HTTP API so there is no SDK to keep up to date.
  *
- * With no RESEND_API_KEY the email is printed to the server console instead,
- * which keeps sign-up and password reset usable on a development machine.
+ * With no API key the email is printed to the server console instead, which
+ * keeps sign-up and password reset usable on a development machine.
+ *
+ * The key and the sender address are asked for each time an email goes out
+ * (integrations/store.js), so one changed in the admin panel is used by the
+ * very next email.
  *
  * What an email says comes from emailTemplate.service.js: the version an admin
  * edited in the panel if there is one, the built-in design otherwise.
  */
 const RESEND_URL = 'https://api.resend.com/emails';
 
-const isConfigured = Boolean(env.email.resendApiKey);
+// A function, not a constant: the answer changes when a key is saved in the panel.
+const isConfigured = () => Boolean(integrations.resend().apiKey);
 
 const deliver = async ({ to, subject, html, text }) => {
-  if (!isConfigured) {
+  const { apiKey, from } = integrations.resend();
+  if (!apiKey) {
     console.log(`\n[email:dev] To: ${to}\n[email:dev] Subject: ${subject}\n${text}\n`);
     return { delivered: false };
   }
@@ -24,10 +30,10 @@ const deliver = async ({ to, subject, html, text }) => {
   const res = await fetch(RESEND_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${env.email.resendApiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: env.email.from, to: [to], subject, html, text }),
+    body: JSON.stringify({ from, to: [to], subject, html, text }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');

@@ -3,6 +3,7 @@ const connectDB = require('./config/db');
 const env = require('./config/env');
 const realtime = require('./realtime/socket');
 const aiItineraryService = require('./services/aiItinerary.service');
+const integrations = require('./integrations/store');
 
 // How long a shutdown waits for AI jobs to be closed before carrying on regardless.
 const AI_ABORT_WAIT_MS = 3000;
@@ -12,6 +13,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const start = async () => {
   try {
     await connectDB();
+    // API keys saved in the admin panel, read before the first request so no
+    // email or upload goes out on a key that has since been replaced. Never
+    // stops the server: if they cannot be read, it runs on config/env.
+    await integrations.start();
     // AI jobs the previous process was running died with it. Close them now
     // (putting back any itinerary caught mid-replace) rather than leaving their
     // groups locked until somebody opens one.

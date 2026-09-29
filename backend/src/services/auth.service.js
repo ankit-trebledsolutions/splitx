@@ -5,6 +5,7 @@ const env = require('../config/env');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const emailService = require('./email.service');
+const integrations = require('../integrations/store');
 const { assertUsableEmail } = require('../utils/emailCheck');
 
 // ---- One-time codes ---------------------------------------------------------
@@ -66,7 +67,7 @@ const issueOtp = async (user, purpose) => {
   const result = { sent: true, retryAfter: OTP_RESEND_COOLDOWN_MS / 1000 };
   // With no mail provider configured nothing reaches an inbox, so development
   // builds get the code back to show on screen. Never in production.
-  if (!emailService.isConfigured && env.nodeEnv !== 'production') result.devOtp = code;
+  if (!emailService.isConfigured() && env.nodeEnv !== 'production') result.devOtp = code;
   return result;
 };
 
@@ -221,7 +222,9 @@ const login = async ({ email, password }) => {
  * find the matching account (or create one) and issue our normal JWT.
  */
 const loginWithGoogle = async (idToken) => {
-  if (env.googleClientIds.length === 0) {
+  // Asked for each time: IDs can be added in the admin panel while the server runs.
+  const clientIds = integrations.googleClientIds();
+  if (clientIds.length === 0) {
     throw new ApiError(503, 'Google sign-in is not configured on the server');
   }
 
@@ -229,7 +232,7 @@ const loginWithGoogle = async (idToken) => {
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: env.googleClientIds,
+      audience: clientIds,
     });
     payload = ticket.getPayload();
   } catch {

@@ -201,5 +201,7 @@ test('a preview of a draft reports what is wrong instead of refusing', async () 
 });
 
 test('an email that does not exist is not found', async () => {
-  await assert.rejects(service.get('newsletter'), (err) => err.statusCode === 404);
+  for (const key of ['newsletter', '__proto__', 'constructor']) {
+    await assert.rejects(service.get(key), (err) => err.statusCode === 404, key);
+  }
 });

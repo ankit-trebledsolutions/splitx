@@ -3,6 +3,8 @@ const { z } = require('zod');
 const validate = require('../middleware/validate');
 const controller = require('../controllers/admin.controller');
 const emailTemplates = require('../controllers/emailTemplate.controller');
+const integrations = require('../controllers/integration.controller');
+const { INTEGRATION_KEYS } = require('../integrations/definitions');
 const { TEMPLATE_KEYS } = require('../emails/defaults');
 const {
   adminProtect,
@@ -14,6 +16,7 @@ const {
   adminLoginLimiter,
   adminReadLimiter,
   adminWriteLimiter,
+  adminSensitiveLimiter,
 } = require('../middleware/adminRateLimit');
 const { PERMISSIONS, ACCESS_LEVEL, ROLES, MODULE_LIST, ACCESS_LEVEL_LIST } =
   require('../config/permissions');
@@ -92,6 +95,15 @@ const templateContent = z.object({
 
 // No draft means "the version that is saved".
 const draftSchema = z.object({ draft: templateContent.optional() }).default({});
+
+const integrationKey = z.object({ key: z.enum(INTEGRATION_KEYS, { message: 'Unknown service' }) });
+
+// Field names are checked against the service they are for in the service
+// layer; here it is enough that they are short strings. Numbers arrive as the
+// text that was typed.
+const integrationValues = z.record(z.string().max(40), z.string().max(500)).default({});
+
+const passwordConfirmed = z.string({ required_error: 'Enter your password to confirm' }).min(1, 'Enter your password to confirm');
 
 // --- Sign in / sign out -----------------------------------------------------
 // Open routes: no session exists yet. The limiter is the only brake.
@@ -237,6 +249,44 @@ router.post(
   canWriteEmails,
   validate({ params: templateKey, body: draftSchema }),
   emailTemplates.sendTest
+);
+
+// --- Third-party APIs -------------------------------------------------------
+// Owners only, with no permission a co-admin could be given. Whoever holds the
+// email key can read every sign-up and reset code Splix sends, which is every
+// account; that is not something to hand out module by module.
+router.get('/integrations', adminReadLimiter, requireSuperAdmin, integrations.list);
+
+router.get('/integrations/changes', adminReadLimiter, requireSuperAdmin, integrations.changes);
+
+// Checks keys with the provider and saves nothing.
+router.post(
+  '/integrations/:key/test',
+  adminWriteLimiter,
+  requireSuperAdmin,
+  validate({ params: integrationKey, body: z.object({ values: integrationValues }) }),
+  integrations.test
+);
+
+router.put(
+  '/integrations/:key',
+  adminWriteLimiter,
+  adminSensitiveLimiter,
+  requireSuperAdmin,
+  validate({
+    params: integrationKey,
+    body: z.object({ values: integrationValues, password: passwordConfirmed }),
+  }),
+  integrations.update
+);
+
+router.post(
+  '/integrations/:key/reset',
+  adminWriteLimiter,
+  adminSensitiveLimiter,
+  requireSuperAdmin,
+  validate({ params: integrationKey, body: z.object({ password: passwordConfirmed }) }),
+  integrations.reset
 );
 
 module.exports = router;

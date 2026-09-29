@@ -1,7 +1,15 @@
 const { StreamClient } = require('@stream-io/node-sdk');
-const env = require('../config/env');
+const integrations = require('../integrations/store');
 
-const streamClient = new StreamClient(env.streamApiKey, env.streamApiSecret);
+// One client per set of keys, made when it is first needed. The keys can be
+// changed in the admin panel while the server runs, so the client cannot be
+// built once at start-up and kept.
+let current = { id: null, client: null };
+const clientFor = ({ apiKey, apiSecret }) => {
+  const id = `${apiKey}:${apiSecret}`;
+  if (current.id !== id) current = { id, client: new StreamClient(apiKey, apiSecret) };
+  return current.client;
+};
 
 // Long enough that the app isn't mid-call when it expires; the mobile SDK
 // re-fetches from this endpoint whenever it needs a fresh one.
@@ -9,6 +17,9 @@ const TOKEN_TTL_SECONDS = 60 * 60 * 24;
 
 const issueToken = async (user) => {
   const userId = user._id.toString();
+  // Read once, so the token and the key sent with it always belong together.
+  const keys = integrations.stream();
+  const streamClient = clientFor(keys);
 
   // Stream needs to know the user before they can join calls; upsert keeps
   // the display name in sync with our account on every token request.
@@ -25,7 +36,7 @@ const issueToken = async (user) => {
   });
 
   return {
-    apiKey: env.streamApiKey,
+    apiKey: keys.apiKey,
     token,
     user: { id: userId, name: user.name },
   };

@@ -70,6 +70,23 @@ if (!openai.apiKey && isProduction) {
   console.warn('[ai] OPENAI_API_KEY is not set: AI itinerary planning answers "not configured"');
 }
 
+// Admin panel > Third-Party APIs. Keys saved there are encrypted with this
+// before they reach the database, so the database on its own gives nothing
+// away. It is the one secret that can never be moved into the panel: stored
+// next to what it protects, it would protect nothing.
+//
+// Optional, like the other services: without it the API runs exactly as it
+// always has, on the values in this file, and the panel cannot save keys.
+// Changing it later makes every key saved under the old one unreadable, and
+// the services fall back to the values here until they are saved again.
+const settingsKey = process.env.SETTINGS_ENCRYPTION_KEY || '';
+if (settingsKey && settingsKey.length < 32) {
+  throw new Error('SETTINGS_ENCRYPTION_KEY is too short: use at least 32 random characters');
+}
+if (!settingsKey && isProduction) {
+  console.warn('[settings] SETTINGS_ENCRYPTION_KEY is not set: API keys cannot be changed from the admin panel');
+}
+
 // Admin panel. The panel is a browser on a different origin to the API, and it
 // authenticates with a cookie, so its origins must be listed explicitly —
 // a wildcard is not allowed alongside credentials. The mobile app is
@@ -89,6 +106,7 @@ module.exports = {
   jwtSecret: required('JWT_SECRET', 'dev-only-secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   adminOrigins,
+  settingsKey,
   // Admin sessions are shorter-lived than the mobile app's: a panel that can
   // delete accounts should not stay signed in for a week by default.
   adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '8h',
@@ -106,4 +124,10 @@ module.exports = {
     process.env.GOOGLE_IOS_CLIENT_ID,
     process.env.GOOGLE_ANDROID_CLIENT_ID,
   ].filter(Boolean),
+  // The same three by name, for the admin panel to show which is which.
+  google: {
+    webClientId: process.env.GOOGLE_WEB_CLIENT_ID || '',
+    iosClientId: process.env.GOOGLE_IOS_CLIENT_ID || '',
+    androidClientId: process.env.GOOGLE_ANDROID_CLIENT_ID || '',
+  },
 };

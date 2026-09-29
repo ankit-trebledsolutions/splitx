@@ -182,7 +182,12 @@ const DEFINITIONS = [
   },
 ];
 
-const DEFAULTS = Object.fromEntries(DEFINITIONS.map((definition) => [definition.key, definition]));
+// No prototype underneath: looked up with a name that arrives in a request,
+// and '__proto__' or 'constructor' must find nothing rather than something.
+const DEFAULTS = Object.assign(
+  Object.create(null),
+  Object.fromEntries(DEFINITIONS.map((definition) => [definition.key, definition]))
+);
 const TEMPLATE_KEYS = DEFINITIONS.map((definition) => definition.key);
 
 // What the preview and the test email are filled with.

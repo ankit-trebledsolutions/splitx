@@ -1,4 +1,5 @@
 const env = require('../config/env');
+const integrations = require('../integrations/store');
 const AiError = require('../utils/AiError');
 const { buildRequest } = require('./aiItinerary.prompt');
 
@@ -10,10 +11,14 @@ const { buildRequest } = require('./aiItinerary.prompt');
  * Callers get parsed JSON or an AiError. Every AiError says whether OpenAI may
  * have charged for the attempt (`billed`), because the daily caps count those
  * and only those. OpenAI's own error text is logged here and goes no further.
+ *
+ * The key and the model names come from integrations/store.js: what was saved
+ * in the admin panel if anything was, config/env otherwise.
  */
 
-// A function, not a constant, so tests can switch the key on and off.
-const isConfigured = () => Boolean(env.openai.apiKey);
+// A function, not a constant: tests switch the key on and off, and so does the
+// admin panel.
+const isConfigured = () => Boolean(integrations.openai().apiKey);
 
 // A whole call may use the per-attempt timeout plus this, however many attempts it takes.
 const DEADLINE_GRACE_MS = 60 * 1000;
@@ -39,18 +44,25 @@ const openBreaker = (kind) => {
   console.error(`[ai] ${kind}: planner switched off for ${BREAKER_MS / 60000} minutes`);
 };
 
-// Tests only: lets one case open the breaker without failing the next.
+// Lets one test open the breaker without failing the next.
 const resetBreaker = () => {
   breakerOpenUntil = 0;
 };
 
+// The breaker is a verdict on a key. A different key has not earned it: without
+// this, a bad key replaced in the admin panel would keep the planner switched
+// off for the rest of the ten minutes, looking as if the new one had failed too.
+integrations.onChange((changed) => {
+  if (changed === 'openai') resetBreaker();
+});
+
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
 
 // Tests must never reach the real API, even if a real key leaks into their environment.
-const assertLocalInTests = () => {
+const assertLocalInTests = (baseUrl) => {
   if (env.nodeEnv !== 'test') return;
-  if (!LOCAL_HOSTS.has(new URL(env.openai.baseUrl).hostname)) {
-    throw new Error(`Refusing to call ${env.openai.baseUrl} while NODE_ENV is test`);
+  if (!LOCAL_HOSTS.has(new URL(baseUrl).hostname)) {
+    throw new Error(`Refusing to call ${baseUrl} while NODE_ENV is test`);
   }
 };
 
@@ -87,13 +99,13 @@ const usageOf = (usage) =>
     : undefined;
 
 // One HTTP attempt. Resolves to the response JSON of a 200, throws AiError otherwise.
-const callOnce = async (body, timeoutMs) => {
+const callOnce = async (body, timeoutMs, { baseUrl, apiKey }) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${env.openai.baseUrl}/responses`, {
+    const res = await fetch(`${baseUrl}/responses`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${env.openai.apiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -161,10 +173,13 @@ const parseResponse = (json, model) => {
  * double both the wait and the cost, and the app has a "Try again" button.
  */
 const generateItinerary = async ({ facts, dayCount, userId }) => {
-  assertLocalInTests();
+  // Read once for the whole call: a key changed in the admin panel half way
+  // through must not send the retry to a different account than the first try.
+  const config = integrations.openai();
+  assertLocalInTests(config.baseUrl);
 
-  const deadline = Date.now() + env.openai.timeoutMs + DEADLINE_GRACE_MS;
-  let model = env.openai.model;
+  const deadline = Date.now() + config.timeoutMs + DEADLINE_GRACE_MS;
+  let model = config.model;
   let retried = false;
   let billed = false;
 
@@ -175,7 +190,8 @@ const generateItinerary = async ({ facts, dayCount, userId }) => {
     try {
       const json = await callOnce(
         buildRequest({ model, facts, dayCount, userId }),
-        Math.min(env.openai.timeoutMs, remaining)
+        Math.min(config.timeoutMs, remaining),
+        config
       );
       return parseResponse(json, model);
     } catch (err) {
@@ -183,9 +199,9 @@ const generateItinerary = async ({ facts, dayCount, userId }) => {
       billed = billed || err.billed;
       err.billed = billed;
 
-      if (err.kind === 'MODEL_NOT_FOUND' && model !== env.openai.fallbackModel) {
-        console.warn(`[ai] model "${model}" not found, trying "${env.openai.fallbackModel}"`);
-        model = env.openai.fallbackModel;
+      if (err.kind === 'MODEL_NOT_FOUND' && model !== config.fallbackModel) {
+        console.warn(`[ai] model "${model}" not found, trying "${config.fallbackModel}"`);
+        model = config.fallbackModel;
         continue;
       }
       if (BREAKER_KINDS.has(err.kind)) openBreaker(err.kind);
