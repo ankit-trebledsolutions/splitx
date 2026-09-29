@@ -1,4 +1,4 @@
-import { LayoutGrid, Shield } from 'lucide-react';
+import { Layout, LayoutGrid, Shield } from 'lucide-react';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // The live navigation. Only entries that lead to a routed page belong here —
@@ -25,6 +25,19 @@ export const MENU_SIDEBAR = [
     children: [
       { title: 'Users', path: '/users' },
       { title: 'Co-Admins', path: '/users/co-admins' },
+    ],
+  },
+  {
+    title: 'Manage CMS',
+    icon: Layout,
+    // Carousels join this list when they are ported.
+    anyPermissions: [PERMISSIONS.EMAIL_TEMPLATE],
+    children: [
+      {
+        title: 'Email Templates',
+        path: '/manage-cms/email-templates',
+        permission: PERMISSIONS.EMAIL_TEMPLATE,
+      },
     ],
   },
 ];

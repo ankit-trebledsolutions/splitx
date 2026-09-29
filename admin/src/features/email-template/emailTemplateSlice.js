@@ -1,9 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// Editing and viewing are pages of their own with the template in the URL, so
+// the only state kept here is how the list is being looked at.
 const initialState = {
   searchTerm: '',
-  selectedTemplate: null,
-  dialogType: null,
   pagination: {
     currentPage: 1,
     pageSize: 5,
@@ -25,18 +25,6 @@ const emailTemplateSlice = createSlice({
     setEmailTemplateCurrentPage: (state, action) => {
       state.pagination.currentPage = action.payload;
     },
-    openCreateTemplateDialog: (state) => {
-      state.selectedTemplate = null;
-      state.dialogType = 'create';
-    },
-    openEditTemplateDialog: (state, action) => {
-      state.selectedTemplate = action.payload;
-      state.dialogType = 'edit';
-    },
-    closeTemplateDialog: (state) => {
-      state.selectedTemplate = null;
-      state.dialogType = null;
-    },
   },
 });
 
@@ -44,9 +32,6 @@ export const {
   setEmailTemplateSearchTerm,
   setEmailTemplatePageSize,
   setEmailTemplateCurrentPage,
-  openCreateTemplateDialog,
-  openEditTemplateDialog,
-  closeTemplateDialog,
 } = emailTemplateSlice.actions;
 
 export default emailTemplateSlice.reducer;

@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router';
+import { lazy, Suspense, useEffect } from 'react';
+import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router';
 import { Layout1 } from '@/components/layouts/layout-1';
+import { ScreenLoader } from '@/components/screen-loader.jsx';
 import { useAppDispatch } from '@/app/hooks';
 import { useGetCurrentUserQuery } from '@/features/auth/authApi';
 import { clearCredentials, setCredentials } from '@/features/auth/authSlice';
 import { setUnauthorizedHandler } from '@/lib/api';
-import { PERMISSIONS } from '@/lib/permissions';
+import { ACCESS_LEVEL, PERMISSIONS } from '@/lib/permissions';
 import ProtectedRoute from './protectedRoute';
 import PublicRoute from './PublicRoute';
 
@@ -15,9 +16,19 @@ import UserManagement from '@/pages/layout-1/user-management/user-managment';
 import UserPage from '@/pages/layout-1/user-management/user/user';
 import CoAdminPage from '@/pages/layout-1/user-management/co-admin/co-admin';
 import CoAdminsPermissionsTable from '@/pages/layout-1/user-management/co-admin/co-admin-permissions-table';
+import ManageCms from '@/pages/layout-1/manage-cms/manage-cms';
+import EmailTemplate from '@/pages/layout-1/manage-cms/email-template/email-template';
+import EmailPage from '@/pages/layout-1/manage-cms/email-template/email-page';
+
+// The editing screen brings the whole rich-text editor with it, which is
+// larger than the rest of the panel put together. Loaded when it is opened, so
+// nobody pays for it on the way to the user list.
+const EmailTemplateForm = lazy(
+  () => import('@/pages/layout-1/manage-cms/email-template/email-template-form'),
+);
 
 // Modules whose screens exist but whose API is not ported yet — general
-// settings, CMS, categories, carousels. Their page files are still in
+// settings, categories, carousels. Their page files are still in
 // src/pages; they are simply not routed, so nothing links to an endpoint that
 // would 404. Re-adding one is a Route element, not a rewrite.
 
@@ -90,6 +101,41 @@ export function AppRoutingSetup() {
           <Route index element={<UserPage />} />
           <Route path="co-admins" element={<CoAdminPage />} />
           <Route path="co-admins/permissions" element={<CoAdminsPermissionsTable />} />
+        </Route>
+
+        <Route
+          path="manage-cms"
+          element={
+            <ProtectedRoute anyPermissions={[PERMISSIONS.EMAIL_TEMPLATE]}>
+              <ManageCms />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="email-templates" replace />} />
+          <Route
+            path="email-templates"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMAIL_TEMPLATE}>
+                <Outlet />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<EmailTemplate />} />
+            <Route path=":key" element={<EmailPage />} />
+            <Route
+              path=":key/edit"
+              element={
+                <ProtectedRoute
+                  permission={PERMISSIONS.EMAIL_TEMPLATE}
+                  access={ACCESS_LEVEL.READ_WRITE}
+                >
+                  <Suspense fallback={<ScreenLoader />}>
+                    <EmailTemplateForm />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+          </Route>
         </Route>
 
         <Route path="unauthorized" element={<Unauthorized />} />

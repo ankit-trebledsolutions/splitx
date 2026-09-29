@@ -1,3 +1,5 @@
+import { Helmet } from 'react-helmet-async';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Toolbar,
@@ -6,13 +8,11 @@ import {
   ToolbarPageTitle,
 } from '@/components/layouts/layout-1/components/toolbar';
 import { useAppSelector } from '@/app/hooks';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useGetEmailTemplatesQuery } from '@/features/email-template/emailTemplateApi';
 import {
   selectEmailTemplatePagination,
   selectEmailTemplateSearchTerm,
 } from '@/features/email-template/emailTemplateSelectors';
-import EmailTemplateForm from './email-template-form';
 import EmailTemplateTable from './email-template-table';
 
 const EmailTemplate = () => {
@@ -26,30 +26,36 @@ const EmailTemplate = () => {
     limit: pagination.pageSize,
   });
 
-  const emailTemplates = data?.data ?? [];
+  const emailTemplates = data?.templates ?? [];
   const totalItems = data?.total ?? 0;
 
   return (
-    <div className="container">
-      <Toolbar>
-        <ToolbarHeading>
-          <ToolbarPageTitle>Email Template</ToolbarPageTitle>
-          <ToolbarDescription>Manage email templates</ToolbarDescription>
-        </ToolbarHeading>
-      </Toolbar>
+    <>
+      <Helmet>
+        <title>Email Templates - Splix Admin</title>
+      </Helmet>
 
-      <Card>
-        <CardContent className="p-0">
-          <EmailTemplateTable
-            emailTemplates={emailTemplates}
-            loading={isFetching}
-            totalItems={totalItems}
-          />
-        </CardContent>
-      </Card>
+      <div className="container">
+        <Toolbar>
+          <ToolbarHeading>
+            <ToolbarPageTitle>Email Template</ToolbarPageTitle>
+            <ToolbarDescription>
+              Edit the emails Splix sends, and see them as people receive them
+            </ToolbarDescription>
+          </ToolbarHeading>
+        </Toolbar>
 
-      <EmailTemplateForm />
-    </div>
+        <Card>
+          <CardContent className="p-0">
+            <EmailTemplateTable
+              emailTemplates={emailTemplates}
+              loading={isFetching}
+              totalItems={totalItems}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 };
 

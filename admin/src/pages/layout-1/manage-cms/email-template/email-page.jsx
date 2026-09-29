@@ -1,115 +1,139 @@
-import { useParams } from 'react-router-dom';
-import defaultLogo from '../../../../../dist/media/app/default-logo.svg';
-import facebook from '../../../../../dist/media/brand-logos/facebook.svg';
-import instagram from '../../../../../dist/media/brand-logos/instagram.svg';
-import x from '../../../../../dist/media/brand-logos/x.svg';
-import youtube from '../../../../../dist/media/brand-logos/youtube.svg';
-import { useGetEmailTemplateByIdQuery } from '@/features/email-template/emailTemplateApi';
+import { ArrowLeft, Pencil } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ACCESS_LEVEL, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Toolbar,
+  ToolbarActions,
+  ToolbarDescription,
+  ToolbarHeading,
+  ToolbarPageTitle,
+} from '@/components/layouts/layout-1/components/toolbar';
+import { useAppSelector } from '@/app/hooks';
+import { selectCurrentUser } from '@/features/auth/authSelectors';
+import {
+  useGetEmailTemplatePreviewQuery,
+  useGetEmailTemplateQuery,
+} from '@/features/email-template/emailTemplateApi';
+import EmailPreview from './email-preview';
 
+const BASE = '/manage-cms/email-templates';
+
+const formatDate = (value) =>
+  new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+
+// One email, exactly as it is sent today: the saved version, in the real Splix
+// frame, filled with sample details.
 const EmailPage = () => {
-  const { id } = useParams();
-  const { data, isLoading } = useGetEmailTemplateByIdQuery(id, {
-    skip: !id,
-  });
-  const templateData = data?.data;
+  const { key } = useParams();
+  const navigate = useNavigate();
+  const currentUser = useAppSelector(selectCurrentUser);
+  const canEdit = hasPermission(
+    currentUser,
+    PERMISSIONS.EMAIL_TEMPLATE,
+    ACCESS_LEVEL.READ_WRITE,
+  );
+  const { data: template, isLoading, isError } = useGetEmailTemplateQuery(key);
+  const { data: mail, isFetching: isRendering } =
+    useGetEmailTemplatePreviewQuery(key, { skip: !template });
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading template...</div>
+      <div className="container flex min-h-[60vh] items-center justify-center">
+        <div className="text-muted-foreground">Loading template...</div>
       </div>
     );
   }
 
-  if (!templateData) {
+  if (isError || !template) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Template not found</div>
+      <div className="container flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
+        <h1 className="text-2xl font-semibold">Template not found</h1>
+        <Button variant="outline" onClick={() => navigate(BASE)}>
+          <ArrowLeft />
+          Back to email templates
+        </Button>
       </div>
     );
   }
 
   return (
     <>
-      <table class="w-full bg-[#f5f5f5] text-gray-800 leading-6 font-sans h-[100vh] overflow-y-auto">
-        <tbody>
-          <tr>
-            <td class="bg-[#F8285A] py-8"></td>
-          </tr>
-          <tr>
-            <td class="bg-[#F8285A]">
-              <table class="bg-white border-b h-full border-gray-200 mx-auto w-[600px] ">
-                <tr>
-                  <td class="px-10 py-5">
-                    <a href="#">
-                      <img src={defaultLogo} alt="metronic" />
-                    </a>
-                  </td>
-                  <td class="text-right px-10 py-10">
-                    <div class="inline-flex gap-2">
-                      <a href="#">
-                        <img class="w-6 h-6" src={facebook} />
-                      </a>
-                      <a href="#">
-                        <img class="w-6 h-6" src={x} />
-                      </a>
-                      <a href="#">
-                        <img class="w-6 h-6" src={instagram} />
-                      </a>
-                      <a href="#">
-                        <img class="w-6 h-6" src={youtube} />
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td
-              dangerouslySetInnerHTML={{
-                __html:
-                  templateData?.body ||
-                  '<p>Email content will appear here...</p>',
-              }}
-            ></td>
-          </tr>
-          <tr>
-            <td>
-              <table class="mx-auto w-[600px] h-full">
-                <tr>
-                  <td class="bg-black/5 px-8 text-center">
-                    <div class="py-8 text-lg text-black">
-                      Need more help?
-                      <br />
-                      <a href="#" class="text-[#F8285A]">
-                        We’re here, ready to talk
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="bg-black/5 px-10 text-center text-sm text-gray-500">
-                    <div class="py-6">
-                      Be sure to add
-                      <a href="#" class="text-[#F8285A]">
-                        platform@dummyid.com
-                      </a>
-                      to your address book or safe sender list so our emails get
-                      to your inbox.
-                      <br />
-                      <br />© 2026, Metronic. All Rights Reserved.
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="h-12"></td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <Helmet>
+        <title>{`${template.name} - Splix Admin`}</title>
+      </Helmet>
+
+      <div className="container">
+        <Toolbar>
+          <ToolbarHeading>
+            <ToolbarPageTitle>{template.name}</ToolbarPageTitle>
+            <ToolbarDescription>{template.description}</ToolbarDescription>
+          </ToolbarHeading>
+          <ToolbarActions>
+            <Button variant="outline" onClick={() => navigate(BASE)}>
+              <ArrowLeft />
+              Back
+            </Button>
+            {canEdit && (
+              <Button onClick={() => navigate(`${BASE}/${key}/edit`)}>
+                <Pencil />
+                Edit
+              </Button>
+            )}
+          </ToolbarActions>
+        </Toolbar>
+
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          {template.isCustomized ? (
+            <Badge variant="info" appearance="light">
+              Edited
+            </Badge>
+          ) : (
+            <Badge variant="secondary" appearance="light">
+              Original design
+            </Badge>
+          )}
+          {template.required ? (
+            <Badge variant="success" appearance="light">
+              Always sent
+            </Badge>
+          ) : template.isActive ? (
+            <Badge variant="success" appearance="light">
+              Being sent
+            </Badge>
+          ) : (
+            <Badge variant="destructive" appearance="light">
+              Switched off
+            </Badge>
+          )}
+          {template.updatedAt && (
+            <span>
+              Last changed {formatDate(template.updatedAt)}
+              {template.updatedBy ? ` by ${template.updatedBy}` : ''}
+            </span>
+          )}
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            <EmailPreview mail={mail} isLoading={isRendering} />
+          </CardContent>
+        </Card>
+
+        <p className="mt-3 text-sm text-muted-foreground">
+          Shown with sample details (Alex Kumar, code 482913). Each person
+          receives their own.
+        </p>
+      </div>
     </>
   );
 };

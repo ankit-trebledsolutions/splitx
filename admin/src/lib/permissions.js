@@ -21,6 +21,7 @@ export const ACCESS_LEVEL = {
 export const PERMISSIONS = {
   USER_MANAGEMENT: 'user_management',
   GENERAL_SETTINGS: 'general_settings',
+  EMAIL_TEMPLATE: 'email_template',
 };
 
 const ACCESS_WEIGHT = {
