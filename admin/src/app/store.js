@@ -7,11 +7,12 @@ import { coAdminsApi } from '@/features/co-admins/coAdminsApi';
 import adminsReducer from '@/features/co-admins/coAdminsSlice';
 import { emailTemplateApi } from '@/features/email-template/emailTemplateApi';
 import emailTemplateReducer from '@/features/email-template/emailTemplateSlice';
+import { integrationsApi } from '@/features/integrations/integrationsApi';
 
 // Only the modules that are wired to the ported API are registered. The slices
-// for the not-yet-ported modules (category, carousels, general settings) are
-// still in src/features — they are simply not mounted, so nothing calls an
-// endpoint that does not exist. Bringing one back is two lines here.
+// for the not-yet-ported modules (category, carousels, the rest of general
+// settings) are still in src/features — they are simply not mounted, so nothing
+// calls an endpoint that does not exist. Bringing one back is two lines here.
 
 export const store = configureStore({
   reducer: {
@@ -23,6 +24,7 @@ export const store = configureStore({
     [usersApi.reducerPath]: usersApi.reducer,
     [coAdminsApi.reducerPath]: coAdminsApi.reducer,
     [emailTemplateApi.reducerPath]: emailTemplateApi.reducer,
+    [integrationsApi.reducerPath]: integrationsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -30,5 +32,6 @@ export const store = configureStore({
       usersApi.middleware,
       coAdminsApi.middleware,
       emailTemplateApi.middleware,
+      integrationsApi.middleware,
     ),
 });
