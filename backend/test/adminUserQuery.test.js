@@ -26,13 +26,16 @@ test('app users are matched by exclusion, so accounts predating the field are fo
   assert.notDeepEqual(query.role, ROLES.USER);
 });
 
+// These two pass viewerRole explicitly: with it left out the filter hides owner
+// accounts, which is the safe default but not what is under test here. Owner
+// visibility has its own suite, adminOwnerVisibility.test.js.
 test('staff are matched by inclusion, which correctly excludes a missing field', () => {
-  const query = buildListQuery({ role: 'staff' });
+  const query = buildListQuery({ role: 'staff', viewerRole: ROLES.SUPER_ADMIN });
   assert.deepEqual(query.role, { $in: [ROLES.ADMIN, ROLES.SUPER_ADMIN] });
 });
 
 test('no role filter means no role condition at all', () => {
-  assert.equal('role' in buildListQuery({}), false);
+  assert.equal('role' in buildListQuery({ viewerRole: ROLES.SUPER_ADMIN }), false);
 });
 
 test('a search term is matched against name and email, and cannot inject a pattern', () => {

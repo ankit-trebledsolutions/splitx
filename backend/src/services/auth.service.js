@@ -110,6 +110,29 @@ const googleClient = new OAuth2Client();
 const signToken = (userId) =>
   jwt.sign({ sub: userId.toString() }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 
+// An administrator has blocked this account from the admin panel. The code
+// matters more than the wording: the app branches on ACCOUNT_SUSPENDED to sign
+// the person out, so the message can be reworded without touching the app.
+// The same check runs on every request in middleware/auth.js, which is what
+// ends a session already in progress.
+const assertNotSuspended = (user) => {
+  if (user.isActive === false) {
+    throw new ApiError(403, 'Your account has been blocked by an administrator.', {
+      code: 'ACCOUNT_SUSPENDED',
+    });
+  }
+};
+
+// Every successful sign-in ends here, so the last-login stamp is written in one
+// place rather than being forgotten in one of three. validateBeforeSave is off
+// because a Google account has no password and would fail full validation.
+const completeLogin = async (user) => {
+  assertNotSuspended(user);
+  user.lastLoginAt = new Date();
+  await user.save({ validateBeforeSave: false });
+  return { user, token: signToken(user._id) };
+};
+
 /**
  * Step 1 of sign-up: create the account as unverified and email a code. No
  * session is issued here; that only happens once the code is entered
@@ -146,7 +169,7 @@ const verifyEmail = async (email, code) => {
   await user.save({ validateBeforeSave: false });
 
   emailService.sendWelcome(user);
-  return { user, token: signToken(user._id) };
+  return completeLogin(user);
 };
 
 // "Resend code" on the OTP screen, for either kind of code.
@@ -170,6 +193,8 @@ const login = async ({ email, password }) => {
     throw ApiError.unauthorized('Invalid email or password');
   }
 
+  assertNotSuspended(user);
+
   // Right password, but the address was never confirmed: send them back to the
   // code screen. A fresh code goes out unless one was sent moments ago.
   if (user.emailVerified === false) {
@@ -187,7 +212,7 @@ const login = async ({ email, password }) => {
     });
   }
 
-  return { user, token: signToken(user._id) };
+  return completeLogin(user);
 };
 
 /**
@@ -244,7 +269,7 @@ const loginWithGoogle = async (idToken) => {
     });
   }
 
-  return { user, token: signToken(user._id) };
+  return completeLogin(user);
 };
 
 const forgotPassword = (email) => resendCode(email, PURPOSE.RESET);

@@ -49,12 +49,12 @@ const modules = asyncHandler(async (_req, res) => {
 });
 
 const listUsers = asyncHandler(async (req, res) => {
-  const data = await adminService.listUsers(req.query);
+  const data = await adminService.listUsers(req.query, req.user);
   res.json({ success: true, data });
 });
 
 const getUser = asyncHandler(async (req, res) => {
-  const user = await adminService.getUser(req.params.id);
+  const user = await adminService.getUser(req.params.id, req.user);
   res.json({ success: true, data: { user } });
 });
 
@@ -69,7 +69,7 @@ const updateUser = asyncHandler(async (req, res) => {
 });
 
 const setPermissions = asyncHandler(async (req, res) => {
-  const user = await adminService.setPermissions(req.params.id, req.body.permissions);
+  const user = await adminService.setPermissions(req.params.id, req.body.permissions, req.user);
   res.json({ success: true, data: { user } });
 });
 

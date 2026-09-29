@@ -3,6 +3,7 @@ const env = require('../config/env');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const { ROLES, MODULE_LIST } = require('../config/permissions');
+const userDeletion = require('./userDeletion.service');
 
 const STAFF_ROLES = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
 
@@ -40,12 +41,23 @@ const login = async ({ email, password, rememberMe }) => {
   return { user, token: signAdminToken(user._id, rememberMe), rememberMe: !!rememberMe };
 };
 
-// Builds the filter for the user directory. Exported so the role rule below can
-// be tested without a database.
-const buildListQuery = ({ role, search }) => {
+// Builds the filter for the user directory. Exported so the role rules below
+// can be tested without a database.
+//
+// `viewerRole` hides owner accounts from everybody except another owner. A
+// co-admin has no business knowing who the owners are, let alone being offered
+// a menu of actions against them — and hiding it in the UI alone would leave
+// the accounts one hand-made request away.
+const buildListQuery = ({ role, search, viewerRole }) => {
   const query = {};
+  const seesOwners = viewerRole === ROLES.SUPER_ADMIN;
+
   if (role === 'staff') {
-    query.role = { $in: STAFF_ROLES };
+    query.role = seesOwners ? { $in: STAFF_ROLES } : ROLES.ADMIN;
+  } else if (role === ROLES.SUPER_ADMIN && !seesOwners) {
+    // Asking for owners directly, without being one: answer with nothing rather
+    // than confirming any exist.
+    query.role = '__none__';
   } else if (role === ROLES.USER) {
     // Accounts created before `role` existed have no such field at all — the
     // schema default is applied when Mongoose reads them, not retroactively to
@@ -64,14 +76,20 @@ const buildListQuery = ({ role, search }) => {
     query.$or = [{ name: pattern }, { email: pattern }];
   }
 
+  // Belt and braces for the unfiltered listing, where the branch above sets no
+  // role condition at all: without this, "all users" would include the owners.
+  if (!seesOwners && query.role === undefined) {
+    query.role = { $ne: ROLES.SUPER_ADMIN };
+  }
+
   return query;
 };
 
 // Paginated directory. `role` narrows to staff or app users; `search` matches
 // name or email. Never returns password hashes: the field is select:false and
 // User.toJSON strips it as well.
-const listUsers = async ({ role, search, page, limit }) => {
-  const query = buildListQuery({ role, search });
+const listUsers = async ({ role, search, page, limit }, actor) => {
+  const query = buildListQuery({ role, search, viewerRole: actor?.role });
 
   const [users, total] = await Promise.all([
     User.find(query)
@@ -84,9 +102,23 @@ const listUsers = async ({ role, search, page, limit }) => {
   return { users, total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) };
 };
 
-const getUser = async (id) => {
+/**
+ * Owner accounts are invisible to everyone but another owner.
+ *
+ * Deliberately "not found" rather than "not allowed": a 403 would confirm the
+ * account exists, which is the very thing being hidden. The listing filters
+ * them out, and this stops a co-admin reaching one by id anyway.
+ */
+const assertVisible = (target, actor) => {
+  if (target.role === ROLES.SUPER_ADMIN && actor?.role !== ROLES.SUPER_ADMIN) {
+    throw ApiError.notFound('User not found');
+  }
+};
+
+const getUser = async (id, actor) => {
   const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found');
+  assertVisible(user, actor);
   return user;
 };
 
@@ -156,8 +188,17 @@ const assertNotLastSuperAdmin = async (target) => {
 const updateUser = async (id, data, actor) => {
   const user = await User.findById(id).select('+password');
   if (!user) throw ApiError.notFound('User not found');
+  assertVisible(user, actor);
 
   if (data.role !== undefined && data.role !== user.role) {
+    // Promoting through an edit has to be as restricted as creating a staff
+    // account outright, or a co-admin could make any app user an admin, sign in
+    // as them, and be past every check that createUser applies.
+    const touchesStaff =
+      STAFF_ROLES.includes(data.role) || STAFF_ROLES.includes(user.role);
+    if (touchesStaff && actor.role !== ROLES.SUPER_ADMIN) {
+      throw ApiError.forbidden('Only a super admin can change admin roles');
+    }
     assertNotSelf(actor, id, 'change the role of');
     await assertNotLastSuperAdmin(user);
     user.role = data.role;
@@ -193,9 +234,10 @@ const updateUser = async (id, data, actor) => {
 
 // Kept apart from updateUser because the permission matrix saves on its own and
 // should not be able to change a role or password as a side effect.
-const setPermissions = async (id, permissions) => {
+const setPermissions = async (id, permissions, actor) => {
   const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found');
+  assertVisible(user, actor);
   if (user.role !== ROLES.ADMIN) {
     throw ApiError.badRequest('Only admin accounts carry module permissions');
   }
@@ -209,6 +251,9 @@ const setPermissions = async (id, permissions) => {
 const setActive = async (id, isActive, actor) => {
   const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found');
+  // Without this a co-admin could suspend an owner by id — the write
+  // permission alone does not make owners fair game.
+  assertVisible(user, actor);
   assertNotSelf(actor, id, 'suspend');
   if (isActive === false) await assertNotLastSuperAdmin(user);
 
@@ -220,15 +265,21 @@ const setActive = async (id, isActive, actor) => {
 const deleteUser = async (id, actor) => {
   const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found');
+  assertVisible(user, actor);
   assertNotSelf(actor, id, 'delete');
   await assertNotLastSuperAdmin(user);
 
-  await user.deleteOne();
+  // Not user.deleteOne(): fourteen models point at this document, so removing
+  // the row alone leaves other people's groups and expenses referring to
+  // somebody who no longer exists. userDeletion cleans those up, and refuses
+  // when the removal would rewrite what other members owe each other.
+  await userDeletion.deleteUser(id);
   return user;
 };
 
 module.exports = {
   buildListQuery,
+  assertVisible,
   login,
   listUsers,
   getUser,

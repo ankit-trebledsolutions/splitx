@@ -18,6 +18,14 @@ const protect = asyncHandler(async (req, _res, next) => {
 
   const user = await User.findById(payload.sub);
   if (!user) throw ApiError.unauthorized('User no longer exists');
+  // Blocking takes effect on the very next request rather than whenever the
+  // token happens to expire, so an administrator can cut someone off straight
+  // away. The app watches for this code and signs the person out.
+  if (user.isActive === false) {
+    throw new ApiError(403, 'Your account has been blocked by an administrator.', {
+      code: 'ACCOUNT_SUSPENDED',
+    });
+  }
 
   req.user = user;
   next();
