@@ -31,7 +31,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { useAppDispatch } from '@/app/hooks';
-import { useLogoutMutation } from '@/features/auth/authApi';
+import { authApi, useLogoutMutation } from '@/features/auth/authApi';
+import { usersApi } from '@/features/users/usersApi';
+import { coAdminsApi } from '@/features/co-admins/coAdminsApi';
 import { clearCredentials } from '@/features/auth/authSlice';
 import { toast } from 'sonner';
 
@@ -76,8 +78,19 @@ export function UserDropdownMenu({ trigger }) {
   const handleLogout = async () => {
     await logout();
     dispatch(clearCredentials());
+
+    // Clearing the Redux user is not enough on its own: RTK Query keeps its own
+    // cache, so /auth/me still answers with the signed-in user from memory. The
+    // sign-in page asks that same query whether somebody is already signed in,
+    // sees the cached answer, and sends them straight back to the dashboard.
+    // Resetting the caches also makes sure the next person to sign in on this
+    // browser cannot see the previous one's user list for a frame.
+    dispatch(authApi.util.resetApiState());
+    dispatch(usersApi.util.resetApiState());
+    dispatch(coAdminsApi.util.resetApiState());
+
     toast.success('Logged out successfully');
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   return (

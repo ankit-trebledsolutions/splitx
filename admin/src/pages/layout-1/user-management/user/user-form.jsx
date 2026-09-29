@@ -99,9 +99,13 @@ const UserForm = () => {
           await refetchCoAdmins();
         }
       } else {
+        // Fields are spread, not nested under `userData`: the mutation sends
+        // everything except `id` as the request body, so a wrapper object would
+        // arrive as an unknown key, be stripped by validation, and leave the
+        // server with nothing to update.
         await updateUser({
           id: userData.id,
-          userData: userDataToSave,
+          ...userDataToSave,
         }).unwrap();
         toast.success(`${userDataToSave.name || 'User'} updated successfully`);
         

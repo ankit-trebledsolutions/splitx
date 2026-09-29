@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import DeleteUserDialog from './delete-user-dialog';
 import {
   useDeleteUserMutation,
   useSetUserActiveMutation,
@@ -104,8 +105,10 @@ const UserTable = ({ users, loading, totalItems }) => {
   const currentUser = useAppSelector(selectCurrentUser);
   const canCreateUser = hasPermission(currentUser, PERMISSIONS.USER_MANAGEMENT, ACCESS_LEVEL.READ_WRITE);
   const [rowSelection, setRowSelection] = useState({});
+  // The row waiting on the delete confirmation, or null when none is.
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [setUserActive] = useSetUserActiveMutation();
-  const [deleteUser] = useDeleteUserMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
   
   // Refetch co-admins when admin users are modified
   const { refetch: refetchCoAdmins } = useGetCoAdminsQuery({
@@ -131,20 +134,29 @@ const UserTable = ({ users, loading, totalItems }) => {
     }
   }, [setUserActive, refetchCoAdmins]);
 
-  const handleDelete = useCallback(async (user) => {
+  // Deleting cascades and cannot be undone, so the menu item only opens the
+  // confirmation; nothing is sent until it is confirmed.
+  const handleDelete = useCallback((user) => setPendingDelete(user), []);
+
+  const confirmDelete = useCallback(async () => {
+    const user = pendingDelete;
+    if (!user) return;
     try {
       await deleteUser(user.id).unwrap();
-      toast.success(`${user.name || 'User'} deleted successfully`);
-      
+      toast.success(`${user.name || 'User'} deleted permanently`);
+      setPendingDelete(null);
+
       // Refetch co-admins if admin is deleted
       if (user.role === 'admin') {
         await refetchCoAdmins();
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to delete user'));
-      console.error('Failed while deleting the user:', error);
+      // The server refuses when the person still owes money or is owed any, and
+      // says which groups. That message is the useful part, so it is shown for
+      // longer than a normal toast and the dialog stays open behind it.
+      toast.error(getErrorMessage(error, 'Failed to delete user'), { duration: 10000 });
     }
-  }, [deleteUser, refetchCoAdmins]);
+  }, [pendingDelete, deleteUser, refetchCoAdmins]);
 
   const columns = useMemo(
     () => [
@@ -273,7 +285,11 @@ const UserTable = ({ users, loading, totalItems }) => {
         ),
       }),
     ],
-    [dispatch, handleDelete, handleToggleBlock],
+    // canCreateUser belongs here: the session is restored asynchronously, so on
+    // the first render it is false, and without it in the list these columns
+    // would keep the menu they were built with — View Details and nothing else,
+    // however much access the signed-in admin turns out to have.
+    [dispatch, handleDelete, handleToggleBlock, canCreateUser],
   );
 
   const table = useReactTable({
@@ -292,6 +308,18 @@ const UserTable = ({ users, loading, totalItems }) => {
   });
 
   return (
+    <>
+    <DeleteUserDialog
+      user={pendingDelete}
+      open={Boolean(pendingDelete)}
+      onOpenChange={(next) => {
+        // Not dismissible mid-request, or the row could vanish under a delete
+        // that is still in flight.
+        if (!next && !isDeleting) setPendingDelete(null);
+      }}
+      onConfirm={confirmDelete}
+      isDeleting={isDeleting}
+    />
     <DataGrid
       table={table}
       recordCount={totalItems}
@@ -353,6 +381,7 @@ const UserTable = ({ users, loading, totalItems }) => {
         <UserPagination totalItems={totalItems} />
       </CardFooter>
     </DataGrid>
+    </>
   );
 };
 
