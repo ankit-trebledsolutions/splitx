@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Bell,
-  LayoutGrid,
-  Menu,
-  MessageCircleMore,
-  Search,
-  SquareChevronRight,
-} from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useLocation } from 'react-router';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@/lib/helpers';
@@ -21,18 +14,19 @@ import {
   SheetHeader,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { SearchDialog } from '@/components/layouts/layout-1/shared/dialogs/search/search-dialog';
-import { AppsDropdownMenu } from '@/components/layouts/layout-1/shared/topbar/apps-dropdown-menu';
-import { ChatSheet } from '@/components/layouts/layout-1/shared/topbar/chat-sheet';
-import { NotificationsSheet } from '@/components/layouts/layout-1/shared/topbar/notifications-sheet';
-import { UserDropdownMenu } from '@/components/layouts/layout-1/shared/topbar/user-dropdown-menu';
-import { MegaMenu } from './mega-menu';
-import { MegaMenuMobile } from './mega-menu-mobile';
+import {
+  UserAvatar,
+  UserDropdownMenu,
+} from '@/components/layouts/layout-1/shared/topbar/user-dropdown-menu';
 import { SidebarMenu } from './sidebar-menu';
 
+// The template's header also carried a mega menu, a search dialog, a
+// notifications sheet, a chat sheet and an apps menu. All five were demo
+// pieces filled with made-up content and wired to nothing in this panel, so
+// they are no longer rendered. Their files are still under ../shared if one is
+// ever built for real.
 export function Header() {
   const [isSidebarSheetOpen, setIsSidebarSheetOpen] = useState(false);
-  const [isMegaMenuSheetOpen, setIsMegaMenuSheetOpen] = useState(false);
 
   const { pathname } = useLocation();
   const mobileMode = useIsMobile();
@@ -43,7 +37,6 @@ export function Header() {
   // Close sheet when route changes
   useEffect(() => {
     setIsSidebarSheetOpen(false);
-    setIsMegaMenuSheetOpen(false);
   }, [pathname]);
 
   return (
@@ -54,128 +47,54 @@ export function Header() {
       )}
     >
       <div className="container-fluid flex justify-between items-stretch lg:gap-4">
-        {/* HeaderLogo */}
+        {/* HeaderLogo: below lg the sidebar is a sheet, so the logo lives here */}
         <div className="flex lg:hidden items-center gap-2.5">
-          <Link to="/" className="shrink-0">
+          <Link to="/" className="flex shrink-0 items-center gap-2">
             <img
-              src={toAbsoluteUrl('/media/app/mini-logo.svg')}
-              className="h-[25px] w-full"
-              alt="mini-logo"
+              src={toAbsoluteUrl('/media/app/splix-logo.svg')}
+              className="size-7"
+              alt=""
             />
+            <span className="text-base font-semibold tracking-tight">
+              Splix
+            </span>
           </Link>
-          <div className="flex items-center">
-            {mobileMode && (
-              <Sheet
-                open={isSidebarSheetOpen}
-                onOpenChange={setIsSidebarSheetOpen}
+          {mobileMode && (
+            <Sheet
+              open={isSidebarSheetOpen}
+              onOpenChange={setIsSidebarSheetOpen}
+            >
+              <SheetTrigger asChild>
+                <Button variant="ghost" mode="icon" aria-label="Open menu">
+                  <Menu className="text-muted-foreground/70" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                className="p-0 gap-0 w-[275px]"
+                side="left"
+                close={false}
               >
-                <SheetTrigger asChild>
-                  <Button variant="ghost" mode="icon">
-                    <Menu className="text-muted-foreground/70" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  className="p-0 gap-0 w-[275px]"
-                  side="left"
-                  close={false}
-                >
-                  <SheetHeader className="p-0 space-y-0" />
-                  <SheetBody className="p-0 overflow-y-auto">
-                    <SidebarMenu />
-                  </SheetBody>
-                </SheetContent>
-              </Sheet>
-            )}
-            {mobileMode && (
-              <Sheet
-                open={isMegaMenuSheetOpen}
-                onOpenChange={setIsMegaMenuSheetOpen}
-              >
-                <SheetTrigger asChild>
-                  <Button variant="ghost" mode="icon">
-                    <SquareChevronRight className="text-muted-foreground/70" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  className="p-0 gap-0 w-[275px]"
-                  side="left"
-                  close={false}
-                >
-                  <SheetHeader className="p-0 space-y-0" />
-                  <SheetBody className="p-0 overflow-y-auto">
-                    <MegaMenuMobile />
-                  </SheetBody>
-                </SheetContent>
-              </Sheet>
-            )}
-          </div>
+                <SheetHeader className="p-0 space-y-0" />
+                <SheetBody className="p-0 overflow-y-auto">
+                  <SidebarMenu />
+                </SheetBody>
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
 
-        {/* Mega Menu */}
-        {!mobileMode && <MegaMenu />}
-
-        {/* HeaderTopbar */}
-        <div className="flex items-center gap-3">
-          {!mobileMode && (
-            <SearchDialog
-              trigger={
-                <Button
-                  variant="ghost"
-                  mode="icon"
-                  shape="circle"
-                  className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
-                >
-                  <Search className="size-4.5!" />
-                </Button>
-              }
-            />
-          )}
-          <NotificationsSheet
-            trigger={
-              <Button
-                variant="ghost"
-                mode="icon"
-                shape="circle"
-                className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
-              >
-                <Bell className="size-4.5!" />
-              </Button>
-            }
-          />
-
-          <ChatSheet
-            trigger={
-              <Button
-                variant="ghost"
-                mode="icon"
-                shape="circle"
-                className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
-              >
-                <MessageCircleMore className="size-4.5!" />
-              </Button>
-            }
-          />
-
-          <AppsDropdownMenu
-            trigger={
-              <Button
-                variant="ghost"
-                mode="icon"
-                shape="circle"
-                className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
-              >
-                <LayoutGrid className="size-4.5!" />
-              </Button>
-            }
-          />
-
+        {/* HeaderTopbar: ms-auto keeps it at the far end on desktop, where the
+            logo block above is hidden and nothing else pushes it across. */}
+        <div className="flex items-center gap-3 ms-auto">
           <UserDropdownMenu
             trigger={
-              <img
-                className="size-9 rounded-full border-2 border-green-500 shrink-0 cursor-pointer"
-                src={toAbsoluteUrl('/media/avatars/300-2.png')}
-                alt="User Avatar"
-              />
+              <button
+                type="button"
+                className="rounded-full cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Account menu"
+              >
+                <UserAvatar />
+              </button>
             }
           />
         </div>

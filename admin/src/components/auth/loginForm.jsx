@@ -29,6 +29,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useLoginMutation } from '@/features/auth/authApi';
+import { usersApi } from '@/features/users/usersApi';
+import { coAdminsApi } from '@/features/co-admins/coAdminsApi';
+import { emailTemplateApi } from '@/features/email-template/emailTemplateApi';
+import { integrationsApi } from '@/features/integrations/integrationsApi';
+import { dashboardApi } from '@/features/dashboard/dashboardApi';
 import { useAppDispatch } from '@/app/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 
@@ -48,9 +53,26 @@ const LoginForm = () => {
   const onSubmit = async (data) => {
     try {
       const result = await login(data).unwrap(); 
+
+      // A session that expired, rather than one that was signed out of, leaves
+      // every list and figure the last admin loaded in memory. Emptied before
+      // the new one is let in, so they cannot see the previous admin's
+      // dashboard or user list for a moment while their own loads. Done here
+      // and not where the 401 is handled: there the failed page is still on
+      // screen, and emptying its cache would make it ask again. authApi is
+      // left alone: signing in already makes it ask who is signed in afresh.
+      dispatch(dashboardApi.util.resetApiState());
+      dispatch(usersApi.util.resetApiState());
+      dispatch(coAdminsApi.util.resetApiState());
+      dispatch(emailTemplateApi.util.resetApiState());
+      dispatch(integrationsApi.util.resetApiState());
+
       dispatch(setCredentials(result.user));
       toast.success('Login successful!');
-      navigate('/layout-1');
+      // The dashboard. This used to name '/layout-1', the template's prefix,
+      // which has had no route since the paths were flattened: it only worked
+      // because PublicRoute's own redirect to '/' happened to land first.
+      navigate('/', { replace: true });
       form.reset();
     } catch (error) {
       console.log('Login error:', error);

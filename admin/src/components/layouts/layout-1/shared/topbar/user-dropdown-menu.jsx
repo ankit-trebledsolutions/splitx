@@ -1,73 +1,66 @@
-import {
-  BetweenHorizontalStart,
-  Coffee,
-  CreditCard,
-  FileText,
-  Globe,
-  IdCard,
-  Moon,
-  Settings,
-  Shield,
-  SquareCode,
-  UserCircle,
-  Users,
-} from 'lucide-react';
+import { Moon } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { Link, useNavigate } from 'react-router';
-import { toAbsoluteUrl } from '@/lib/helpers';
+import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import { API_URL } from '@/lib/api';
+import { getInitials } from '@/lib/helpers';
+import { ROLES } from '@/lib/permissions';
+import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { useAppDispatch } from '@/app/hooks';
+import { useAppDispatch, useAppSelector } from '@/app/hooks';
 import { authApi, useLogoutMutation } from '@/features/auth/authApi';
-import { usersApi } from '@/features/users/usersApi';
-import { coAdminsApi } from '@/features/co-admins/coAdminsApi';
+import { selectCurrentUser } from '@/features/auth/authSelectors';
 import { clearCredentials } from '@/features/auth/authSlice';
-import { toast } from 'sonner';
+import { coAdminsApi } from '@/features/co-admins/coAdminsApi';
+import { dashboardApi } from '@/features/dashboard/dashboardApi';
+import { emailTemplateApi } from '@/features/email-template/emailTemplateApi';
+import { integrationsApi } from '@/features/integrations/integrationsApi';
+import { usersApi } from '@/features/users/usersApi';
 
-const I18N_LANGUAGES = [
-  {
-    label: 'English',
-    code: 'en',
-    direction: 'ltr',
-    flag: toAbsoluteUrl('/media/flags/united-states.svg'),
-  },
-  {
-    label: 'Arabic (Saudi)',
-    code: 'ar',
-    direction: 'rtl',
-    flag: toAbsoluteUrl('/media/flags/saudi-arabia.svg'),
-  },
-  {
-    label: 'French',
-    code: 'fr',
-    direction: 'ltr',
-    flag: toAbsoluteUrl('/media/flags/france.svg'),
-  },
-  {
-    label: 'Chinese',
-    code: 'zh',
-    direction: 'ltr',
-    flag: toAbsoluteUrl('/media/flags/china.svg'),
-  },
-];
+const ROLE_LABELS = {
+  [ROLES.SUPER_ADMIN]: 'Owner',
+  [ROLES.ADMIN]: 'Co-admin',
+};
 
+// A picture uploaded through the app is stored as a path on the API
+// ('/uploads/...'); one from Google or Cloudinary is already a full address.
+const avatarUrl = (avatar) => {
+  if (!avatar) return undefined;
+  return /^(https?:|data:)/.test(avatar) ? avatar : `${API_URL}${avatar}`;
+};
+
+// The signed-in admin's own picture, or their initials when they have none (or
+// it fails to load). The template showed the same stock photo for everybody.
+export function UserAvatar({ className }) {
+  const user = useAppSelector(selectCurrentUser);
+
+  return (
+    <Avatar className={cn('size-9', className)}>
+      <AvatarImage src={avatarUrl(user?.avatar)} alt={user?.name || ''} />
+      <AvatarFallback className="font-semibold">
+        {getInitials(user?.name || user?.email || '?', 2)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+// The template's menu was a page of demo links (Public Profile, Billing, Dev
+// Forum, a language picker with no translations behind it), every one pointing
+// at '#'. What is left is what works: who is signed in, the theme, signing out.
 export function UserDropdownMenu({ trigger }) {
-  const currenLanguage = I18N_LANGUAGES[0];
   const { theme, setTheme } = useTheme();
   const dispatch = useAppDispatch();
+  const user = useAppSelector(selectCurrentUser);
   const [logout] = useLogoutMutation();
   const navigate = useNavigate();
 
@@ -84,10 +77,14 @@ export function UserDropdownMenu({ trigger }) {
     // sign-in page asks that same query whether somebody is already signed in,
     // sees the cached answer, and sends them straight back to the dashboard.
     // Resetting the caches also makes sure the next person to sign in on this
-    // browser cannot see the previous one's user list for a frame.
+    // browser cannot see the previous one's data for a frame. Every slice the
+    // store mounts is listed: one left out keeps its cache across the sign-out.
     dispatch(authApi.util.resetApiState());
     dispatch(usersApi.util.resetApiState());
     dispatch(coAdminsApi.util.resetApiState());
+    dispatch(emailTemplateApi.util.resetApiState());
+    dispatch(integrationsApi.util.resetApiState());
+    dispatch(dashboardApi.util.resetApiState());
 
     toast.success('Logged out successfully');
     navigate('/login', { replace: true });
@@ -98,149 +95,35 @@ export function UserDropdownMenu({ trigger }) {
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" side="bottom" align="end">
         {/* Header */}
-        <div className="flex items-center justify-between p-3">
-          <div className="flex items-center gap-2">
-            <img
-              className="size-9 rounded-full border-2 border-green-500"
-              src={toAbsoluteUrl('/media/avatars/300-2.png')}
-              alt="User avatar"
-            />
-
-            <div className="flex flex-col">
-              <Link
-                to="#"
-                className="text-sm text-mono hover:text-primary font-semibold"
+        <div className="flex items-center justify-between gap-2 p-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <UserAvatar className="shrink-0" />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-sm font-semibold text-foreground">
+                {user?.name || 'Admin'}
+              </span>
+              <span
+                className="truncate text-xs text-muted-foreground"
+                title={user?.email}
               >
-                Sean
-              </Link>
-              <a
-                href={`mailto:sean@kt.com`}
-                className="text-xs text-muted-foreground hover:text-primary"
-              >
-                sean@kt.com
-              </a>
+                {user?.email}
+              </span>
             </div>
           </div>
-          <Badge variant="primary" appearance="light" size="sm">
-            Pro
-          </Badge>
+          {ROLE_LABELS[user?.role] && (
+            <Badge
+              variant="primary"
+              appearance="light"
+              size="sm"
+              className="shrink-0"
+            >
+              {ROLE_LABELS[user.role]}
+            </Badge>
+          )}
         </div>
 
         <DropdownMenuSeparator />
 
-        {/* Menu Items */}
-        <DropdownMenuItem asChild>
-          <Link to="#" className="flex items-center gap-2">
-            <IdCard />
-            Public Profile
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="#" className="flex items-center gap-2">
-            <UserCircle />
-            My Profile
-          </Link>
-        </DropdownMenuItem>
-
-        {/* My Account Submenu */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="flex items-center gap-2">
-            <Settings />
-            My Account
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-48">
-            <DropdownMenuItem asChild>
-              <Link to="#" className="flex items-center gap-2">
-                <Coffee />
-                Get Started
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="#" className="flex items-center gap-2">
-                <FileText />
-                My Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="#" className="flex items-center gap-2">
-                <CreditCard />
-                Billing
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="#" className="flex items-center gap-2">
-                <Shield />
-                Security
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="#" className="flex items-center gap-2">
-                <Users />
-                Members & Roles
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="#" className="flex items-center gap-2">
-                <BetweenHorizontalStart />
-                Integrations
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        <DropdownMenuItem asChild>
-          <Link
-            to="https://devs.keenthemes.com"
-            className="flex items-center gap-2"
-          >
-            <SquareCode />
-            Dev Forum
-          </Link>
-        </DropdownMenuItem>
-
-        {/* Language Submenu with Radio Group */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="flex items-center gap-2 [&_[data-slot=dropdown-menu-sub-trigger-indicator]]:hidden hover:[&_[data-slot=badge]]:border-input data-[state=open]:[&_[data-slot=badge]]:border-input">
-            <Globe />
-            <span className="flex items-center justify-between gap-2 grow relative">
-              Language
-              <Badge
-                variant="outline"
-                className="absolute end-0 top-1/2 -translate-y-1/2"
-              >
-                {currenLanguage.label}
-                <img
-                  src={currenLanguage.flag}
-                  className="w-3.5 h-3.5 rounded-full"
-                  alt={currenLanguage.label}
-                />
-              </Badge>
-            </span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-48">
-            <DropdownMenuRadioGroup value={currenLanguage.code}>
-              {I18N_LANGUAGES.map((item) => (
-                <DropdownMenuRadioItem
-                  key={item.code}
-                  value={item.code}
-                  className="flex items-center gap-2"
-                >
-                  <img
-                    src={item.flag}
-                    className="w-4 h-4 rounded-full"
-                    alt={item.label}
-                  />
-
-                  <span>{item.label}</span>
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        <DropdownMenuSeparator />
-
-        {/* Footer */}
         <DropdownMenuItem
           className="flex items-center gap-2"
           onSelect={(event) => event.preventDefault()}
@@ -256,7 +139,12 @@ export function UserDropdownMenu({ trigger }) {
           </div>
         </DropdownMenuItem>
         <div className="p-2 mt-1">
-          <Button onClick={handleLogout} variant="outline" size="sm" className="w-full">
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            size="sm"
+            className="w-full"
+          >
             Logout
           </Button>
         </div>

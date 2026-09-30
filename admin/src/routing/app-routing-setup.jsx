@@ -3,7 +3,7 @@ import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router';
 import { Layout1 } from '@/components/layouts/layout-1';
 import { ScreenLoader } from '@/components/screen-loader.jsx';
 import { useAppDispatch } from '@/app/hooks';
-import { useGetCurrentUserQuery } from '@/features/auth/authApi';
+import { authApi, useGetCurrentUserQuery } from '@/features/auth/authApi';
 import { clearCredentials, setCredentials } from '@/features/auth/authSlice';
 import { setUnauthorizedHandler } from '@/lib/api';
 import { ACCESS_LEVEL, PERMISSIONS, ROLES } from '@/lib/permissions';
@@ -11,7 +11,7 @@ import ProtectedRoute from './protectedRoute';
 import PublicRoute from './PublicRoute';
 
 import Login from '@/pages/auth/login';
-import { Layout1Page } from '@/pages/layout-1/page';
+import Dashboard from '@/pages/layout-1/dashboard/dashboard';
 import UserManagement from '@/pages/layout-1/user-management/user-managment';
 import UserPage from '@/pages/layout-1/user-management/user/user';
 import CoAdminPage from '@/pages/layout-1/user-management/co-admin/co-admin';
@@ -64,9 +64,26 @@ export function AppRoutingSetup() {
 
   // One place handles an expired session: any request answering 401 clears the
   // user and returns to sign-in, instead of leaving a page of failed panels.
+  //
+  // The remembered answer to /auth/me is blanked as well. PublicRoute reads it
+  // alongside the store, so left as it was it still says "signed in" and sends
+  // the admin from /login straight back to the page that just failed, which
+  // asks again and gets 401 again: round and round, and the sign-in form never
+  // appears.
+  //
+  // Blanked in place, and deliberately not authApi.util.resetApiState(). A
+  // reset makes the query mounted a few lines up ask /auth/me again; that
+  // answers 401 and lands back here, which resets again, without end. A patch
+  // asks for nothing. Signing in brings the entry back, because the login
+  // mutation invalidates 'Auth'.
   useEffect(() => {
     setUnauthorizedHandler(() => {
       dispatch(clearCredentials());
+      dispatch(
+        authApi.util.updateQueryData('getCurrentUser', undefined, (draft) => {
+          if (draft) draft.user = null;
+        }),
+      );
       navigate('/login', { replace: true });
     });
     return () => setUnauthorizedHandler(null);
@@ -90,7 +107,7 @@ export function AppRoutingSetup() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Layout1Page />} />
+        <Route index element={<Dashboard />} />
 
         <Route
           path="users"

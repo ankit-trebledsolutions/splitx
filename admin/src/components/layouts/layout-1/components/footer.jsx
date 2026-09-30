@@ -10,14 +10,14 @@ export function Footer() {
           <div className="flex order-2 md:order-1  gap-2 font-normal text-sm">
             <span className="text-muted-foreground">{currentYear} &copy;</span>
             <a
-              href="https://keenthemes.com"
+              href="https://trebledsolutions.com"
               target="_blank"
               className="text-secondary-foreground hover:text-primary"
             >
-              Keenthemes Inc.
+              Treble-D Solutions
             </a>
           </div>
-          <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
+          {/* <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
             <a
               href={generalSettings.docsLink}
               target="_blank"
@@ -53,7 +53,7 @@ export function Footer() {
             >
               License
             </a>
-          </nav>
+          </nav> */}
         </div>
       </div>
     </footer>
