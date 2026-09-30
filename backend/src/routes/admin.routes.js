@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../middleware/validate');
 const controller = require('../controllers/admin.controller');
+const dashboard = require('../controllers/adminDashboard.controller');
 const emailTemplates = require('../controllers/emailTemplate.controller');
 const integrations = require('../controllers/integration.controller');
 const { INTEGRATION_KEYS } = require('../integrations/definitions');
@@ -105,6 +106,29 @@ const integrationValues = z.record(z.string().max(40), z.string().max(500)).defa
 
 const passwordConfirmed = z.string({ required_error: 'Enter your password to confirm' }).min(1, 'Enter your password to confirm');
 
+// The runtime's own list decides what a time zone is: a name it cannot build a
+// formatter for is one the dashboard could not count days in either.
+const isTimeZone = (value) => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Three fixed ranges rather than any number: the panel offers exactly these,
+// and `days=100000` would otherwise be a scan of everything ever stored. The
+// time zone is the browser's, so that "today" is the admin's day and not the
+// server's.
+const dashboardSchema = z.object({
+  days: z.coerce
+    .number()
+    .refine((value) => [7, 30, 90].includes(value), 'days must be 7, 30 or 90')
+    .default(30),
+  tz: z.string().max(64).refine(isTimeZone, 'Unknown time zone').default('UTC'),
+});
+
 // --- Sign in / sign out -----------------------------------------------------
 // Open routes: no session exists yet. The limiter is the only brake.
 router.post('/auth/login', adminLoginLimiter, validate(loginSchema), controller.login);
@@ -116,6 +140,18 @@ router.use(requireAdminCsrfHeader);
 
 router.get('/auth/me', controller.me);
 router.get('/meta/modules', adminReadLimiter, controller.modules);
+
+// --- Dashboard --------------------------------------------------------------
+// No permission guard beyond being staff, on purpose: this is the screen every
+// admin lands on, and what it returns is counts. The one part that names
+// people, the newest sign-ups, is withheld inside the service from anyone
+// without read access to user management.
+router.get(
+  '/dashboard',
+  adminReadLimiter,
+  validate({ query: dashboardSchema }),
+  dashboard.get
+);
 
 // --- User management --------------------------------------------------------
 // The read guard here is the fix for treble-d's listing route, which carried no

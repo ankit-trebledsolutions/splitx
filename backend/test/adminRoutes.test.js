@@ -75,6 +75,7 @@ test('every admin endpoint refuses an anonymous caller', async () => {
       ['DELETE', '/api/v1/admin/users/65a000000000000000000001'],
       ['GET', '/api/v1/admin/auth/me'],
       ['GET', '/api/v1/admin/meta/modules'],
+      ['GET', '/api/v1/admin/dashboard'],
       ['GET', '/api/v1/admin/email-templates'],
       ['GET', '/api/v1/admin/email-templates/welcome'],
       ['PUT', '/api/v1/admin/email-templates/welcome'],
