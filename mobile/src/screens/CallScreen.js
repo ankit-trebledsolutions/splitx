@@ -2,9 +2,26 @@ import React from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StreamCall, CallContent } from '@stream-io/video-react-native-sdk';
+import {
+  StreamCall,
+  CallContent,
+  FloatingParticipantView,
+} from '@stream-io/video-react-native-sdk';
 import { useActiveCall } from '../context/ActiveCallProvider';
 import { dark, radius, spacing } from '../theme';
+
+// The small draggable self-view snaps to the very top of the call, which is
+// under the status bar in this edge-to-edge app. Starting its drag area below
+// the bar keeps the tile clear of it in both top corners.
+const SelfView = (props) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <FloatingParticipantView
+      {...props}
+      draggableContainerStyle={{ marginTop: insets.top + spacing.sm }}
+    />
+  );
+};
 
 // Full-screen view of the call the user is in. The call itself lives in
 // ActiveCallProvider, so leaving this screen (back / minimize) keeps the call
@@ -46,7 +63,7 @@ const CallScreen = ({ navigation }) => {
     // system navigation bar, so the screen ends above it for them.
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StreamCall call={call}>
-        <CallContent onHangupCallHandler={hangup} />
+        <CallContent onHangupCallHandler={hangup} FloatingParticipantView={SelfView} />
         {/* Minimize: return to the chat while staying in the call. */}
         <TouchableOpacity
           style={styles.minimize}
