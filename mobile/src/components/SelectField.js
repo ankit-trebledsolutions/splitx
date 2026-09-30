@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { dark, radius, spacing } from '../theme';
+import useSheetBottom from '../hooks/useSheetBottom';
 
 // Dropdown styled to match TextField's dark variant.
 //   options: [{ label, value }]
@@ -31,6 +32,7 @@ const SelectField = ({
   const selected = options.find((o) => o.value === value);
 
   const show = () => setOpen(true);
+  const sheetBottom = useSheetBottom(spacing.xl);
 
   const pick = (option) => {
     onChange?.(option.value);
@@ -59,7 +61,7 @@ const SelectField = ({
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet}>
+          <Pressable style={[styles.sheet, { paddingBottom: sheetBottom }]}>
             {label ? <Text style={styles.sheetTitle}>{label}</Text> : null}
             {/* A long list (the 14 days of a trip) scrolls inside the sheet
                 rather than pushing its top off the screen. A short one stays

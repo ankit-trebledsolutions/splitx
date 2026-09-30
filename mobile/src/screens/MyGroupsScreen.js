@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import SearchField from '../components/SearchField';
 import AiItineraryModal from '../components/AiItineraryModal';
 import { fetchGroups } from '../api/groups.api';
@@ -122,7 +122,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
   };
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       {/* Upper container on the raised card background: header, title, search. */}
       <View style={styles.topArea}>
         <View style={styles.headerRow}>

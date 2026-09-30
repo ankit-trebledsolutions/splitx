@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import GradientButton from '../components/GradientButton';
 import TextField from '../components/TextField';
 import DateField from '../components/DateField';
@@ -491,7 +491,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
   );
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       <Root
         style={[styles.flex, !IS_IOS && { paddingBottom: lift }]}
         {...(IS_IOS ? { behavior: 'padding' } : { onLayout })}

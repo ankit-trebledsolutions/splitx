@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { profileDefaults, accountSettings, helpSupport } from '../data/profile';
@@ -13,7 +13,7 @@ const ProfileScreen = ({ navigation }) => {
   const profile = { ...profileDefaults, ...(user ?? {}) };
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Profile</Text>

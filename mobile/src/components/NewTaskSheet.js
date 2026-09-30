@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import TextField from './TextField';
 import GradientButton from './GradientButton';
 import Avatar from './Avatar';
+import useSheetBottom from '../hooks/useSheetBottom';
 import { dark, radius, spacing } from '../theme';
 import { formatTime } from '../utils/format';
 
@@ -46,6 +47,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
   const [dueAt, setDueAt] = useState(defaultDueAt);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const sheetBottom = useSheetBottom(spacing.lg);
 
   // Re-seed each time the sheet opens so a new suggestion replaces the old draft.
   useEffect(() => {
@@ -106,7 +108,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.sheetWrap}
         >
-          <Pressable style={styles.sheet}>
+          <Pressable style={[styles.sheet, { paddingBottom: sheetBottom }]}>
             <View style={styles.grabber} />
 
             <View style={styles.headerRow}>

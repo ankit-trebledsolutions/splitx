@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { colors, dark, radius, spacing } from '../theme';
 import { formatDate } from '../utils/format';
+import useSheetBottom from '../hooks/useSheetBottom';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -42,6 +43,8 @@ const DateField = ({
       ...Array.from({ length: days }, (_, i) => new Date(year, m, i + 1)),
     ];
   }, [month]);
+
+  const sheetBottom = useSheetBottom(spacing.xl);
 
   const show = () => {
     setMonth(startOfDay(value ?? new Date()));
@@ -87,7 +90,7 @@ const DateField = ({
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet}>
+          <Pressable style={[styles.sheet, { paddingBottom: sheetBottom }]}>
             <View style={styles.monthRow}>
               <TouchableOpacity
                 style={styles.monthButton}
@@ -222,7 +225,7 @@ const styles = StyleSheet.create({
   dayToday: { borderWidth: 1, borderColor: dark.border },
   daySelected: { backgroundColor: dark.button, borderColor: dark.button },
   dayText: { color: dark.text, fontSize: 15 },
-  dayTextDisabled: { color: 'rgba(255,255,255,0.2)' },
+  dayTextDisabled: { color: 'rgba(255, 255, 255, 0.2)' },
   dayTextSelected: { color: '#04121C', fontWeight: '800' },
 });
 

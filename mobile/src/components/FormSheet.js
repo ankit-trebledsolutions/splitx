@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import GradientButton from './GradientButton';
+import useSheetBottom from '../hooks/useSheetBottom';
 import { dark, spacing } from '../theme';
 
 /**
@@ -28,40 +29,43 @@ const FormSheet = ({
   onClose,
   onSubmit,
   children,
-}) => (
-  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <Pressable style={styles.backdrop} onPress={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.sheetWrap}
-      >
-        <Pressable style={styles.sheet}>
-          <View style={styles.grabber} />
+}) => {
+  const sheetBottom = useSheetBottom(spacing.lg);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.sheetWrap}
+        >
+          <Pressable style={[styles.sheet, { paddingBottom: sheetBottom }]}>
+            <View style={styles.grabber} />
 
-          <View style={styles.headerRow}>
-            <View style={styles.headerText}>
-              <Text style={styles.title}>{title}</Text>
-              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            <View style={styles.headerRow}>
+              <View style={styles.headerText}>
+                <Text style={styles.title}>{title}</Text>
+                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+                <Ionicons name="close" size={18} color={dark.text} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
-              <Ionicons name="close" size={18} color={dark.text} />
-            </TouchableOpacity>
-          </View>
 
-          <ScrollView
-            style={styles.body}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {children}
-          </ScrollView>
+            <ScrollView
+              style={styles.body}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
 
-          <GradientButton title={submitLabel} onPress={onSubmit} loading={saving} style={styles.save} />
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Pressable>
-  </Modal>
-);
+            <GradientButton title={submitLabel} onPress={onSubmit} loading={saving} style={styles.save} />
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Pressable>
+    </Modal>
+  );
+};
 
 export const sheetStyles = StyleSheet.create({
   label: {

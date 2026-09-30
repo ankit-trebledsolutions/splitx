@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { fetchGroups, fetchExpenses } from '../api/groups.api';
@@ -61,7 +61,7 @@ const ExpensesScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <DarkScreen>
+      <DarkScreen edges={TOP_ONLY}>
         <View style={styles.loading}>
           <ActivityIndicator color={dark.accentGreen} />
         </View>
@@ -104,7 +104,7 @@ const ExpensesScreen = ({ navigation }) => {
   };
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       <Text style={styles.title}>Expenses</Text>
       <SectionList
         sections={sections}

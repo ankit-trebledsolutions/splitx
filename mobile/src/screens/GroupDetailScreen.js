@@ -364,7 +364,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
         onRequestClose={() => !deleting && setConfirmingDelete(false)}
       >
         <Pressable style={styles.backdrop} onPress={() => !deleting && setConfirmingDelete(false)}>
-          <Pressable style={styles.sheet}>
+          <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
             <View style={styles.dangerBadge}>
               <Ionicons name="warning-outline" size={24} color="#F97362" />
             </View>
@@ -422,7 +422,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
         onRequestClose={() => setPickingAdmin(false)}
       >
         <Pressable style={styles.backdrop} onPress={() => !leaving && setPickingAdmin(false)}>
-          <Pressable style={styles.sheet}>
+          <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
             <Text style={styles.sheetTitle}>Choose a new admin</Text>
             <Text style={styles.sheetHint}>
               You're the admin of "{group.name}". Pick who takes over before you leave.

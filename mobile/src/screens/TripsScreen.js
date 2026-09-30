@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import MemberAvatars from '../components/MemberAvatars';
 import GradientButton from '../components/GradientButton';
 import { fetchTrips } from '../api/trips.api';
@@ -145,7 +145,7 @@ const TripsScreen = ({ navigation }) => {
 
   if (!data && !error) {
     return (
-      <DarkScreen>
+      <DarkScreen edges={TOP_ONLY}>
         <View style={styles.center}>
           <ActivityIndicator color={dark.accentGreen} />
         </View>
@@ -349,7 +349,7 @@ const TripsScreen = ({ navigation }) => {
   const listed = filter === 'all' && featured ? visible.filter((t) => t._id !== featured._id) : visible;
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import CallBanner from '../components/CallBanner';
 import AiItineraryBanner, { aiRunningText } from '../components/AiItineraryBanner';
@@ -860,7 +860,11 @@ const GroupChatScreen = ({ route, navigation }) => {
     !aiNudgeDismissed;
 
   return (
-    <DarkScreen>
+    // The chat composer pads itself down to the navigation bar. Every other
+    // tab ends in a list and the floating button, so the screen stops above
+    // the bar for them. Done as padding because the safe area does not pick
+    // up its edges changing while the screen is open.
+    <DarkScreen edges={TOP_ONLY} style={tab !== 'chat' && { paddingBottom: insets.bottom }}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={20} color={dark.text} />
@@ -1070,7 +1074,14 @@ const GroupChatScreen = ({ route, navigation }) => {
         <View
           style={[
             styles.fabWrap,
-            tab === 'chat' && { bottom: composerBottomPadding(insets) + COMPOSER_HEIGHT + 14 },
+            // Pinned, so the screen's padding does not move it: it clears the
+            // navigation bar itself.
+            {
+              bottom:
+                tab === 'chat'
+                  ? composerBottomPadding(insets) + COMPOSER_HEIGHT + 14
+                  : insets.bottom + spacing.xl,
+            },
           ]}
         >
           {actionsOpen && (

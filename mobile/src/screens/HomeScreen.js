@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import NetBalanceBg from '../assets/net-balance-bg.svg';
 import { fetchNotifications } from '../api/notifications.api';
 import { fetchGroups } from '../api/groups.api';
@@ -163,7 +163,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}

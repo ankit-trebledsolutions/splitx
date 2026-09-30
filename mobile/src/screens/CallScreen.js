@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StreamCall, CallContent } from '@stream-io/video-react-native-sdk';
 import { useActiveCall } from '../context/ActiveCallProvider';
 import { dark, radius, spacing } from '../theme';
@@ -10,6 +11,7 @@ import { dark, radius, spacing } from '../theme';
 // running and shows the minimized bar in the chat — only Hang up ends it.
 const CallScreen = ({ navigation }) => {
   const { call, status, error, leave } = useActiveCall();
+  const insets = useSafeAreaInsets();
 
   const hangup = async () => {
     await leave();
@@ -40,7 +42,9 @@ const CallScreen = ({ navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    // The call controls sit on the screen bottom and know nothing about the
+    // system navigation bar, so the screen ends above it for them.
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StreamCall call={call}>
         <CallContent onHangupCallHandler={hangup} />
         {/* Minimize: return to the chat while staying in the call. */}

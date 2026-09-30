@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DarkScreen from '../components/DarkScreen';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import TypingDots from '../components/TypingDots';
 import AppAlert from '../components/AppAlert';
@@ -295,7 +295,7 @@ const DirectChatScreen = ({ route, navigation }) => {
   const canSend = draft.trim().length > 0;
 
   return (
-    <DarkScreen>
+    <DarkScreen edges={TOP_ONLY}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={18} color={dark.text} />
