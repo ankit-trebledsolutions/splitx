@@ -1,7 +1,7 @@
 import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
 // The email template editor bundles TinyMCE, which is imported one piece at a
 // time (src/pages/layout-1/manage-cms/email-template/editor.jsx). Left to find
@@ -31,18 +31,29 @@ const TINYMCE = [
   'tinymce/plugins/wordcount',
 ];
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  base: process.env.VITE_BASE_URL || '/',
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+export default defineConfig(({ mode }) => {
+  // The browser only ever talks to this server; /api and /uploads are passed on
+  // to the API named in .env. That keeps the admin session cookie same-origin.
+  // The deployed site does the same job with a rewrite rule on the static host.
+  const apiUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL || 'http://localhost:4000';
+  const proxy = { target: apiUrl, changeOrigin: true };
+
+  return {
+    plugins: [react(), tailwindcss()],
+    base: process.env.VITE_BASE_URL || '/',
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
     },
-  },
-  optimizeDeps: {
-    include: ['@tinymce/tinymce-react', ...TINYMCE],
-  },
-  build: {
-    chunkSizeWarningLimit: 3000,
-  },
+    optimizeDeps: {
+      include: ['@tinymce/tinymce-react', ...TINYMCE],
+    },
+    server: {
+      proxy: { '/api': proxy, '/uploads': proxy },
+    },
+    build: {
+      chunkSizeWarningLimit: 3000,
+    },
+  };
 });

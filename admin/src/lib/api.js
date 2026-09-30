@@ -4,7 +4,12 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 // own, with its own hardcoded fallback URL — so changing the API host meant
 // editing seven files, and a dropped session went unhandled in all of them.
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+// The panel calls the API on its own origin and something in front forwards
+// /api and /uploads to the real one: the Vite dev server locally (see
+// vite.config.js, which is where VITE_API_URL is read), a rewrite rule on the
+// static host in production. Calling the API's own host directly would make the
+// session cookie a cross-site one, which browsers do not send with sameSite 'lax'.
+export const API_URL = '';
 
 // Everything the panel calls lives under the admin router. Nothing here should
 // ever reach the mobile app's endpoints.
