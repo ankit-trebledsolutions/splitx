@@ -87,6 +87,13 @@ if (!settingsKey && isProduction) {
   console.warn('[settings] SETTINGS_ENCRYPTION_KEY is not set: API keys cannot be changed from the admin panel');
 }
 
+// Reminders ring from the phones themselves. The server's part at reminder time
+// (the in-app entry, a backup push, moving weekly ones on) is a timer in this
+// process, so it must run in exactly one place: on by default in production,
+// off everywhere else. A machine whose .env points at the live database would
+// otherwise send pushes to real people. REMINDER_SWEEP=on|off overrides.
+const reminderSweep = (process.env.REMINDER_SWEEP || (isProduction ? 'on' : 'off')) === 'on';
+
 // Admin panel. The panel is a browser on a different origin to the API, and it
 // authenticates with a cookie, so its origins must be listed explicitly —
 // a wildcard is not allowed alongside credentials. The mobile app is
@@ -107,6 +114,7 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   adminOrigins,
   settingsKey,
+  reminderSweep,
   // Admin sessions are shorter-lived than the mobile app's: a panel that can
   // delete accounts should not stay signed in for a week by default.
   adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '8h',

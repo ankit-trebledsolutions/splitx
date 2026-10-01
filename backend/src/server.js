@@ -3,6 +3,7 @@ const connectDB = require('./config/db');
 const env = require('./config/env');
 const realtime = require('./realtime/socket');
 const aiItineraryService = require('./services/aiItinerary.service');
+const reminderSweep = require('./services/reminderSweep.service');
 const integrations = require('./integrations/store');
 
 // How long a shutdown waits for AI jobs to be closed before carrying on regardless.
@@ -31,8 +32,13 @@ const start = async () => {
     // Express, WebSocket upgrades go to the realtime layer.
     realtime.init(server);
 
+    // Reminder-time bookkeeping and the backup push (see reminderSweep.service).
+    if (env.reminderSweep) reminderSweep.start();
+    console.log(`[reminders] backup sweep is ${env.reminderSweep ? 'on' : 'off'}`);
+
     const shutdown = async (signal) => {
       console.log(`${signal} received, shutting down`);
+      reminderSweep.stop();
       // Before the sockets close, so requesters still get the "failed" event
       // instead of watching the planning animation until it times out.
       await Promise.race([

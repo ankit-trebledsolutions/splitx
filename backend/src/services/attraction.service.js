@@ -14,6 +14,7 @@ const listAttractions = async (groupId, userId) => {
 
 const createAttraction = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
+  groupService.assertTripGroup(group, 'Only trip groups have attractions.');
 
   const attraction = await Attraction.create({
     group: groupId,

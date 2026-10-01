@@ -1,9 +1,9 @@
 const Task = require('../models/Task');
-const Reminder = require('../models/Reminder');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
 const notificationService = require('./notification.service');
+const reminderService = require('./reminder.service');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [
@@ -91,7 +91,7 @@ const deleteTask = async (taskId, userId) => {
   if (!task.createdBy._id.equals(userId)) {
     throw ApiError.forbidden('Only the task creator can delete it');
   }
-  await Reminder.deleteMany({ task: task._id });
+  await reminderService.removeForTask(task._id);
   await messageService.deleteForEntity('task', task._id);
   await task.deleteOne();
 };

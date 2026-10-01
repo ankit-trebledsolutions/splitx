@@ -9,6 +9,7 @@
     "lint": "eslint src",
     "test": "node --test",
     "smoke:ai": "node scripts/smoke-ai-itinerary.js",
+    "smoke:reminders": "node scripts/smoke-reminders.js",
     "seed:admin": "node scripts/seed-super-admin.js",
     "dev:local": "node scripts/dev-local.js"
   },

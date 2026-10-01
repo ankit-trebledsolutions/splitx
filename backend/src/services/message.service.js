@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const Photo = require('../models/Photo');
+const Reminder = require('../models/Reminder');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const storedFileService = require('./storedFile.service');
@@ -24,7 +25,8 @@ const POPULATE = [
       { path: 'source.user', select: SENDER_FIELDS },
     ],
   },
-  { path: 'reminder' },
+  // Without who muted it or has the alarm set: that is per member, not for the chat.
+  { path: 'reminder', select: '-mutedBy -armedBy' },
   // Just enough of the quoted message to draw the reply preview.
   {
     path: 'replyTo',
@@ -36,6 +38,15 @@ const POPULATE = [
 // What people write themselves, as opposed to system lines and activity cards.
 // Only these can be replied to or deleted.
 const USER_TYPES = ['text', 'image', 'audio', 'file'];
+
+/**
+ * A private ("Just me") reminder gets no chat card. Ones made before that was
+ * the rule did get one, so those cards are left out for everyone but their
+ * owner. Done in the query rather than afterwards: the app takes a short page
+ * to mean it has reached the start of the chat.
+ */
+const hiddenReminderIds = (groupId, userId) =>
+  Reminder.find({ group: groupId, scope: 'me', createdBy: { $ne: userId } }).distinct('_id');
 
 /**
  * `before` pages backwards through history; `after` returns only what arrived
@@ -52,6 +63,9 @@ const listMessages = async (groupId, userId, { limit = 100, before, after } = {}
     if (after) query.createdAt.$gt = new Date(after);
   }
   const cap = Math.min(limit, 200);
+
+  const hidden = await hiddenReminderIds(groupId, userId);
+  if (hidden.length) query.reminder = { $nin: hidden };
 
   if (after) {
     // Catch-up: oldest-first, everything newer than the client's last message.

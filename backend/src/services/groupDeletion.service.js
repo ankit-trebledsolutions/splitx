@@ -12,6 +12,7 @@ const Notification = require('../models/Notification');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const notificationService = require('./notification.service');
+const reminderSync = require('./reminderSync.service');
 const storage = require('../storage');
 const realtime = require('../realtime/socket');
 
@@ -74,6 +75,8 @@ const deleteGroup = async (groupId, userId) => {
   await Promise.all(CHILD_MODELS.map((Model) => Model.deleteMany({ group: groupId })));
 
   realtime.closeGroup(groupId, { name: group.name, deletedBy: userId });
+  // The group's reminders are gone: every member's phone drops their alarms.
+  reminderSync.refresh(group.members.map((m) => m._id));
 
   // Told one by one and without a group attached: there is nothing left to open.
   await Promise.all(

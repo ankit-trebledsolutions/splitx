@@ -29,6 +29,7 @@ const listDays = async (groupId, userId) => {
 
 const createDay = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
+  groupService.assertTripGroup(group, 'Only trip groups have an itinerary.');
   await aiItineraryService.assertNotGenerating(groupId);
 
   let dayNumber = payload.dayNumber;

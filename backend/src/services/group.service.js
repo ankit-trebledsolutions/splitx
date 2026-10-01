@@ -3,6 +3,7 @@ const Expense = require('../models/Expense');
 const Task = require('../models/Task');
 const ApiError = require('../utils/ApiError');
 const notificationService = require('./notification.service');
+const reminderSync = require('./reminderSync.service');
 
 const MEMBER_FIELDS = 'name email lastSeenAt';
 
@@ -34,6 +35,16 @@ const getGroupForMember = async (groupId, userId) => {
   return group;
 };
 
+/**
+ * The itinerary and attractions belong to trips. The app hides those tabs for
+ * every other kind of group; this is the same rule for anything that reaches
+ * the API another way. Only adding is refused: whatever an older group already
+ * holds can still be read and removed.
+ */
+const assertTripGroup = (group, message) => {
+  if (group.groupType !== 'trip') throw new ApiError(400, message, { code: 'TRIP_ONLY' });
+};
+
 const joinGroupByCode = async (userId, inviteCode) => {
   const group = await Group.findOne({ inviteCode: inviteCode.toUpperCase() });
   if (!group) throw ApiError.notFound('No group found for that invite code');
@@ -43,6 +54,8 @@ const joinGroupByCode = async (userId, inviteCode) => {
   group.members.push(userId);
   await group.save();
   await group.populate('members', MEMBER_FIELDS);
+  // The group's reminders now ring for them too.
+  reminderSync.refresh([userId]);
 
   const joiner = group.members.find((m) => m._id.equals(userId));
   await notificationService.notifyGroup({
@@ -83,8 +96,10 @@ const detachMember = async (group, userId) => {
   group.members = group.members.filter((m) => !sameId(m._id, userId));
   group.mutedBy = group.mutedBy.filter((m) => !sameId(m, userId));
   await group.save();
-  // Required lazily: the realtime layer and message service both depend on this module.
+  // Required lazily: the realtime layer, message service and reminder service
+  // all depend on this module.
   require('../realtime/socket').removeFromGroup(userId, group._id);
+  await require('./reminder.service').forgetMember(group._id, userId);
 };
 
 const postSystem = (groupId, text) => require('./message.service').postSystem(groupId, text);
@@ -167,13 +182,15 @@ const removeMember = async (groupId, adminId, memberId) => {
   return group;
 };
 
-// Muting only silences device pushes; the in-app notification list still fills.
+// Muting silences device pushes and other members' reminder alarms; the in-app
+// notification list still fills.
 const setMuted = async (groupId, userId, muted) => {
   await getGroupForMember(groupId, userId);
   await Group.updateOne(
     { _id: groupId },
     muted ? { $addToSet: { mutedBy: userId } } : { $pull: { mutedBy: userId } }
   );
+  reminderSync.refresh([userId]);
   return { muted };
 };
 
@@ -337,6 +354,7 @@ module.exports = {
   createGroup,
   listGroupsForUser,
   getGroupForMember,
+  assertTripGroup,
   joinGroupByCode,
   leaveGroup,
   removeMember,
