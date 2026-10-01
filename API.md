@@ -275,7 +275,7 @@ Response: `{ "success": true, "message": "Group deleted" }`. Afterwards every re
 
 ### `PUT /groups/:groupId/mute`
 
-Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller only. While muted, the caller gets no device pushes from this group; in-app notifications are still recorded. Response: `{ "data": { "muted": true } }`
+Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller only. While muted, the caller gets no device pushes from this group and other members' reminders there do not ring on their phone (their own still do); in-app notifications are still recorded. Response: `{ "data": { "muted": true } }`
 
 ### `GET /groups/:groupId/balances`
 
@@ -476,25 +476,100 @@ Any subset of the create fields plus `status`: `open` \| `done`.
 
 ## Reminders
 
-### `GET /groups/:groupId/reminders` · `POST /groups/:groupId/reminders`
+A reminder rings as an alarm **on the phone**: the app hands it to the phone's own alarm clock, so it rings at the exact minute with the app closed or no signal. The server's part is to keep every phone's alarms in step with what is stored here (silent pushes, below) and to act as a backup at reminder time.
 
-Create body:
+A reminder is one of three kinds:
+
+| Kind | `group` | `scope` | Rings for |
+| --- | --- | --- | --- |
+| Shared | a group | `group` | every member of the group |
+| Private | a group | `me` | its creator only; nobody else can see it, and it gets no chat card |
+| Personal | `null` | `me` | its creator only; it belongs to no group |
+
+Reminder object, as returned by every endpoint here. It is written for the person asking, so two members can get different `muted` and `rings` for the same reminder:
+
+| Field | Meaning |
+| --- | --- |
+| `_id`, `title`, `subtitle`, `remindAt`, `scope`, `repeatWeekly`, `icon`, `task`, `createdBy: { _id, name, email }` | as stored |
+| `group`, `groupName` | the group's id and name; both `null` for a personal reminder |
+| `enabled` | `false` means switched off for everybody |
+| `muted` | the caller switched it off for themselves |
+| `rings` | whether it rings on the caller's phone: `enabled`, not `muted`, and not someone else's reminder in a group the caller has muted. The app sets an alarm only when this is `true` |
+| `repeatUntil` | for a weekly reminder in a trip with a start date, the end of the trip's last day; otherwise `null` (no end) |
+| `firedAt` | when the server dealt with the current `remindAt`; `null` while it is still to come |
+
+### `GET /groups/:groupId/reminders`
+
+The group's shared reminders plus the caller's own private ones, soonest first.
+
+### `POST /groups/:groupId/reminders`
 
 | Body field | Type | Rules |
 | --- | --- | --- |
 | `title` | string | required, ≤200 |
 | `subtitle` | string | optional, ≤200 |
-| `remindAt` | date | required |
+| `remindAt` | date | required, not in the past (`400` "Pick a time in the future for the reminder") |
 | `scope` | enum | `group` (default) \| `me` |
 | `repeatWeekly` | boolean | optional |
 | `icon` | string | optional Ionicons name, ≤40 |
-| `task` | ObjectId | optional linked task |
+| `task` | ObjectId | optional linked task; must be a task of this group |
+
+A shared reminder posts a card in the group chat and notifies the other members ("Reminder Set"). A private one does neither.
+
+### `GET /reminders`
+
+Every reminder that can ring for the caller, across all their groups, plus their personal ones. One-off reminders older than 30 days are left out. This is what the app syncs its alarms from.
+
+### `POST /reminders`
+
+Creates a **personal** reminder. Body: `title`, `subtitle`, `remindAt`, `repeatWeekly`, `icon` as above.
 
 ### `PATCH /reminders/:reminderId`
 
-Any subset of the create fields plus `enabled`: boolean (toggle on/off).
+Any subset of `title`, `subtitle`, `remindAt`, `scope`, `repeatWeekly`, `icon`, plus:
+
+| Body field | Meaning |
+| --- | --- |
+| `muted` | boolean. The caller's own switch: off on their phone, still ringing for everyone else |
+| `enabled` | boolean. Off or on for everybody |
+
+Any member of the group may edit a shared reminder. Only its creator may change `scope` (`403` otherwise); making it private removes its chat card. A new `remindAt` must be in the future.
 
 ### `DELETE /reminders/:reminderId`
+
+The creator, or the group's admin (`403` "Only the reminder creator can delete it" otherwise). Deleting a task deletes its reminders too.
+
+### `POST /reminders/armed`
+
+Body: `{ "ids": ["<reminderId>", ...] }` (≤500). The phone reports the alarms it has set. Only reminders the caller can see are recorded; the rest are ignored. See "At reminder time" below.
+
+A report is forgotten when it can no longer be trusted: the reminder's time changes, the person signs out (`DELETE /notifications/push-token`), or a push token they have not used before is registered with `POST /notifications/push-token` (a new phone or a reinstall). The app reports again after its next sync.
+
+### Silent pushes (keeping phones in step)
+
+Whenever a reminder is created, changed, deleted, switched off, or its audience changes, the phones concerned get a **silent** push: no title or body, so nothing is shown, and the app's background task applies it.
+
+| `data` | Sent to | The app |
+| --- | --- | --- |
+| `{ type: "reminder-sync", action: "upsert", reminder }` | everyone it rings for | sets or moves that alarm. `reminder` holds `_id, title, subtitle, remindAt, group, groupName, task, repeatWeekly, repeatUntil` |
+| `{ type: "reminder-sync", action: "remove", reminderId }` | everyone it no longer rings for | drops that alarm |
+| `{ type: "reminder-sync", action: "refresh" }` | one person | reads `GET /reminders` again. Sent on joining, leaving or being removed from a group, muting or unmuting one, and when a group is deleted |
+
+Leaving or being removed from a group deletes that member's private reminders there.
+
+The realtime event `reminder:changed` `{ groupId }` goes to the group's members for a shared reminder, and to the creator alone for a private or personal one (`groupId` is `null` for personal). It carries no data: refetch.
+
+### At reminder time
+
+A timer in the API process (every 30 seconds) picks up reminders that have come due:
+
+- everyone the reminder is for, except those who switched it off, gets an in-app notification ("Reminder", type `reminder`, `entityId` = the linked task if any);
+- those it should ring for whose phone never called `POST /reminders/armed` get a visible push as a backup (`data: { type: "reminder", reminderId, groupId?, entityId? }`);
+- a weekly reminder moves on seven days, until `repeatUntil`.
+
+A reminder found more than 15 minutes late (the server was asleep, or the reminder predates this feature) is closed without telling anyone.
+
+The timer is on by default when `NODE_ENV=production` and off otherwise; `REMINDER_SWEEP=on|off` overrides. Keep it off on any machine whose `.env` points at the live database.
 
 ---
 
@@ -524,6 +599,8 @@ Every write below (create, update, delete, the activity endpoints, and an AI pla
 | `AI_UNAVAILABLE` | 503 | The planner is switched off for now (a key or billing problem at OpenAI, or the server-wide daily cap) | |
 
 ### `GET /groups/:groupId/itinerary` · `POST /groups/:groupId/itinerary`
+
+The itinerary belongs to trip groups. `POST` on any other kind of group answers `400` with code `TRIP_ONLY` ("Only trip groups have an itinerary."), and the app does not show the Itinerary tab there. `GET` still answers for every group, with whatever an older group already holds.
 
 Create-day body:
 
@@ -698,6 +775,8 @@ Response: `{ "data": { "deletedIds": [ ... ] } }` — the photos that were actua
 ## Attractions
 
 ### `GET /groups/:groupId/attractions` · `POST /groups/:groupId/attractions`
+
+Attractions belong to trip groups. `POST` on any other kind of group answers `400` with code `TRIP_ONLY` ("Only trip groups have attractions."), and the app does not show the Attractions tab there. `GET` still answers for every group.
 
 Create body:
 

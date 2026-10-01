@@ -32,3 +32,6 @@ node_modules/
 .expo/
 dist/
 *.log
+
+# Gradle output of local native modules (mobile/modules/*).
+/mobile/modules/*/android/build
