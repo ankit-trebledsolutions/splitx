@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The incoming call screen. Colours and shapes follow the app's dark theme
+     (mobile/src/theme/index.js); change them in res/drawable and here. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/splix_call_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/splix_alarm_bg"
+  android:gravity="center_horizontal"
+  android:orientation="vertical"
+  android:paddingLeft="24dp"
+  android:paddingTop="24dp"
+  android:paddingRight="24dp"
+  android:paddingBottom="32dp">
+
+  <TextView
+    android:id="@+id/splix_call_label"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="16dp"
+    android:letterSpacing="0.18"
+    android:text="INCOMING GROUP CALL"
+    android:textColor="#8A97A6"
+    android:textSize="12sp"
+    android:textStyle="bold" />
+
+  <Space
+    android:layout_width="1dp"
+    android:layout_height="0dp"
+    android:layout_weight="1" />
+
+  <!-- Room for the rings to grow: they pulse from 0.6 to 1.2 of their size. -->
+  <FrameLayout
+    android:layout_width="248dp"
+    android:layout_height="248dp">
+
+    <View
+      android:id="@+id/splix_call_ring_outer"
+      android:layout_width="200dp"
+      android:layout_height="200dp"
+      android:layout_gravity="center"
+      android:background="@drawable/splix_alarm_ring" />
+
+    <View
+      android:id="@+id/splix_call_ring_inner"
+      android:layout_width="200dp"
+      android:layout_height="200dp"
+      android:layout_gravity="center"
+      android:background="@drawable/splix_alarm_ring" />
+
+    <!-- The group's initials, as on its avatar in the app. -->
+    <TextView
+      android:id="@+id/splix_call_initials"
+      android:layout_width="112dp"
+      android:layout_height="112dp"
+      android:layout_gravity="center"
+      android:background="@drawable/splix_alarm_core"
+      android:gravity="center"
+      android:maxLines="1"
+      android:textColor="#04121C"
+      android:textSize="40sp"
+      android:textStyle="bold" />
+  </FrameLayout>
+
+  <TextView
+    android:id="@+id/splix_call_group"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="20dp"
+    android:ellipsize="end"
+    android:gravity="center"
+    android:maxLines="2"
+    android:textColor="#F4F7FA"
+    android:textSize="28sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:id="@+id/splix_call_caller"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:ellipsize="end"
+    android:gravity="center"
+    android:maxLines="1"
+    android:textColor="#8A97A6"
+    android:textSize="15sp" />
+
+  <!-- "Unlock to join the call", once Accept has been pressed. -->
+  <TextView
+    android:id="@+id/splix_call_status"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="18dp"
+    android:gravity="center"
+    android:textColor="#00C4D0"
+    android:textSize="14sp"
+    android:textStyle="bold"
+    android:visibility="gone" />
+
+  <Space
+    android:layout_width="1dp"
+    android:layout_height="0dp"
+    android:layout_weight="1" />
+
+  <LinearLayout
+    android:id="@+id/splix_call_buttons"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:orientation="horizontal">
+
+    <LinearLayout
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:gravity="center_horizontal"
+      android:orientation="vertical">
+
+      <ImageView
+        android:id="@+id/splix_call_decline"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:background="@drawable/splix_call_decline"
+        android:clickable="true"
+        android:contentDescription="Decline call"
+        android:focusable="true"
+        android:foreground="?android:attr/selectableItemBackgroundBorderless"
+        android:padding="20dp"
+        android:src="@drawable/splix_ic_call_end"
+        android:tint="#FFFFFF" />
+
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Decline"
+        android:textColor="#8A97A6"
+        android:textSize="13sp" />
+    </LinearLayout>
+
+    <LinearLayout
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:gravity="center_horizontal"
+      android:orientation="vertical">
+
+      <ImageView
+        android:id="@+id/splix_call_accept"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:background="@drawable/splix_call_accept"
+        android:clickable="true"
+        android:contentDescription="Accept call"
+        android:focusable="true"
+        android:foreground="?android:attr/selectableItemBackgroundBorderless"
+        android:padding="20dp"
+        android:src="@drawable/splix_ic_call"
+        android:tint="#FFFFFF" />
+
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Accept"
+        android:textColor="#8A97A6"
+        android:textSize="13sp" />
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>

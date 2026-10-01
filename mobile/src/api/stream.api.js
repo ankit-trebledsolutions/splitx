@@ -6,9 +6,11 @@ export const streamTokenRequest = async () => {
   return data.data;
 };
 
-// Drops a "call started" / "Call ended" system message into the group chat.
-// `event` is 'started' or 'ended'.
-export const postCallEvent = async (groupId, event) => {
-  const { data } = await client.post('/stream/call-event', { groupId, event });
+// Drops a "call started" / "Call ended" system message into the group chat,
+// and makes the other members' phones ring (or stop ringing).
+// `event` is 'started' or 'ended'; `video` (with 'started') is whether the
+// call began with the camera on, which is what their phones show.
+export const postCallEvent = async (groupId, event, { video } = {}) => {
+  const { data } = await client.post('/stream/call-event', { groupId, event, video });
   return data.data;
 };

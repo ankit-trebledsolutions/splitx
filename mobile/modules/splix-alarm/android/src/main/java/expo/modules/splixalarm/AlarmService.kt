@@ -1,7 +1,5 @@
 package expo.modules.splixalarm
 
-import android.app.ActivityManager
-import android.app.KeyguardManager
 import android.app.Notification
 import android.app.Service
 import android.content.Context
@@ -85,7 +83,7 @@ class AlarmService : Service() {
     current = alarm
     AlarmStore(this).ringing = alarm
 
-    val appOnScreen = isAppOnScreen()
+    val appOnScreen = isAppOnScreen(this)
     if (!enterForeground(AlarmNotifications.ringing(this, alarm, fullScreen = !appOnScreen))) {
       // Android refused the foreground service: fall back to a plain notification.
       AlarmNotifications.showPlain(this, alarm)
@@ -179,17 +177,6 @@ class AlarmService : Service() {
     stopAlerting()
     if (ringing != null) clearRinging()
     super.onDestroy()
-  }
-
-  // ---- Is the app itself on screen? ----------------------------------------
-
-  private fun isAppOnScreen(): Boolean {
-    val power = getSystemService(Context.POWER_SERVICE) as PowerManager
-    val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-    if (!power.isInteractive || keyguard.isKeyguardLocked) return false
-    val state = ActivityManager.RunningAppProcessInfo()
-    ActivityManager.getMyMemoryState(state)
-    return state.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
   }
 
   // ---- Sound ---------------------------------------------------------------

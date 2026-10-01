@@ -8,8 +8,9 @@ import { getAlarmPermissions, openAlarmSettings } from '../utils/reminderAlarms'
 import { dark, radius, spacing } from '../theme';
 
 /**
- * "Turn on reminder alarms": what Android still has to allow before a
- * reminder can ring like an alarm, with a button for each.
+ * "Turn on alarms and calls": what Android still has to allow before a
+ * reminder can ring like an alarm and a group call like a phone call, with a
+ * button for each.
  *
  * Two of the three are not popups. "Alarms & reminders" and full-screen
  * notifications are switches on a page in Android's settings, so the button
@@ -17,9 +18,11 @@ import { dark, radius, spacing } from '../theme';
  *
  * <AlarmPermissionHost /> is mounted once at the app root. Anywhere else:
  *
- *   const allowed = await ensureAlarmPermissions();
+ *   const allowed = await ensureAlarmPermissions();   // saving a reminder
+ *   const allowed = await ensureCallPermissions();    // starting a call
  *
- * shows the sheet only if something is missing, and resolves when it closes.
+ * shows the sheet only if something that purpose needs is missing, and
+ * resolves when it closes.
  */
 const GRANTED = '#17E695';
 
@@ -33,20 +36,34 @@ const isStrictBrand = () => {
 
 let present = null;
 
+// What each purpose needs. A call rings without "Alarms & reminders": that
+// switch is only about ringing at a set minute.
+const allowsAlarms = (state) => state.complete;
+const allowsCalls = (state) => state.notifications && state.fullScreen;
+
+const ensure = async (isEnough) => {
+  const state = await getAlarmPermissions();
+  if (isEnough(state) || !present) return isEnough(state);
+  return new Promise((resolve) => present(async () => resolve(isEnough(await getAlarmPermissions()))));
+};
+
 /**
  * Resolves true when a reminder can ring as an alarm. If something is missing
  * the sheet is shown first, and the answer is whatever holds when it closes.
  */
-export const ensureAlarmPermissions = async () => {
-  const state = await getAlarmPermissions();
-  if (state.complete || !present) return state.complete;
-  return new Promise((resolve) => present(resolve));
-};
+export const ensureAlarmPermissions = () => ensure(allowsAlarms);
+
+// The same for an incoming group call: shown on screen, and over the lock screen.
+export const ensureCallPermissions = () => ensure(allowsCalls);
 
 export const AlarmPermissionHost = () => {
-  const [resolve, setResolve] = useState(null);
+  // Everyone waiting for the sheet to close; empty while it is not showing.
+  // More than one when it is asked for again while already up (a call started
+  // during the first-time prompt): each is answered when it closes.
+  const [waiting, setWaiting] = useState([]);
   const [state, setState] = useState(null);
   const sheetBottom = useSheetBottom(spacing.lg);
+  const showing = waiting.length > 0;
 
   const refresh = useCallback(async () => {
     setState(await getAlarmPermissions());
@@ -54,8 +71,7 @@ export const AlarmPermissionHost = () => {
 
   useEffect(() => {
     present = (onClose) => {
-      // A function in state has to be wrapped, or React calls it as an updater.
-      setResolve(() => onClose);
+      setWaiting((list) => [...list, onClose]);
       refresh();
     };
     return () => {
@@ -65,19 +81,19 @@ export const AlarmPermissionHost = () => {
 
   // Back from Android's settings page: read the switches again.
   useEffect(() => {
-    if (!resolve) return undefined;
+    if (!showing) return undefined;
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active') refresh();
     });
     return () => subscription.remove();
-  }, [resolve, refresh]);
+  }, [showing, refresh]);
 
-  if (!resolve || !state) return null;
+  if (!showing || !state) return null;
 
-  const close = async () => {
-    const done = resolve;
-    setResolve(null);
-    done((await getAlarmPermissions()).complete);
+  const close = () => {
+    const done = waiting;
+    setWaiting([]);
+    done.forEach((onClose) => onClose());
   };
 
   const allowNotifications = async () => {
@@ -93,7 +109,7 @@ export const AlarmPermissionHost = () => {
       key: 'notifications',
       icon: 'notifications-outline',
       title: 'Notifications',
-      text: 'Shows the reminder on your screen.',
+      text: 'Shows reminders and incoming calls on your screen.',
       granted: state.notifications,
       onAllow: allowNotifications,
     },
@@ -101,7 +117,7 @@ export const AlarmPermissionHost = () => {
       key: 'exactAlarm',
       icon: 'alarm-outline',
       title: 'Alarms & reminders',
-      text: 'Rings at the exact minute.',
+      text: 'Rings a reminder at the exact minute.',
       how: 'Android opens its settings: switch on "Allow setting alarms and reminders", then come back.',
       granted: state.exactAlarm,
       onAllow: () => openAlarmSettings('exactAlarm'),
@@ -109,8 +125,8 @@ export const AlarmPermissionHost = () => {
     state.fullScreenIsSetting && {
       key: 'fullScreen',
       icon: 'phone-portrait-outline',
-      title: 'Full-screen alarm',
-      text: 'Shows the alarm when your phone is locked.',
+      title: 'Full-screen alarms and calls',
+      text: 'Shows the alarm or the incoming call when your phone is locked.',
       how: 'Android opens its settings: switch it on, then come back.',
       granted: state.fullScreen,
       onAllow: () => openAlarmSettings('fullScreen'),
@@ -126,10 +142,10 @@ export const AlarmPermissionHost = () => {
           <View style={styles.badge}>
             <Ionicons name="alarm-outline" size={26} color={dark.accentGreen} />
           </View>
-          <Text style={styles.title}>Turn on reminder alarms</Text>
+          <Text style={styles.title}>Turn on alarms and calls</Text>
           <Text style={styles.subtitle}>
-            Reminders ring like an alarm at the time you set, even when Splix is closed or your
-            phone is locked.
+            Reminders ring like an alarm and group calls ring like a phone call, even when Splix
+            is closed or your phone is locked.
           </Text>
 
           {rows.map((row) => (
@@ -162,8 +178,8 @@ export const AlarmPermissionHost = () => {
               <Ionicons name="battery-charging-outline" size={16} color="#F5B342" />
               <Text style={styles.tipText}>
                 On this phone, also allow Splix to start by itself (Autostart) and set its battery
-                use to “No restrictions”, or alarms can be stopped once the app is closed. Tap to
-                open the app’s settings.
+                use to “No restrictions”, or alarms and calls can be stopped once the app is
+                closed. Tap to open the app’s settings.
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -174,7 +190,7 @@ export const AlarmPermissionHost = () => {
             <>
               <Text style={styles.footnote}>
                 Until these are on, a reminder arrives as a normal notification and can be a few
-                minutes late.
+                minutes late, and a group call may not ring.
               </Text>
               <TouchableOpacity style={styles.later} onPress={close} activeOpacity={0.8}>
                 <Text style={styles.laterText}>Not now</Text>

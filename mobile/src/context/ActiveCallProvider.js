@@ -1,7 +1,9 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform, PermissionsAndroid } from 'react-native';
 import { useStreamClient } from './StreamVideoProvider';
 import { postCallEvent } from '../api/stream.api';
+import { ensureCallPermissions } from '../components/AlarmPermissionSheet';
+import { setActiveCall } from '../utils/incomingCalls';
 
 // Android needs runtime consent for the camera/mic before a call can open them;
 // iOS prompts on first use via the Info.plist strings. A voice call only needs
@@ -12,6 +14,16 @@ const requestCallPermissions = async (audioOnly) => {
   if (!audioOnly) needed.push(PermissionsAndroid.PERMISSIONS.CAMERA);
   const result = await PermissionsAndroid.requestMultiple(needed);
   return needed.every((p) => result[p] === PermissionsAndroid.RESULTS.GRANTED);
+};
+
+// Someone who makes calls will want to be rung for them too. Asked the first
+// time they start or join one each time the app runs, and only while something
+// a ringing call needs is still switched off.
+let askedToRing = false;
+const askToRingOnce = async () => {
+  if (askedToRing) return;
+  askedToRing = true;
+  await ensureCallPermissions();
 };
 
 /**
@@ -29,8 +41,19 @@ export const ActiveCallProvider = ({ children }) => {
   const [status, setStatus] = useState('idle'); // idle | joining | joined | error
   const [error, setError] = useState(null);
 
+  // The phone is told which call the person is in: that one must not ring
+  // here, and it stops ringing if they join it from inside the app.
+  useEffect(() => {
+    setActiveCall(status === 'joining' || status === 'joined' ? groupId : null);
+  }, [status, groupId]);
+
+  /**
+   * answering: the person accepted this call as it rang. It is then only ever
+   * joined, never started: if everyone has left by the time the app is open,
+   * joining would start a new call and ring the whole group again.
+   */
   const join = useCallback(
-    async (targetGroupId, { audioOnly = false } = {}) => {
+    async (targetGroupId, { audioOnly = false, answering = false } = {}) => {
       if (!client) return;
       // Already in this group's call — just surface it, don't rejoin.
       if (call && groupId === targetGroupId) return;
@@ -39,6 +62,8 @@ export const ActiveCallProvider = ({ children }) => {
       setError(null);
       setGroupId(targetGroupId);
       try {
+        if (!answering) await askToRingOnce();
+
         const granted = await requestCallPermissions(audioOnly);
         if (!granted) {
           throw new Error('Camera and microphone access are needed to join the call.');
@@ -55,6 +80,7 @@ export const ActiveCallProvider = ({ children }) => {
         } catch {
           isFirst = true; // call doesn't exist yet
         }
+        if (answering && isFirst) throw new Error('This call has already ended.');
 
         if (audioOnly) await nextCall.camera.disable();
         await nextCall.join({ create: true });
@@ -62,7 +88,8 @@ export const ActiveCallProvider = ({ children }) => {
         setCall(nextCall);
         setStatus('joined');
 
-        if (isFirst) postCallEvent(targetGroupId, 'started').catch(() => {});
+        // Also what makes the other members' phones ring.
+        if (isFirst) postCallEvent(targetGroupId, 'started', { video: !audioOnly }).catch(() => {});
       } catch (err) {
         setError(err);
         setStatus('error');

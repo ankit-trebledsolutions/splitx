@@ -3,7 +3,7 @@
        Settings > Alarms & reminders; without it the reminder still arrives,
        as an ordinary notification that Android may deliver late. -->
   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-  <!-- Show the alarm screen over the lock screen. -->
+  <!-- Show the alarm screen, and an incoming call, over the lock screen. -->
   <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
   <!-- Alarms do not survive a restart: they are set again once the phone is back. -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -43,6 +43,41 @@
          never brings the rest of the app up with it. -->
     <activity
       android:name=".AlarmActivity"
+      android:exported="false"
+      android:theme="@style/Theme.SplixAlarm"
+      android:launchMode="singleInstance"
+      android:taskAffinity=""
+      android:excludeFromRecents="true"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:screenOrientation="portrait"
+      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
+    <!-- Incoming group calls. Every push comes here first: the priority is
+         above expo-notifications' own service (-1), which this one extends and
+         hands everything that is not a call on to. -->
+    <service
+      android:name=".SplixMessagingService"
+      android:exported="false">
+      <intent-filter android:priority="1">
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+      </intent-filter>
+    </service>
+
+    <!-- Rings a call for well under a minute: "shortService" is the type for
+         that, and needs no permission of its own. -->
+    <service
+      android:name=".CallService"
+      android:exported="false"
+      android:foregroundServiceType="shortService" />
+
+    <receiver
+      android:name=".CallReceiver"
+      android:exported="false" />
+
+    <!-- The incoming call screen, set up the same way as the alarm screen. -->
+    <activity
+      android:name=".CallActivity"
       android:exported="false"
       android:theme="@style/Theme.SplixAlarm"
       android:launchMode="singleInstance"

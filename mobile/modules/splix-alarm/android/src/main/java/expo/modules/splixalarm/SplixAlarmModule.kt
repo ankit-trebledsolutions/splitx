@@ -13,11 +13,16 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
- * What JavaScript can ask of the alarm clock: which alarms to hold, what the
- * phone allows, and what happened while the app was not running.
+ * What JavaScript can ask of the things that ring on this phone.
  *
- * JavaScript decides which reminders ring (it knows the account and the
- * server); this side only keeps them set and rings them.
+ * Reminder alarms: which ones to hold, what the phone allows, and what
+ * happened while the app was not running. JavaScript decides which reminders
+ * ring (it knows the account and the server); this side only keeps them set
+ * and rings them.
+ *
+ * Incoming group calls: they ring without JavaScript (SplixMessagingService,
+ * CallCenter). JavaScript is told when one was accepted, so it can join it,
+ * and says which call the person is in.
  */
 class SplixAlarmModule : Module() {
   private val context: Context
@@ -31,6 +36,10 @@ class SplixAlarmModule : Module() {
     notifyJs(type, alarm, reason)
   }
 
+  private val callListener = CallCenter.Listener { type, call, reason ->
+    notifyJsOfCall(type, call, reason)
+  }
+
   private fun notifyJs(type: String, alarm: Alarm, reason: String? = null) {
     try {
       sendEvent(EVENT, mapOf("type" to type, "reason" to reason, "alarm" to alarm.toMap()))
@@ -39,26 +48,43 @@ class SplixAlarmModule : Module() {
     }
   }
 
+  private fun notifyJsOfCall(type: String, call: IncomingCall, reason: String? = null) {
+    try {
+      sendEvent(CALL_EVENT, mapOf("type" to type, "reason" to reason, "call" to call.toMap()))
+    } catch (_: Exception) {
+      // No JavaScript to tell. It asks when it next starts.
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("SplixAlarm")
 
-    Events(EVENT)
+    Events(EVENT, CALL_EVENT)
 
     OnCreate {
       AlarmEvents.add(listener)
+      CallCenter.add(callListener)
     }
 
     OnDestroy {
       AlarmEvents.remove(listener)
+      CallCenter.remove(callListener)
     }
 
-    // A tap on a missed or plain reminder while the app was already running.
+    // A tap on a missed or plain reminder, or on a missed call, while the app
+    // was already running.
     OnNewIntent { intent ->
       val alarm = Alarm.fromJsonOrNull(intent.getStringExtra(AlarmNotifications.EXTRA_OPEN))
       if (alarm != null) {
         intent.removeExtra(AlarmNotifications.EXTRA_OPEN)
         store.setOpen(alarm)
         notifyJs(AlarmEvents.OPEN, alarm)
+      }
+      val call = IncomingCall.fromJsonOrNull(intent.getStringExtra(CallNotifications.EXTRA_OPEN))
+      if (call != null) {
+        intent.removeExtra(CallNotifications.EXTRA_OPEN)
+        openedCall = call
+        notifyJsOfCall(CallCenter.OPEN, call)
       }
     }
 
@@ -118,6 +144,9 @@ class SplixAlarmModule : Module() {
         // longer on the list: they name the last person's reminders.
         AlarmNotifications.cancelEverything(context)
       }
+      // Their groups' calls as well, until someone signs in again.
+      openedCall = null
+      CallCenter.signedOut(context)
     }
 
     Function("getScheduled") {
@@ -158,6 +187,78 @@ class SplixAlarmModule : Module() {
       val carried = Alarm.fromJsonOrNull(intent?.getStringExtra(AlarmNotifications.EXTRA_OPEN))
       if (carried != null) intent?.removeExtra(AlarmNotifications.EXTRA_OPEN)
       (stored ?: carried)?.toMap()
+    }
+
+    // ---- Incoming group calls ------------------------------------------------
+
+    /**
+     * Someone is signed in, so their groups' calls may ring here. The phone
+     * stops ringing for calls at clear() (signing out) until this is said again.
+     */
+    Function("setSignedIn") {
+      CallCenter.signedIn(context)
+    }
+
+    /**
+     * A ring that reached the app over its own connection, which is quicker
+     * than the push while the app is open. The same ring arriving both ways
+     * rings once. Null fields the server may leave out are allowed.
+     */
+    AsyncFunction("showIncomingCall") { call: Map<String, Any?> ->
+      val parsed = IncomingCall.fromMap(call)
+      if (parsed != null) CallCenter.ring(context, parsed)
+      parsed != null
+    }
+
+    // The call is over (the same news as the silent push, over the app's connection).
+    AsyncFunction("endIncomingCall") { groupId: String, at: Double ->
+      CallCenter.end(context, groupId, at.toLong())
+    }
+
+    Function("getIncomingCall") {
+      CallCenter.current?.toMap()
+    }
+
+    /**
+     * Puts the call screen in front if a call is ringing. For when the app is
+     * opened mid-ring from the banner Android shows while another app is in
+     * use. True if there was one to show.
+     */
+    AsyncFunction("showRingingCall") {
+      val activity = appContext.currentActivity
+      if (CallCenter.current == null || activity == null) {
+        false
+      } else {
+        activity.startActivity(CallActivity.intent(activity))
+        true
+      }
+    }
+
+    /**
+     * The call the person accepted, for JavaScript to join. Handed over once,
+     * and only for a short while after Accept was pressed.
+     */
+    Function("takeAnsweredCall") {
+      CallCenter.takeAnswered(context)?.toMap()
+    }
+
+    // The call whose "missed" notification was tapped, to open its group. Once.
+    Function("takeCallOpen") {
+      val intent = appContext.currentActivity?.intent
+      val carried = IncomingCall.fromJsonOrNull(intent?.getStringExtra(CallNotifications.EXTRA_OPEN))
+      if (carried != null) intent?.removeExtra(CallNotifications.EXTRA_OPEN)
+      val opened = openedCall ?: carried
+      openedCall = null
+      opened?.toMap()
+    }
+
+    /**
+     * Which group's call the person is in right now, or null for none. A call
+     * they joined from inside the app stops ringing, and a call from another
+     * group is announced without ringing over the one they are in.
+     */
+    Function("setActiveCall") { groupId: String? ->
+      CallCenter.setInCall(context, groupId)
     }
   }
 
@@ -272,5 +373,10 @@ class SplixAlarmModule : Module() {
 
   private companion object {
     const val EVENT = "onAlarmEvent"
+    const val CALL_EVENT = "onCallEvent"
+
+    // A missed call tapped while the app was running, until JavaScript collects it.
+    @Volatile
+    var openedCall: IncomingCall? = null
   }
 }

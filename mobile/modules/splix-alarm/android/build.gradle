@@ -14,10 +14,31 @@ android {
   }
 }
 
+/**
+ * SplixMessagingService extends expo-notifications' push service, so every
+ * push that is not a call carries on to it unchanged. Expo links that package
+ * as the prebuilt library it publishes (at whatever version is installed), or,
+ * when it is told to build it from source, as a project of this build.
+ */
+def expoNotifications = {
+  def fromSource = findProject(':expo-notifications')
+  if (fromSource != null) return fromSource
+  def packageJson = ["node", "--print", "require.resolve('expo-notifications/package.json')"]
+    .execute(null, rootDir).text.trim()
+  def installed = new groovy.json.JsonSlurper().parse(new File(packageJson)).version
+  return "host.exp.exponent:expo.modules.notifications:${installed}"
+}
+
 dependencies {
   // NotificationCompat, ContextCompat and ServiceCompat.
   implementation "androidx.core:core-ktx:1.13.1"
 
-  // The alarm time rules (src/test): gradlew :splix-alarm:testDebugUnitTest
+  implementation expoNotifications()
+  // Firebase itself comes with expo-notifications; here it is only compiled against.
+  compileOnly "com.google.firebase:firebase-messaging:24.0.1"
+
+  // The alarm and call rules (src/test): gradlew :splix-alarm:testDebugUnitTest
   testImplementation "junit:junit:4.13.2"
+  // The real JSON classes: the ones in the Android SDK are empty shells off a phone.
+  testImplementation "org.json:json:20240303"
 }

@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import usePushNotifications from '../hooks/usePushNotifications';
 import useReminderAlarms from '../hooks/useReminderAlarms';
+import useIncomingCalls from '../hooks/useIncomingCalls';
 import { colors } from '../theme';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -53,6 +54,7 @@ const RootNavigator = () => {
   usePushNotifications({ userId: user?._id, ready });
   // After the push hook: its notification prompt goes first (see the hook).
   useReminderAlarms({ userId: user?._id, ready });
+  useIncomingCalls({ userId: user?._id, ready });
 
   if (isLoading || !splashDone) {
     return <SplashScreen />;
