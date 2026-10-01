@@ -60,8 +60,28 @@ export const setAccountSuspendedHandler = (handler) => {
   accountSuspendedHandler = handler;
 };
 
+// The app can be opened with no connection: the person is let in on what was
+// saved, and their session goes unchecked (see AuthContext). An answer from
+// the server, to anything, is the first sign it can be reached again, so
+// AuthContext asks to be told of the next one, for the same reason as above.
+// Only the next one: the check it then makes is a request as well, and its
+// answer comes back through here.
+let serverAnswerListener = null;
+export const onNextServerAnswer = (listener) => {
+  serverAnswerListener = listener;
+};
+
+const serverAnswered = () => {
+  const listener = serverAnswerListener;
+  serverAnswerListener = null;
+  listener?.();
+};
+
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    serverAnswered();
+    return response;
+  },
   (error) => {
     const body = error.response?.data;
     const message = body?.message || error.message || 'Something went wrong';
@@ -72,6 +92,8 @@ client.interceptors.response.use(
     failure.details = body;
 
     if (failure.code === ACCOUNT_SUSPENDED) accountSuspendedHandler?.(message);
+    // A refusal is an answer too. A timeout, or no connection, is not.
+    if (error.response) serverAnswered();
 
     return Promise.reject(failure);
   }

@@ -27,12 +27,23 @@ const ensurePermission = async () => {
   return asked.granted;
 };
 
+let registration = Promise.resolve();
+
+// Resolves once the latest registerForPush has finished, permission popup
+// included. For anything that must not put a second prompt on top of that one.
+export const pushRegistrationSettled = () => registration;
+
+export const registerForPush = () => {
+  registration = register();
+  return registration;
+};
+
 /**
  * Asks for permission, fetches this device's Expo push token and hands it to
  * the backend. Best-effort: emulators, denied permission and offline starts
  * simply leave the device without pushes until the next login/app start.
  */
-export const registerForPush = async () => {
+const register = async () => {
   try {
     if (Platform.OS === 'android') {
       // Must exist before the permission prompt on Android 13+. The backend

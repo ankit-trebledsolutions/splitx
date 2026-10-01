@@ -39,7 +39,7 @@ const TaskSavedModal = ({ visible, task, onSetReminder, onDismiss }) => {
             <Text style={styles.promptTitle}>Add a reminder too?</Text>
           </View>
           <Text style={styles.promptBody}>
-            We&apos;ll notify you before the due date so nothing slips through.
+            Pick a time and it rings like an alarm, so nothing slips through.
           </Text>
 
           <GradientButton

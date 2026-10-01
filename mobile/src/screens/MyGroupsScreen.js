@@ -98,7 +98,13 @@ const MyGroupsScreen = ({ navigation, route }) => {
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.8}
-        onPress={() => navigation.navigate('GroupChat', { groupId: item._id, name: item.name })}
+        onPress={() =>
+          navigation.navigate('GroupChat', {
+            groupId: item._id,
+            name: item.name,
+            groupType: item.groupType,
+          })
+        }
       >
         <LinearGradient
           colors={dark.gradient}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import usePushNotifications from '../hooks/usePushNotifications';
+import useReminderAlarms from '../hooks/useReminderAlarms';
 import { colors } from '../theme';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -28,6 +29,7 @@ import AddActivityScreen from '../screens/AddActivityScreen';
 import AiItineraryPrefsScreen from '../screens/AiItineraryPrefsScreen';
 import UploadPhotosScreen from '../screens/UploadPhotosScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
+import RemindersScreen from '../screens/RemindersScreen';
 import ContributionsScreen from '../screens/ContributionsScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import CallScreen from '../screens/CallScreen';
@@ -47,7 +49,10 @@ const RootNavigator = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  usePushNotifications({ userId: user?._id, ready: Boolean(user) && !isLoading && splashDone });
+  const ready = Boolean(user) && !isLoading && splashDone;
+  usePushNotifications({ userId: user?._id, ready });
+  // After the push hook: its notification prompt goes first (see the hook).
+  useReminderAlarms({ userId: user?._id, ready });
 
   if (isLoading || !splashDone) {
     return <SplashScreen />;
@@ -153,6 +158,11 @@ const RootNavigator = () => {
           <Stack.Screen
             name="TaskDetail"
             component={TaskDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Reminders"
+            component={RemindersScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

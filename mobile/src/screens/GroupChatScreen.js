@@ -12,7 +12,7 @@ import AiWorkingView from '../components/AiWorkingView';
 import NewTaskSheet from '../components/NewTaskSheet';
 import TaskSavedModal from '../components/TaskSavedModal';
 import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
-import NewReminderSheet from '../components/NewReminderSheet';
+import ReminderSheet from '../components/ReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
 import ChatTab, { COMPOSER_HEIGHT, composerBottomPadding } from './group/ChatTab';
@@ -29,10 +29,11 @@ import { useSocket } from '../context/SocketProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import useAiItinerary from '../hooks/useAiItinerary';
+import useReminderActions from '../hooks/useReminderActions';
 import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage, sendAttachment, deleteMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
-import { fetchReminders, createReminder, updateReminder } from '../api/reminders.api';
+import { fetchReminders } from '../api/reminders.api';
 import { fetchItinerary, createItineraryDay } from '../api/itinerary.api';
 import { fetchPhotos, deletePhotos } from '../api/gallery.api';
 import {
@@ -58,6 +59,11 @@ const TABS = [
   { key: 'stays', label: 'Stays', icon: 'bed-outline' },
 ];
 
+// Tabs that only a trip has. Every other kind of group (home, couple, event,
+// other) never shows them. The server refuses the same writes with TRIP_ONLY.
+const TRIP_ONLY_TABS = new Set(['itinerary', 'attractions']);
+const TABS_WITHOUT_TRIP = TABS.filter((item) => !TRIP_ONLY_TABS.has(item.key));
+
 // Which stay status a tap on the chip moves to next.
 const NEXT_STAY_STATUS = { pending: 'confirmed', confirmed: 'cancelled', cancelled: 'pending' };
 
@@ -65,7 +71,9 @@ const NEXT_STAY_STATUS = { pending: 'confirmed', confirmed: 'cancelled', cancell
 const TYPING_THROTTLE_MS = 3000;
 const TYPING_HIDE_MS = 5000;
 
-// One hour before the due time, or an hour from now if the task has no due date.
+// One hour before the due time, or an hour from now if the task has no due
+// date. It is only where the reminder sheet starts: the person confirms or
+// changes the time there before anything is set.
 const defaultRemindAt = (dueAt) => {
   const base = dueAt ? new Date(dueAt) : new Date(Date.now() + 2 * 60 * 60 * 1000);
   base.setHours(base.getHours() - 1);
@@ -106,7 +114,9 @@ const dateForDayNumber = (dayNumber, startDate, days) => {
 };
 
 const GroupChatScreen = ({ route, navigation }) => {
-  const { groupId, initialTab, aiJob } = route.params;
+  // groupType is only a hint from the list the user came from, so the right
+  // tabs are there on the first frame; the loaded group always has the last word.
+  const { groupId, initialTab, aiJob, groupType: groupTypeHint } = route.params;
   const { user } = useAuth();
   const currentUserId = user?._id;
   const { join } = useActiveCall();
@@ -141,7 +151,6 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [daySheetOpen, setDaySheetOpen] = useState(false);
-  const [reminderSheetOpen, setReminderSheetOpen] = useState(false);
   const [attractionSheetOpen, setAttractionSheetOpen] = useState(false);
   const [staySheetOpen, setStaySheetOpen] = useState(false);
   const [suggestion, setSuggestion] = useState(null);
@@ -273,6 +282,16 @@ const GroupChatScreen = ({ route, navigation }) => {
   const refreshPhotos = useCallback(async () => {
     try {
       setPhotos(await fetchPhotos(groupId));
+    } catch {
+      // The next focus reloads it.
+    }
+  }, [groupId]);
+
+  // Reminders are set, moved and deleted by other members too; the server says
+  // when this list is out of date.
+  const refreshReminders = useCallback(async () => {
+    try {
+      setReminders(await fetchReminders(groupId));
     } catch {
       // The next focus reloads it.
     }
@@ -416,19 +435,34 @@ const GroupChatScreen = ({ route, navigation }) => {
       navigation.navigate('MainTabs');
     };
 
+    const onReminderChanged = (event) => {
+      if (String(event?.groupId) === String(groupId)) refreshReminders();
+    };
+
     socket.on('message:new', onMessage);
     socket.on('message:deleted', onMessageDeleted);
     socket.on('typing', onTyping);
     socket.on('group:member-left', onMemberLeft);
     socket.on('group:deleted', onGroupDeleted);
+    socket.on('reminder:changed', onReminderChanged);
     return () => {
       socket.off('message:new', onMessage);
       socket.off('message:deleted', onMessageDeleted);
       socket.off('typing', onTyping);
       socket.off('group:member-left', onMemberLeft);
       socket.off('group:deleted', onGroupDeleted);
+      socket.off('reminder:changed', onReminderChanged);
     };
-  }, [socket, connected, groupId, currentUserId, navigation, applyDeleted, refreshPhotos]);
+  }, [
+    socket,
+    connected,
+    groupId,
+    currentUserId,
+    navigation,
+    applyDeleted,
+    refreshPhotos,
+    refreshReminders,
+  ]);
 
   // Drop any pending typing timers when leaving the screen.
   useEffect(() => () => Object.values(typingTimers.current).forEach(clearTimeout), []);
@@ -541,49 +575,43 @@ const GroupChatScreen = ({ route, navigation }) => {
     }
   };
 
-  const addReminder = async ({ title, subtitle, remindAt, taskId, icon, scope, repeatWeekly }) => {
-    try {
-      const reminder = await createReminder(groupId, {
-        title,
-        subtitle,
-        remindAt,
-        scope: scope ?? 'group',
-        ...(repeatWeekly !== undefined ? { repeatWeekly } : {}),
-        icon: icon ?? 'alarm-outline',
-        ...(taskId ? { task: taskId } : {}),
-      });
-      setReminders((prev) => [...prev, reminder]);
-      if (!connected) setMessages(await fetchMessages(groupId));
-      return reminder;
-    } catch (err) {
-      AppAlert.alert('Could not set reminder', err.message);
-      return null;
-    }
-  };
+  const adminId = group?.admin ?? group?.createdBy?._id ?? group?.createdBy;
 
-  const handleRemindFromSuggestion = async () => {
+  // Creating, editing, switching and deleting reminders, and the sheet for it.
+  const reminderActions = useReminderActions({
+    groupId,
+    userId: currentUserId,
+    adminId,
+    setReminders,
+    onCreated: async () => {
+      setTab('reminders');
+      if (!connected) setMessages(await fetchMessages(groupId));
+    },
+  });
+
+  // Both of these open the reminder sheet filled in rather than setting the
+  // reminder outright: it rings on people's phones, so the time is confirmed first.
+  const handleRemindFromSuggestion = () => {
     if (!suggestion) return;
     handledSuggestions.current.add(suggestion.messageId);
-    const created = await addReminder({
+    reminderActions.openNew({
       title: suggestion.title,
       subtitle: `Mentioned by ${suggestion.from?.name ?? 'a member'}`,
       remindAt: defaultRemindAt(null),
     });
     setSuggestion(null);
-    if (created) setTab('reminders');
   };
 
-  const handleSetReminderForTask = async () => {
+  const handleSetReminderForTask = () => {
     const task = savedTask;
     setSavedTask(null);
     if (!task) return;
-    const created = await addReminder({
+    reminderActions.openNew({
       title: task.title,
       subtitle: 'Task reminder',
       remindAt: defaultRemindAt(task.dueAt),
       taskId: task._id,
     });
-    if (created) setTab('reminders');
   };
 
   const handleToggleTask = async (task) => {
@@ -597,20 +625,6 @@ const GroupChatScreen = ({ route, navigation }) => {
     } catch (err) {
       setTasks((prev) => prev.map((t) => (t._id === task._id ? task : t))); // roll back
       AppAlert.alert('Could not update task', err.message);
-    }
-  };
-
-  const handleToggleReminder = async (reminder) => {
-    const enabled = !reminder.enabled;
-    setReminders((prev) =>
-      prev.map((r) => (r._id === reminder._id ? { ...r, enabled } : r))
-    );
-    try {
-      const updated = await updateReminder(reminder._id, { enabled });
-      setReminders((prev) => prev.map((r) => (r._id === updated._id ? updated : r)));
-    } catch (err) {
-      setReminders((prev) => prev.map((r) => (r._id === reminder._id ? reminder : r)));
-      AppAlert.alert('Could not update reminder', err.message);
     }
   };
 
@@ -656,16 +670,6 @@ const GroupChatScreen = ({ route, navigation }) => {
   const openDaySheet = () => {
     if (!blockedByAi()) setDaySheetOpen(true);
   };
-
-  const handleCreateReminder = async (payload) => {
-    const created = await addReminder(payload);
-    if (created) {
-      setReminderSheetOpen(false);
-      setTab('reminders');
-    }
-  };
-
-  const adminId = group?.admin ?? group?.createdBy?._id ?? group?.createdBy;
 
   const openEditDay = (day) => {
     if (blockedByAi()) return;
@@ -847,6 +851,19 @@ const GroupChatScreen = ({ route, navigation }) => {
     return parts.join(' · ');
   }, [memberCount, group?.totalDays]);
 
+  // While the type is still unknown (no hint, group not loaded) the full bar
+  // shows, as it always has; it is trimmed only once the group is known not to
+  // be a trip.
+  const groupType = group?.groupType ?? groupTypeHint;
+  const tripTabsHidden = Boolean(groupType) && groupType !== 'trip';
+  const tabs = tripTabsHidden ? TABS_WITHOUT_TRIP : TABS;
+
+  // A notification, a deep link or an older screen can still ask for a tab
+  // this group does not have. Chat is where it lands instead.
+  useEffect(() => {
+    if (tripTabsHidden && TRIP_ONLY_TABS.has(tab)) setTab('chat');
+  }, [tripTabsHidden, tab]);
+
   // Running, or done with the new days still on their way.
   const aiBusy = ai.running || ai.settling;
   // Only once the server has said AI is set up: never while that is unknown,
@@ -936,7 +953,7 @@ const GroupChatScreen = ({ route, navigation }) => {
 
       <View style={styles.tabBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {TABS.map((item) => {
+          {tabs.map((item) => {
             const active = tab === item.key;
             return (
               <TouchableOpacity
@@ -995,10 +1012,15 @@ const GroupChatScreen = ({ route, navigation }) => {
       )}
 
       {tab === 'reminders' && (
-        <RemindersTab reminders={reminders} loading={loading} onToggle={handleToggleReminder} />
+        <RemindersTab
+          reminders={reminders}
+          loading={loading}
+          onToggle={reminderActions.toggle}
+          onOpen={reminderActions.openEdit}
+        />
       )}
 
-      {tab === 'itinerary' && (
+      {tab === 'itinerary' && !tripTabsHidden && (
         <View style={styles.flex}>
           {showAiNudge && (
             <View style={styles.aiNudge}>
@@ -1048,7 +1070,7 @@ const GroupChatScreen = ({ route, navigation }) => {
         />
       )}
 
-      {tab === 'attractions' && (
+      {tab === 'attractions' && !tripTabsHidden && (
         <AttractionsTab
           attractions={attractions}
           loading={loading}
@@ -1135,7 +1157,7 @@ const GroupChatScreen = ({ route, navigation }) => {
                   icon: 'notifications-outline',
                   tint: '#2DD4BF',
                   label: 'New Reminder',
-                  onPress: () => setReminderSheetOpen(true),
+                  onPress: () => reminderActions.openNew(),
                 },
                 {
                   key: 'expense',
@@ -1212,11 +1234,7 @@ const GroupChatScreen = ({ route, navigation }) => {
         onSubmit={handleCreateDay}
       />
 
-      <NewReminderSheet
-        visible={reminderSheetOpen}
-        onClose={() => setReminderSheetOpen(false)}
-        onSubmit={handleCreateReminder}
-      />
+      <ReminderSheet {...reminderActions.sheetProps} />
 
       <NewAttractionSheet
         visible={attractionSheetOpen}

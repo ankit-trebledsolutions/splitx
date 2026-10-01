@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.splity.app'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.splixalarm"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // NotificationCompat, ContextCompat and ServiceCompat.
+  implementation "androidx.core:core-ktx:1.13.1"
+
+  // The alarm time rules (src/test): gradlew :splix-alarm:testDebugUnitTest
+  testImplementation "junit:junit:4.13.2"
+}

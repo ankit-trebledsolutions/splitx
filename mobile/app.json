@@ -75,7 +75,8 @@
           "microphonePermission": "Splix uses the microphone to record voice notes and for group calls."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

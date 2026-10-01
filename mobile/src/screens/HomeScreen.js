@@ -179,6 +179,13 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.name}>{name}</Text>
           </View>
           <TouchableOpacity
+            style={[styles.bell, styles.alarm]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Reminders')}
+          >
+            <Ionicons name="alarm-outline" size={20} color={dark.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.bell}
             activeOpacity={0.8}
             onPress={() => navigation.navigate('Notifications')}
@@ -417,6 +424,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The reminders button, drawn like the bell and sitting just before it.
+  alarm: { marginRight: spacing.sm },
   bellDot: {
     position: 'absolute',
     top: 7,

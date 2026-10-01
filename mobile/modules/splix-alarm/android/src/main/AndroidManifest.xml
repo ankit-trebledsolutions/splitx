@@ -1,0 +1,56 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Ring at the exact minute. On Android 14+ the user grants this in
+       Settings > Alarms & reminders; without it the reminder still arrives,
+       as an ordinary notification that Android may deliver late. -->
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+  <!-- Show the alarm screen over the lock screen. -->
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <!-- Alarms do not survive a restart: they are set again once the phone is back. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- The service that keeps ringing while the app is closed. "systemExempted"
+       is the type Android reserves for apps that hold the exact-alarm
+       permission and use a service to carry on an alarm. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+
+  <application>
+    <receiver
+      android:name=".AlarmReceiver"
+      android:exported="false" />
+
+    <receiver
+      android:name=".BootReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+      </intent-filter>
+    </receiver>
+
+    <!-- "shortService" is the fallback type for ringing while the app is open
+         without the exact-alarm permission. -->
+    <service
+      android:name=".AlarmService"
+      android:exported="false"
+      android:foregroundServiceType="systemExempted|shortService" />
+
+    <!-- Its own task, kept out of Recents, so showing over the lock screen
+         never brings the rest of the app up with it. -->
+    <activity
+      android:name=".AlarmActivity"
+      android:exported="false"
+      android:theme="@style/Theme.SplixAlarm"
+      android:launchMode="singleInstance"
+      android:taskAffinity=""
+      android:excludeFromRecents="true"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:screenOrientation="portrait"
+      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+  </application>
+</manifest>

@@ -28,6 +28,10 @@ export const routeForNotification = (notification = {}) => {
   // Expenses get the summary screen first; it links on to the full expense.
   if (type === 'expense' && entityId) return ['NotificationDetail', { notification }];
   if (type === 'task' && entityId) return ['TaskDetail', { taskId: entityId }];
+  // A reminder that was set for a task opens that task.
+  if (type === 'reminder' && entityId) return ['TaskDetail', { taskId: entityId }];
   if (groupId) return ['GroupChat', { groupId, initialTab: GROUP_TAB[type] ?? 'chat' }];
+  // A personal reminder belongs to no group: it lives in the list of all of mine.
+  if (type === 'reminder') return ['Reminders'];
   return null;
 };

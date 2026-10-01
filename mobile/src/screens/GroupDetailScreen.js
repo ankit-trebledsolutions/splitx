@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketProvider';
 import { dark, radius, spacing } from '../theme';
 import { presenceFrom } from '../utils/presence';
+import { syncReminderAlarms } from '../utils/reminderAlarms';
 import { useGroupPresence } from '../hooks/useGroupPresence';
 import AppAlert from '../components/AppAlert';
 
@@ -136,6 +137,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
     setMuted(next);
     try {
       await setGroupMuted(groupId, next);
+      // A muted group's reminders stop ringing on this phone (and start again).
+      syncReminderAlarms();
     } catch (err) {
       setMuted(!next);
       AppAlert.alert('Could not update notifications', err.message);
@@ -378,7 +381,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
               ['chatbubbles-outline', 'The whole chat, with its photos, files and voice notes'],
               ['cash-outline', 'All expenses and balances, including any that are not settled'],
               ['checkbox-outline', 'Tasks and reminders'],
-              ['map-outline', 'The itinerary, stays and attractions'],
+              // Only a trip has an itinerary and attractions to lose.
+              [
+                'map-outline',
+                group.groupType === 'trip' ? 'The itinerary, stays and attractions' : 'Stays',
+              ],
               ['images-outline', 'Every photo in the gallery'],
             ].map(([icon, label]) => (
               <View key={icon} style={styles.lossRow}>
