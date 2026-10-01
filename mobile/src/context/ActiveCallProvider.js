@@ -3,7 +3,7 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import { useStreamClient } from './StreamVideoProvider';
 import { postCallEvent } from '../api/stream.api';
 import { ensureCallPermissions } from '../components/AlarmPermissionSheet';
-import { setActiveCall } from '../utils/incomingCalls';
+import { callsSupported, setActiveCall } from '../utils/incomingCalls';
 
 // Android needs runtime consent for the camera/mic before a call can open them;
 // iOS prompts on first use via the Info.plist strings. A voice call only needs
@@ -18,10 +18,11 @@ const requestCallPermissions = async (audioOnly) => {
 
 // Someone who makes calls will want to be rung for them too. Asked the first
 // time they start or join one each time the app runs, and only while something
-// a ringing call needs is still switched off.
+// a ringing call needs is still switched off. Not where calls cannot ring
+// anyway (iOS, or a build from before they did).
 let askedToRing = false;
 const askToRingOnce = async () => {
-  if (askedToRing) return;
+  if (askedToRing || !callsSupported) return;
   askedToRing = true;
   await ensureCallPermissions();
 };

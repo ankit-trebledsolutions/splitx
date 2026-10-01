@@ -145,8 +145,14 @@ object CallNotifications {
 
   // Rings from the notification alone (see [ringing]).
   fun showRingingAlone(context: Context, call: IncomingCall) {
-    NotificationManagerCompat.from(context)
-      .notify(RINGING_ID, ringing(context, call, fullScreen = true, alone = true))
+    try {
+      NotificationManagerCompat.from(context)
+        .notify(RINGING_ID, ringing(context, call, fullScreen = true, alone = true))
+    } catch (_: Exception) {
+      // Android turned the call-style notification down. The call is then
+      // announced the plain way rather than not at all.
+      showWaiting(context, call)
+    }
   }
 
   fun cancelRinging(context: Context) {

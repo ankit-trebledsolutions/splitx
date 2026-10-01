@@ -216,7 +216,7 @@ class SplixAlarmModule : Module() {
     }
 
     Function("getIncomingCall") {
-      CallCenter.current?.toMap()
+      CallCenter.ringingNow()?.toMap()
     }
 
     /**
@@ -226,7 +226,7 @@ class SplixAlarmModule : Module() {
      */
     AsyncFunction("showRingingCall") {
       val activity = appContext.currentActivity
-      if (CallCenter.current == null || activity == null) {
+      if (CallCenter.ringingNow() == null || activity == null) {
         false
       } else {
         activity.startActivity(CallActivity.intent(activity))

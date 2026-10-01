@@ -55,7 +55,7 @@ class CallService : Service() {
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    val call = CallCenter.current
+    val call = CallCenter.ringing(this)
     val onScreen = intent?.getBooleanExtra(EXTRA_ON_SCREEN, false) ?: false
 
     // Always, and first: a service started this way must become a foreground
@@ -130,7 +130,7 @@ class CallService : Service() {
     when (audio.ringerMode) {
       AudioManager.RINGER_MODE_NORMAL -> {
         requestAudioFocus(audio)
-        play(Settings.System.DEFAULT_RINGTONE_URI, fallBack = true)
+        play(ringtones())
         startVibration()
       }
       AudioManager.RINGER_MODE_VIBRATE -> startVibration()
@@ -142,8 +142,22 @@ class CallService : Service() {
     return manager.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
   }
 
-  private fun play(uri: Uri?, fallBack: Boolean) {
-    if (uri == null) return
+  /**
+   * What to ring with, in order of preference: the phone's own ringtone, its
+   * notification tone, and last the tone that ships with the app. The first
+   * two belong to the phone, and a ringtone kept on a memory card, or none
+   * being set, leaves them unplayable.
+   */
+  private fun ringtones(): List<Uri> = listOfNotNull(
+    Settings.System.DEFAULT_RINGTONE_URI,
+    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+    AlarmSound.uriFor(this, AlarmSound.DEFAULT)
+  )
+
+  // Plays the first of [candidates] that can be played.
+  private fun play(candidates: List<Uri>) {
+    val uri = candidates.firstOrNull() ?: return
+    val rest = candidates.drop(1)
     val next = MediaPlayer()
     player = next
     try {
@@ -157,15 +171,14 @@ class CallService : Service() {
       next.setOnErrorListener { failed, _, _ ->
         if (player === failed) {
           releasePlayer()
-          if (fallBack) play(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), fallBack = false)
+          play(rest)
         }
         true
       }
       next.prepareAsync()
     } catch (_: Exception) {
-      // No ringtone set, or one that cannot be read: the notification tone still can.
       releasePlayer()
-      if (fallBack) play(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), fallBack = false)
+      play(rest)
     }
   }
 

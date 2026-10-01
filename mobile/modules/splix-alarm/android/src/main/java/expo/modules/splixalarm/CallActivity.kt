@@ -90,7 +90,7 @@ class CallActivity : Activity() {
    * screen up: CallCenter is the one that knows, and an intent can be stale.
    */
   private fun show() {
-    val next = CallCenter.current
+    val next = CallCenter.ringing(this)
     if (next == null) {
       // Opened from an old notification, or the call stopped while this was starting.
       close()

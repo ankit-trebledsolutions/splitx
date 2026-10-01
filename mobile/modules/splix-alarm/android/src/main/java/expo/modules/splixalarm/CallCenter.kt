@@ -6,6 +6,8 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -46,14 +48,19 @@ object CallCenter {
 
   private const val MAIN_WAIT_SECONDS = 5L
 
+  // Past this, something that should have ended the ringing did not happen.
+  private const val RING_OVERDUE_MS = RING_MS + 15_000L
+
+  private const val TAG = "SplixCall"
+
   fun interface Listener {
     fun onCallEvent(type: String, call: IncomingCall, reason: String?)
   }
 
-  /** The call ringing right now. */
+  // The call ringing right now, and since when (on the clock that never jumps).
   @Volatile
-  var current: IncomingCall? = null
-    private set
+  private var current: IncomingCall? = null
+  private var ringingSince = 0L
 
   // The group whose call the person is in, as JavaScript last said.
   @Volatile
@@ -84,16 +91,28 @@ object CallCenter {
    * Runs on the main thread, and returns once it has run. Waiting matters for
    * a push: Android only keeps the phone awake for it until the service that
    * received it returns, and the ringing has to be under way by then.
+   *
+   * Nothing in here may take the app down: a push arrives whenever it likes,
+   * including in the middle of a call. A step that fails is logged, and
+   * whatever was ringing is cleared so the next call can still ring.
    */
-  private fun onMain(block: () -> Unit) {
+  private fun onMain(context: Context, block: () -> Unit) {
+    val guarded = {
+      try {
+        block()
+      } catch (error: Exception) {
+        Log.e(TAG, "Handling a call failed", error)
+        reset(context)
+      }
+    }
     if (Looper.myLooper() == Looper.getMainLooper()) {
-      block()
+      guarded()
       return
     }
     val done = CountDownLatch(1)
     main.post {
       try {
-        block()
+        guarded()
       } finally {
         done.countDown()
       }
@@ -105,12 +124,25 @@ object CallCenter {
     }
   }
 
+  // After a failure: nothing is ringing, as far as anything here knows.
+  private fun reset(context: Context) {
+    current = null
+    try {
+      CallStore(context).clearRinging()
+      cancelTimeout(context)
+      CallService.stop()
+      CallNotifications.cancelRinging(context)
+    } catch (_: Exception) {
+      // Best effort.
+    }
+  }
+
   // ---- A ring arrives ------------------------------------------------------
 
   /** From a push, or from the app's own connection while it is open. Any thread. */
   fun ring(context: Context, call: IncomingCall) {
     val app = context.applicationContext
-    onMain { onRing(app, call) }
+    onMain(app) { onRing(app, call) }
   }
 
   private fun onRing(context: Context, call: IncomingCall) {
@@ -122,6 +154,7 @@ object CallCenter {
       call = call,
       now = now,
       seenAt = seenAt,
+      endedAt = store.endedAt(call.groupId),
       signedOut = store.signedOut,
       inCallGroupId = inCallGroupId,
       ringing = current,
@@ -139,6 +172,7 @@ object CallCenter {
 
   private fun startRinging(context: Context, call: IncomingCall, now: Long) {
     current = call
+    ringingSince = SystemClock.elapsedRealtime()
     CallStore(context).setRinging(call, now + RING_MS)
     // What was missed from this group before is about to be answered, or missed again.
     CallNotifications.cancelMissed(context, call.groupId)
@@ -172,23 +206,42 @@ object CallCenter {
   /** CallService could not become a foreground service after all. */
   fun serviceRefused(context: Context) {
     val app = context.applicationContext
-    onMain { current?.let { ringAlone(app, it) } }
+    onMain(app) { current?.let { ringAlone(app, it) } }
   }
+
+  /** The call ringing right now, if any. Main thread only. */
+  fun ringing(context: Context): IncomingCall? {
+    val app = context.applicationContext
+    return try {
+      restore(app)
+      current
+    } catch (error: Exception) {
+      Log.e(TAG, "Reading the ringing call failed", error)
+      reset(app)
+      null
+    }
+  }
+
+  /** The same, as last known, from any thread (for JavaScript). */
+  fun ringingNow(): IncomingCall? = current
 
   // ---- The ringing ends ----------------------------------------------------
 
   /** The call is over before it was answered here. Any thread. */
   fun end(context: Context, groupId: String, at: Long) {
     val app = context.applicationContext
-    onMain {
+    onMain(app) {
       restore(app)
+      // Remembered, for a ring that is still on its way: pushes can arrive out of order.
+      val store = CallStore(app)
+      if (at > store.endedAt(groupId)) store.setEnded(groupId, at)
       if (CallRules.endsRing(current, groupId, at)) finish(app, REASON_ENDED)
     }
   }
 
   fun decline(context: Context) {
     val app = context.applicationContext
-    onMain {
+    onMain(app) {
       restore(app)
       finish(app, REASON_DECLINED)
     }
@@ -197,7 +250,7 @@ object CallCenter {
   /** Nobody answered. With [expected], only if that is still the call ringing. */
   fun timeout(context: Context, expected: IncomingCall? = null) {
     val app = context.applicationContext
-    onMain {
+    onMain(app) {
       restore(app)
       finish(app, REASON_TIMEOUT, expected)
     }
@@ -209,8 +262,14 @@ object CallCenter {
    */
   fun answer(context: Context): IncomingCall? {
     val app = context.applicationContext
-    restore(app)
-    return finish(app, REASON_ANSWERED)
+    return try {
+      restore(app)
+      finish(app, REASON_ANSWERED)
+    } catch (error: Exception) {
+      Log.e(TAG, "Answering a call failed", error)
+      reset(app)
+      null
+    }
   }
 
   /** The phone was not unlocked after Accept: the call was not joined after all. */
@@ -231,7 +290,7 @@ object CallCenter {
    */
   fun setInCall(context: Context, groupId: String?) {
     val app = context.applicationContext
-    onMain {
+    onMain(app) {
       inCallGroupId = groupId
       if (groupId != null) {
         CallNotifications.cancelMissed(app, groupId)
@@ -247,7 +306,7 @@ object CallCenter {
   /** Signing out: nothing may ring, or stay on screen, for the next person. */
   fun signedOut(context: Context) {
     val app = context.applicationContext
-    onMain {
+    onMain(app) {
       restore(app)
       finish(app, REASON_SIGNED_OUT)
       inCallGroupId = null
@@ -279,18 +338,29 @@ object CallCenter {
   }
 
   /**
-   * A new process, while a call rings from its notification alone: the
+   * Makes `current` true to what is really ringing before anything is decided.
+   *
+   * In a new process, while a call rings from its notification alone: the
    * notification outlives the process, so its buttons can arrive here with
    * nothing in memory. What is ringing is read back, but only while that
    * notification is really still up.
+   *
+   * And in a process that has been ringing for longer than a call rings:
+   * whatever should have ended it did not happen, and it is ended here, so
+   * that this call does not stand in the way of every later one.
    */
   private fun restore(context: Context) {
-    if (current != null) return
+    val ringing = current
+    if (ringing != null) {
+      if (SystemClock.elapsedRealtime() - ringingSince > RING_OVERDUE_MS) finish(context, REASON_TIMEOUT)
+      return
+    }
     val store = CallStore(context)
-    val stored = store.ringing(System.currentTimeMillis())
-    if (stored != null && CallNotifications.isRingingShown(context)) {
+    val stored = store.ringing(System.currentTimeMillis()) ?: return
+    if (CallNotifications.isRingingShown(context)) {
       current = stored
-    } else if (stored != null) {
+      ringingSince = SystemClock.elapsedRealtime()
+    } else {
       store.clearRinging()
     }
   }

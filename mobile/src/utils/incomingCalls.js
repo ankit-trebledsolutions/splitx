@@ -39,11 +39,29 @@ export const endIncomingCall = (data) => {
   }
 };
 
+// The call the person accepted, until the app has joined it. Kept here rather
+// than in a component: the screens are mounted afresh when the connection to
+// the call service comes up (StreamVideoProvider), and an answer held in
+// their state would be lost with them.
+let accepted = null;
+
 /**
- * The call the person accepted, as { groupId, groupName, video, ... }, for the
- * app to join. Handed over once, and only shortly after Accept was pressed.
+ * The call the person accepted and the app has still to join, as
+ * { call: { groupId, groupName, video, ... }, since }, or null. The phone
+ * hands an answer over once, and only shortly after Accept was pressed.
  */
-export const takeAnsweredCall = () => (callsSupported ? SplixAlarm.takeAnsweredCall() : null);
+export const acceptedCall = () => {
+  if (!accepted && callsSupported) {
+    const call = SplixAlarm.takeAnsweredCall();
+    if (call) accepted = { call, since: Date.now() };
+  }
+  return accepted;
+};
+
+// Joined, given up on, or the person signed out.
+export const forgetAcceptedCall = () => {
+  accepted = null;
+};
 
 // Where a tap on a "missed call" notification leads, as [screen, params]. Once.
 export const takeCallRoute = () => {

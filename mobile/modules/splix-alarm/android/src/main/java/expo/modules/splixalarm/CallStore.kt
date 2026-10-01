@@ -10,7 +10,8 @@ import android.content.SharedPreferences
  * answer it may be a new process.
  *
  *  seen:<groupId>  the newest ring handled for that group (when the server sent it)
- *  ringing         the call ringing from its notification alone, and until when
+ *  ended:<groupId> the newest "the call is over" heard for that group
+ *  ringing         the call ringing right now, and until when
  *  answered        the call that was accepted, until JavaScript collects it
  *  signedOut       nobody is signed in, so nothing may ring
  */
@@ -29,6 +30,12 @@ class CallStore(context: Context) {
 
   fun setSeen(groupId: String, at: Long) {
     prefs.edit().putLong(SEEN + groupId, at).commit()
+  }
+
+  fun endedAt(groupId: String): Long = prefs.getLong(ENDED + groupId, 0L)
+
+  fun setEnded(groupId: String, at: Long) {
+    prefs.edit().putLong(ENDED + groupId, at).commit()
   }
 
   fun setRinging(call: IncomingCall, until: Long) {
@@ -70,6 +77,7 @@ class CallStore(context: Context) {
 
   private companion object {
     const val SEEN = "seen:"
+    const val ENDED = "ended:"
     const val RINGING = "ringing"
     const val RINGING_UNTIL = "ringingUntil"
     const val ANSWERED = "answered"

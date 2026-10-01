@@ -148,6 +148,7 @@ object CallRules {
 
   /**
    * [seenAt]         the newest ring already handled for this group (0 if none)
+   * [endedAt]        the newest "the call is over" heard for this group (0 if none)
    * [signedOut]      nobody is signed in on this phone
    * [inCallGroupId]  the group whose call the person is in right now, if any
    * [ringing]        the call ringing right now, if any
@@ -157,6 +158,7 @@ object CallRules {
     call: IncomingCall,
     now: Long,
     seenAt: Long,
+    endedAt: Long,
     signedOut: Boolean,
     inCallGroupId: String?,
     ringing: IncomingCall?,
@@ -168,6 +170,9 @@ object CallRules {
     // Already in this call, or already ringing for it.
     inCallGroupId == call.groupId -> RingAnswer.IGNORE
     ringing?.groupId == call.groupId -> RingAnswer.IGNORE
+    // Its "over" got here first (pushes can arrive out of order), or it is
+    // simply old: there is no call left to ring for.
+    call.at <= endedAt -> RingAnswer.MISSED
     now - call.at > STALE_MS -> RingAnswer.MISSED
     // Busy with another call: told about this one without ringing over it.
     inCallGroupId != null || ringing != null || phoneBusy -> RingAnswer.WAITING

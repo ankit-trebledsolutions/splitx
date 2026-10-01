@@ -31,11 +31,12 @@ class CallTest {
     incoming: IncomingCall = call(),
     now: Long = at + 1_000,
     seenAt: Long = 0,
+    endedAt: Long = 0,
     signedOut: Boolean = false,
     inCallGroupId: String? = null,
     ringing: IncomingCall? = null,
     phoneBusy: Boolean = false
-  ) = CallRules.decide(incoming, now, seenAt, signedOut, inCallGroupId, ringing, phoneBusy)
+  ) = CallRules.decide(incoming, now, seenAt, endedAt, signedOut, inCallGroupId, ringing, phoneBusy)
 
   // ---- Reading the push ------------------------------------------------------
 
@@ -142,6 +143,15 @@ class CallTest {
     assertEquals(RingAnswer.MISSED, decide(now = at + CallRules.STALE_MS + 1))
     // A phone whose clock runs behind the server's still rings.
     assertEquals(RingAnswer.RING, decide(now = at - 90_000))
+  }
+
+  @Test
+  fun aRingThatArrivesAfterTheCallIsOverIsOnlyShownAsMissed() {
+    // Pushes can arrive out of order: "over" first, then the ring it was for.
+    assertEquals(RingAnswer.MISSED, decide(endedAt = at + 4_000))
+    assertEquals(RingAnswer.MISSED, decide(endedAt = at))
+    // The end of an earlier call in the group does not concern this ring.
+    assertEquals(RingAnswer.RING, decide(endedAt = at - 60_000))
   }
 
   @Test
