@@ -29,7 +29,8 @@ splitx/
 └── mobile/
     ├── index.js           # app entry (registerRootComponent)
     ├── modules/
-    │   └── splix-alarm/   # native Android module: reminders that ring as alarms
+    │   └── splix-alarm/   # native Android module: reminders that ring as
+    │                      # alarms, group calls that ring as phone calls
     └── src/
         ├── api/           # axios client + endpoint wrappers per resource
         ├── components/    # Avatar, GradientButton, DarkScreen, sheets, ...
@@ -98,6 +99,9 @@ Scan the QR code with Expo Go, or press `a` / `i` for an emulator/simulator.
   member list with admin (creator) badge
 - **Group chat** — messages with polling, smart task detection from chat,
   activity entries for expenses/tasks/reminders
+- **Group calls** — voice or video, one call per group (Stream). Starting one
+  rings every other member's phone like a phone call, with the app closed or
+  the phone locked (Android; see "Incoming group calls" below)
 - **Expenses** — equal or exact splits, categories, settle per member,
   balances with suggested settlements
 - **Contributions** — fairness dashboard (money + task effort per member)
@@ -155,6 +159,46 @@ Checks: `npm test` and `npm run smoke:reminders` in `backend/` (the second
 needs a local MongoDB and uses a throwaway database), and
 `gradlew :splix-alarm:testDebugUnitTest` in `mobile/android/` for the alarm
 time rules in the native module.
+
+## Incoming group calls
+
+When the first person joins a group's call, every other member's phone rings:
+the call screen over the lock screen, or a banner with Decline and Answer while
+the phone is in use, with Splix closed. Accept opens the app in the call (a
+locked phone is unlocked first); no answer in 45 seconds, or the call ending
+first, leaves a "Missed group call" notification. The pieces:
+
+- `backend/src/services/callRing.service.js` — on the app's "call started" it
+  sends the ring: an ordinary push (title and body) to everyone in the group
+  except the caller and those who muted the group. "Call ended" sends a silent
+  push that stops phones still ringing. Both also go over the socket.
+- `mobile/modules/splix-alarm/` — the same native module as the alarms.
+  `SplixMessagingService` stands in front of expo-notifications' push service:
+  it takes the pushes about calls and hands every other push on untouched.
+  `CallCenter` decides what a ring does, `CallService` rings (the phone's own
+  ringtone, on the ring volume, silent on silent or Do Not Disturb), and
+  `CallActivity` is the call screen. None of it needs the app's JavaScript, so
+  it rings just as well in a development build.
+- `mobile/src/utils/incomingCalls.js` and `hooks/useIncomingCalls.js` — what
+  the app does once it is open: joins the call that was accepted, and tells the
+  phone which call the person is already in (that one does not ring).
+
+**Android permissions.** Notifications, and on Android 14+ full-screen
+notifications. They are on the same sheet as the alarm permissions, shown the
+first time the app is opened and again when someone starts a call while one is
+missing. The microphone and camera are asked for when a call is joined.
+
+**iOS, and an Android build from before this,** have no part that takes the
+push, so there it is shown as the notification it looks like ("Asha started a
+group video call"); tapping it opens the group, where the call can be joined.
+
+**New native code:** like the alarms, it needs a new build
+(`npx expo run:android`, or a new EAS build for testers), and the backend has
+to be deployed for anything to ring.
+
+Checks: `npm test` in `backend/` (`test/callRing.test.js`), and the same
+`gradlew :splix-alarm:testDebugUnitTest` for reading the push and deciding what
+a ring does (`CallTest.kt`).
 
 ## API
 

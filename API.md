@@ -275,7 +275,7 @@ Response: `{ "success": true, "message": "Group deleted" }`. Afterwards every re
 
 ### `PUT /groups/:groupId/mute`
 
-Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller only. While muted, the caller gets no device pushes from this group and other members' reminders there do not ring on their phone (their own still do); in-app notifications are still recorded. Response: `{ "data": { "muted": true } }`
+Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller only. While muted, the caller gets no device pushes from this group, other members' reminders there do not ring on their phone (their own still do), and the group's calls do not ring; in-app notifications are still recorded. Response: `{ "data": { "muted": true } }`
 
 ### `GET /groups/:groupId/balances`
 
@@ -570,6 +570,35 @@ A timer in the API process (every 30 seconds) picks up reminders that have come 
 A reminder found more than 15 minutes late (the server was asleep, or the reminder predates this feature) is closed without telling anyone.
 
 The timer is on by default when `NODE_ENV=production` and off otherwise; `REMINDER_SWEEP=on|off` overrides. Keep it off on any machine whose `.env` points at the live database.
+
+---
+
+## Calls
+
+A group has one call, held by Stream (call type `default`, call id = the group id). The app joins it directly with Stream's SDK; this API hands out the token for that, and is told when a call starts and ends so the chat shows it and the other members' phones ring.
+
+### `GET /stream/token`
+
+A Stream token for the caller: `{ "data": { "apiKey", "token", "user": { "id", "name" } } }`. Valid for 24 hours; the app asks again when it expires.
+
+### `POST /stream/call-event`
+
+Body: `{ "groupId": "<groupId>", "event": "started" | "ended", "video"?: true | false }`. The caller must be a member of the group (`403` otherwise). The app sends `started` when it is the first to join the group's call and `ended` when it is the last to leave. Response: `{ "data": { "message" } }`, the chat card that was posted ("Asha started a call" / "Call ended").
+
+`video` (with `started`) is whether the call began with the camera on. An app from before calls rang does not send it; the others are then told only that it is a call.
+
+**`started` rings the group.** Everyone in it, except the caller and those who muted the group, gets:
+
+- a push, with a title and a body so that an iPhone or an older build shows it as it is: title = the group's name, body = "Asha started a group video call" (or "voice call", or just "call"), and
+
+  `data: { type: "call", action: "ring", groupId, groupName, callerId, callerName, video: true | false | null, at }`
+
+  `at` is the server's time in epoch milliseconds; with the group it names the ring. The push is given up on after 45 seconds (as long as a phone rings), so a phone that was out of reach does not ring for a call long over;
+- the realtime event `call:ring` with the same `data`, which is quicker while the app is open. A phone that gets both rings once.
+
+An Android app that knows about calls takes the push before it is shown and rings like a phone call instead. A second `started` for the same group within 15 seconds is the same call and rings nobody again.
+
+**`ended` stops the ringing.** Every other member (muted or not) gets a silent push `data: { type: "call", action: "end", groupId, at }` and the realtime event `call:end` with the same `data`. A phone still ringing for that group stops and shows the call as missed; one that has not had the ring yet shows it as missed when it arrives.
 
 ---
 
