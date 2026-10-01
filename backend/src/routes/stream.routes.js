@@ -12,6 +12,8 @@ const callEventSchema = {
   body: z.object({
     groupId: objectId,
     event: z.enum(['started', 'ended']),
+    // With 'started': whether the call began with the camera on.
+    video: z.boolean().optional(),
   }),
 };
 

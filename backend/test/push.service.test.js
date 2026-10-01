@@ -68,6 +68,19 @@ test('a silent push carries only data, so the phone gives it to the app instead 
   assert.equal(message._contentAvailable, true);
 });
 
+test('a push that is only worth having now says how long it may be kept trying', async (t) => {
+  const requests = stubExpo(t, [{ pushTokens: [TOKEN] }]);
+
+  await pushService.sendToUsers([ASHA], { title: 'Tokyo Trip', body: 'Ben started a group call' }, { ttl: 45 });
+  await pushService.sendToUsers([ASHA], { data: { type: 'call', action: 'end' } }, { silent: true, ttl: 45 });
+  await pushService.sendToUsers([ASHA], { title: 'Reminder Set', body: 'Ben set a reminder' });
+
+  assert.equal(requests[0].messages[0].ttl, 45);
+  assert.equal(requests[1].messages[0].ttl, 45);
+  // Everything else is left to the push services' own, much longer, limit.
+  assert.equal('ttl' in requests[2].messages[0], false);
+});
+
 test('nothing is sent when nobody has a phone registered', async (t) => {
   const requests = stubExpo(t, []);
   await pushService.sendToUsers([ASHA], { title: 'x', body: 'y' });

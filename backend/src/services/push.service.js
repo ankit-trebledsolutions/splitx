@@ -116,11 +116,15 @@ const silentMessage = ({ data }) => ({
  *
  * silent: deliver `data` to the app without showing anything (used to set or
  * drop reminder alarms on a phone whose app is closed).
+ * ttl: seconds a phone that cannot be reached is still tried for, instead of
+ * the push services' own weeks. For what is only worth having now, such as a
+ * ringing call.
  */
-const sendToUsers = async (userIds, { title, body, data = {} }, { silent = false } = {}) => {
+const sendToUsers = async (userIds, { title, body, data = {} }, { silent = false, ttl } = {}) => {
   try {
     if (!userIds.length) return;
     const message = silent ? silentMessage({ data }) : visibleMessage({ title, body, data });
+    if (ttl !== undefined) message.ttl = ttl;
     const users = await User.find({ _id: { $in: userIds }, 'pushTokens.0': { $exists: true } })
       .select('pushTokens')
       .lean();
