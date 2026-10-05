@@ -1,0 +1,42 @@
+# Production stack for the Hostinger VPS (Ubuntu 24.04). MongoDB stays on
+# Atlas. Secrets live in backend/.env and the domains in ./.env; neither is in git.
+#
+#   docker compose up -d --build
+services:
+  api:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+    # server.js waits up to 3s for AI jobs to close before shutting down.
+    stop_grace_period: 20s
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4000/api/v1/health']
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    # One copy only: sockets, the reminder sweep and AI jobs live in this process.
+
+  web:
+    build: ./admin
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set ADMIN_DOMAIN in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/nginx/templates:/etc/nginx/templates:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  uploads:
