@@ -1,0 +1,12 @@
+# Testing without a domain: layered on docker-compose.yml so the API and the
+# admin panel share the VPS's Hostinger name (srvXXXX.hstgr.cloud) over HTTPS.
+# Turned on from .env with COMPOSE_FILE (see .env.example), so the usual
+# `docker compose up -d --build` picks it up. Remove that line once a real
+# domain is set up.
+services:
+  web:
+    volumes:
+      # Replaces the two-domain Nginx config (same target path).
+      - ./deploy/nginx/no-domain:/etc/nginx/templates:ro
+      # Certificate from certbot on the host.
+      - /etc/letsencrypt:/etc/letsencrypt:ro

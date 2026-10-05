@@ -1,0 +1,48 @@
+# No-domain mode (docker-compose.no-domain.yml): everything on the VPS's own
+# Hostinger name (srvXXXX.hstgr.cloud), with a Let's Encrypt certificate from
+# certbot on the host. ${API_DOMAIN} is that name; see .env.example.
+#
+#   /api, /uploads, /socket.io  -> API container
+#   everything else             -> admin panel
+# The panel already calls /api on its own origin, and the mobile app calls
+# <origin>/api/v1 and <origin>/socket.io, so one name serves both.
+
+# Docker's internal DNS, asked again every 10s so a recreated api container
+# (new IP) is found without restarting Nginx.
+resolver 127.0.0.11 valid=10s;
+
+server {
+  listen 80;
+  server_name ${API_DOMAIN};
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${API_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${API_DOMAIN}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${API_DOMAIN}/privkey.pem;
+
+  # Uploads are capped at 10 MB by the API (middleware/upload.js).
+  client_max_body_size 12m;
+
+  root /usr/share/nginx/html;
+
+  location ~ ^/(api|uploads|socket\.io)/ {
+    set $api http://api:4000;
+    proxy_pass $api;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 120s;
+  }
+
+  location / {
+    try_files $uri /index.html;
+  }
+}
