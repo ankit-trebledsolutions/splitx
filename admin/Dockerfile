@@ -3,7 +3,8 @@
 FROM node:24-alpine AS build
 
 WORKDIR /app
-COPY package*.json ./
+# .npmrc carries legacy-peer-deps (react-helmet-async still declares React <=18).
+COPY package*.json .npmrc ./
 RUN npm ci
 COPY . .
 RUN npm run build
