@@ -103,6 +103,11 @@ const adminOrigins = (process.env.ADMIN_ORIGINS || 'http://localhost:5173')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// Proxies in front of the API whose X-Forwarded-For may be believed: 1 = Nginx
+// only, 2 = Cloudflare + Nginx (docker-compose sets it). 0, the default, trusts
+// none, so a bare `node src/server.js` cannot be handed a fake caller address.
+const trustProxy = intEnv('TRUST_PROXY', 0);
+
 module.exports = {
   cloudinary,
   email,
@@ -113,6 +118,7 @@ module.exports = {
   jwtSecret: required('JWT_SECRET', 'dev-only-secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   adminOrigins,
+  trustProxy,
   settingsKey,
   reminderSweep,
   // Admin sessions are shorter-lived than the mobile app's: a panel that can

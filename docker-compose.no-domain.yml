@@ -4,6 +4,11 @@
 # `docker compose up -d --build` picks it up. Remove that line once a real
 # domain is set up.
 services:
+  api:
+    environment:
+      # No Cloudflare in this mode: Nginx is the only proxy.
+      TRUST_PROXY: 1
+
   web:
     volumes:
       # Replaces the two-domain Nginx config (same target path).

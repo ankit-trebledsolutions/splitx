@@ -16,7 +16,7 @@ const buildAiLimiter = (overrides = {}) =>
     limit: 20,
     standardHeaders: true,
     legacyHeaders: false,
-    // Never the IP: trust proxy is unset, so behind the host's proxy every
+    // Never the IP: without TRUST_PROXY, behind the host's proxy every
     // request would share one address and one counter.
     keyGenerator: (req) => String(req.user._id),
     validate: { xForwardedForHeader: false },

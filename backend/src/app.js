@@ -10,6 +10,11 @@ const env = require('./config/env');
 
 const app = express();
 
+// Behind Nginx (and Cloudflare) every request arrives from the proxy. Trusting
+// those hops gives req.ip the real caller, so the per-IP /auth limit below is
+// per user rather than one counter shared by everyone.
+if (env.trustProxy > 0) app.set('trust proxy', env.trustProxy);
+
 // cross-origin-resource-policy relaxed so the mobile app can load /uploads images.
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 // The mobile app sends no Origin header and no cookies, so it keeps the open

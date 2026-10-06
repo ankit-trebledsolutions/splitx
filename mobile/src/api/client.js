@@ -3,8 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// Production builds (the APK) talk to the deployed API.
-const PROD_ORIGIN = 'https://splitx-dj1h.onrender.com';
+// Production builds (the APK) talk to the deployed API: the Hostinger VPS under
+// its own Hostinger name until there is a domain, then https://api.<domain>.
+const PROD_ORIGIN = 'https://srv2035255.hstgr.cloud';
 
 // The Android emulator can't use "localhost" to mean the host machine; it has
 // a fixed alias for it instead. A physical phone reached over USB with

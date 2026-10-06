@@ -9,6 +9,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
+      # Cloudflare + Nginx sit in front; see backend/src/config/env.js.
+      TRUST_PROXY: 2
     volumes:
       - uploads:/app/uploads
     restart: unless-stopped

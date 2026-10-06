@@ -15,7 +15,7 @@ const base = {
 /**
  * Sign-in brake, counted per email address rather than per IP.
  *
- * `trust proxy` is unset, so behind the host's proxy every caller shares one
+ * Without TRUST_PROXY, behind the host's proxy every caller shares one
  * address and one counter — an IP key would let a single noisy client lock the
  * whole panel out. Keying on the email stops a password being guessed against a
  * known account, which is the attack that matters here. A spread-out attempt
