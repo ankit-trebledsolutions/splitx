@@ -1,5 +1,7 @@
 const { StreamClient } = require('@stream-io/node-sdk');
+const { PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const env = require('../config/env');
+const r2Storage = require('../storage/r2.storage');
 
 /**
  * Asks each provider whether it accepts a set of keys, before they are saved.
@@ -31,6 +33,22 @@ const outside = {
     env.nodeEnv === 'test'
       ? refuseInTests('streamApp')
       : (apiKey, apiSecret) => new StreamClient(apiKey, apiSecret, { timeout: TIMEOUT_MS }).getApp(),
+  // Stores a tiny file and removes it again: proves the keys, the bucket and
+  // the token's permission on it in one go, which is exactly what uploads need.
+  r2PutAndRemove:
+    env.nodeEnv === 'test'
+      ? refuseInTests('r2PutAndRemove')
+      : async (keys) => {
+          const client = r2Storage.clientFor(keys);
+          const probe = { Bucket: keys.bucket, Key: '.splix-connection-test' };
+          const options = { abortSignal: AbortSignal.timeout(TIMEOUT_MS) };
+          try {
+            await client.send(new PutObjectCommand({ ...probe, Body: 'ok', ContentType: 'text/plain' }), options);
+            await client.send(new DeleteObjectCommand(probe), options);
+          } finally {
+            client.destroy();
+          }
+        },
 };
 
 const ok = (message, note) => ({ ok: true, message, ...(note ? { note } : {}) });
@@ -137,29 +155,37 @@ const openai = async ({ apiKey, model, fallbackModel, baseUrl = env.openai.baseU
   return ok(`OpenAI accepted the key, and it can use the model "${model}".`);
 };
 
-const cloudinary = async ({ cloudName, apiKey, apiSecret }) => {
-  if (!cloudName || !apiKey || !apiSecret) {
-    return failed('Cloudinary needs all three: the cloud name, the API key and the API secret.');
-  }
+const R2_REFUSED = new Set(['InvalidAccessKeyId', 'SignatureDoesNotMatch', 'AccessDenied', 'Unauthorized']);
 
-  let res;
-  try {
-    res = await outside.fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/ping`, {
-      headers: { Authorization: `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}` },
-    });
-  } catch {
-    return unreachable('Cloudinary');
-  }
-
-  if (res.status === 401 || res.status === 403) {
+const r2 = async ({ accountId, accessKeyId, secretAccessKey, bucket }) => {
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
     return failed(
-      'Cloudinary did not accept these values. Check that the cloud name, API key and API secret all come from the same account.'
+      'Cloudflare R2 needs all four: the account ID, the Access Key ID, the Secret Access Key and the bucket name.'
     );
   }
-  if (res.status === 404) return failed(`Cloudinary has no account with the cloud name "${cloudName}".`);
-  if (!res.ok) return failed(`Cloudinary answered with an error (${res.status}). Try again in a moment.`);
+  // definitions.js refuses such an ID before it gets here; this is the second
+  // lock, since the ID becomes part of the address the keys are sent to.
+  if (!/^[a-f0-9]{32}$/i.test(accountId)) return failed('The account ID is 32 letters and numbers.');
 
-  return ok('Cloudinary accepted the keys.');
+  try {
+    await outside.r2PutAndRemove({ accountId, accessKeyId, secretAccessKey, bucket });
+  } catch (err) {
+    // The S3 client reports what R2 answered as a code and an HTTP status;
+    // anything without one never reached R2.
+    const status = err?.$metadata?.httpStatusCode;
+    const code = err?.name || err?.Code || '';
+    if (code === 'NoSuchBucket' || status === 404) {
+      return failed(`Cloudflare R2 has no bucket called "${bucket}" in this account.`);
+    }
+    if (R2_REFUSED.has(code) || status === 401 || status === 403) {
+      return failed(
+        'Cloudflare R2 did not accept these keys. Check that they come from the same account, and that the token has Object Read & Write on this bucket.'
+      );
+    }
+    if (status) return failed(`Cloudflare R2 answered with an error (${status}). Try again in a moment.`);
+    return unreachable('Cloudflare R2');
+  }
+  return ok('Cloudflare R2 accepted the keys, and files can be stored in the bucket.');
 };
 
 const stream = async ({ apiKey, apiSecret }) => {
@@ -191,4 +217,4 @@ const google = async (values) => {
   );
 };
 
-module.exports = { outside, resend, openai, cloudinary, stream, google };
+module.exports = { outside, resend, openai, r2, stream, google };

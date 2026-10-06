@@ -115,7 +115,7 @@ test('an owner sees every service, its steps and its fields', async (t) => {
     assert.equal(res.status, 200);
     assert.deepEqual(
       res.body.data.integrations.map((entry) => entry.name),
-      ['Resend', 'OpenAI', 'Cloudinary', 'Stream', 'Google Sign-In']
+      ['Resend', 'OpenAI', 'Cloudflare R2', 'Stream', 'Google Sign-In']
     );
     assert.equal(res.body.data.canSaveSecrets, true);
     // The checks that make up a field's rules stay on the server.

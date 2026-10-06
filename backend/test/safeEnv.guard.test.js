@@ -36,7 +36,7 @@ test('safeEnv moved the process to a folder with no .env and pinned local-only v
   assertSafe(env);
   assert.equal(env.nodeEnv, 'test');
   assert.equal(env.mongoUri, 'mongodb://127.0.0.1:27017/splix_test');
-  assert.equal(env.cloudinary, null);
+  assert.equal(env.r2, null);
   assert.equal(env.email.resendApiKey, '');
   assert.equal(env.openai.apiKey, 'fake-ok');
   assert.equal(new URL(env.openai.baseUrl).hostname, '127.0.0.1');

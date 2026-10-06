@@ -67,7 +67,7 @@ const world = (t, { existing = [], accepts = { ok: true, message: 'Accepted.' } 
   const log = t.mock.method(IntegrationChange, 'create', async (entry) => entry);
 
   const asked = {};
-  for (const name of ['resend', 'openai', 'cloudinary', 'stream', 'google']) {
+  for (const name of ['resend', 'openai', 'r2', 'stream', 'google']) {
     asked[name] = t.mock.method(testers, name, async () => accepts);
   }
   t.after(() => store.apply([]));
@@ -108,7 +108,7 @@ test('the panel is told where each value comes from, and is never sent a secret'
 
   const { integrations, canSaveSecrets } = await service.list();
   assert.equal(canSaveSecrets, true);
-  assert.deepEqual(integrations.map((entry) => entry.key), ['resend', 'openai', 'cloudinary', 'stream', 'google']);
+  assert.deepEqual(integrations.map((entry) => entry.key), ['resend', 'openai', 'r2', 'stream', 'google']);
 
   const field = (service_, key) => integrations.find((entry) => entry.key === service_).fields.find((f) => f.key === key);
 
@@ -329,7 +329,8 @@ test('values that cannot be right are refused before the provider is asked', asy
   await assert.rejects(save('openai', { userDailyCap: '-1' }), refused(400, /whole number from 0 to 1000/));
   await assert.rejects(save('openai', { userDailyCap: '2.5' }), refused(400, /whole number/));
   await assert.rejects(save('openai', { globalDailyCap: '999999999' }), refused(400, /whole number from 0 to 100000/));
-  await assert.rejects(save('cloudinary', { cloudName: '../../evil' }), refused(400, /Cloud name/));
+  await assert.rejects(save('r2', { accountId: '../../evil' }), refused(400, /Account ID/));
+  await assert.rejects(save('r2', { bucket: 'My Bucket' }), refused(400, /Bucket name/));
   await assert.rejects(save('google', { webClientId: 'my-client-id' }), refused(400, /apps\.googleusercontent\.com/));
 
   assert.equal(write.mock.callCount(), 0);
@@ -390,19 +391,25 @@ test('the server that saved a key starts using it at once', async (t) => {
 // ---- Testing without saving -------------------------------------------------
 
 test('"Test connection" asks the provider and stores nothing', async (t) => {
-  const existing = [stored('cloudinary', { values: { cloudName: 'splix' }, secrets: { apiKey: '123456789012345' } })];
+  const existing = [
+    stored('r2', {
+      values: { accountId: 'a'.repeat(32), bucket: 'splitx-media' },
+      secrets: { accessKeyId: 'k'.repeat(32) },
+    }),
+  ];
   const { write, log, asked } = world(t, {
     existing,
-    accepts: { ok: false, message: 'Cloudinary did not accept these values.' },
+    accepts: { ok: false, message: 'Cloudflare R2 did not accept these keys.' },
   });
 
-  const result = await service.test('cloudinary', { apiSecret: 'a-new-secret-0123456789' });
+  const result = await service.test('r2', { secretAccessKey: 's'.repeat(64) });
   // A refusal is the answer to the question, not an error.
-  assert.deepEqual(result, { ok: false, message: 'Cloudinary did not accept these values.' });
-  assert.deepEqual(asked.cloudinary.mock.calls[0].arguments[0], {
-    cloudName: 'splix',
-    apiKey: '123456789012345',
-    apiSecret: 'a-new-secret-0123456789',
+  assert.deepEqual(result, { ok: false, message: 'Cloudflare R2 did not accept these keys.' });
+  assert.deepEqual(asked.r2.mock.calls[0].arguments[0], {
+    accountId: 'a'.repeat(32),
+    accessKeyId: 'k'.repeat(32),
+    secretAccessKey: 's'.repeat(64),
+    bucket: 'splitx-media',
   });
   assert.equal(write.mock.callCount(), 0);
   assert.equal(log.mock.callCount(), 0);

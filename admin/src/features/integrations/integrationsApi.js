@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { adminBaseQuery, unwrap } from '@/lib/api';
 
-// The outside services Splix runs on — Resend, OpenAI, Cloudinary, Stream,
+// The outside services Splix runs on — Resend, OpenAI, Cloudflare R2, Stream,
 // Google Sign-In — and the keys each one uses. Owners only, on the server too.
 //
 // A secret travels one way. It is sent when an admin types a new one and is

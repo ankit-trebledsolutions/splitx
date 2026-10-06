@@ -119,7 +119,7 @@ const deleteUser = async (userId) => {
   }
 
   // Groups nobody else is in go through the existing group cascade, which also
-  // clears their stored files — those would otherwise sit in Cloudinary forever.
+  // clears their stored files — those would otherwise sit in storage forever.
   for (const group of plan.groupsToDelete) {
     await groupDeletion.deleteGroup(group.id, userId);
   }
@@ -184,7 +184,7 @@ const deleteUser = async (userId) => {
   ]);
 
   // Photos carry stored files, so they go through storage rather than a plain
-  // delete — otherwise the images stay in Cloudinary after the account is gone.
+  // delete — otherwise the images stay in storage after the account is gone.
   const photos = await Photo.find({ uploadedBy: userId }).select('+storageKey storageProvider');
   for (const photo of photos) {
     if (photo.storageKey) {

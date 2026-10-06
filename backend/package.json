@@ -17,9 +17,10 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@stream-io/node-sdk": "^0.8.6",
     "bcryptjs": "^2.4.3",
-    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -30,6 +31,7 @@
     "mongoose": "^8.5.0",
     "morgan": "^1.10.0",
     "multer": "^2.2.0",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "zod": "^3.23.8"
   },

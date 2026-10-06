@@ -3,7 +3,7 @@ node_modules/
 *.log
 coverage/
 
-# Uploaded gallery photos (development fallback only; production uses Cloudinary)
+# Uploaded gallery photos (development fallback only; production uses Cloudflare R2)
 uploads/
 
 # Output of scripts/preview-emails.js

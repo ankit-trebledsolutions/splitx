@@ -123,15 +123,15 @@ test('a key and a secret are never taken from two different places by accident',
   // and nobody could make a call. The server's own pair still works.
   assert.deepEqual(store.stream(), serverKeys);
 
-  // The same holds for a photo account.
-  withEnv(t, { cloudinary: null });
-  const photos = saved('cloudinary', {
-    values: { cloudName: 'panel-cloud' },
-    secrets: { apiKey: '123456789012345', apiSecret: 'a-secret-from-the-panel' },
+  // The same holds for the file bucket.
+  withEnv(t, { r2: null });
+  const files = saved('r2', {
+    values: { accountId: 'a'.repeat(32), bucket: 'splitx-media' },
+    secrets: { accessKeyId: 'k'.repeat(32), secretAccessKey: 'a-secret-from-the-panel' },
   });
-  photos.secrets.apiSecret = 'not-a-locked-value';
-  store.apply([photos]);
-  assert.equal(store.cloudinary(), null);
+  files.secrets.secretAccessKey = 'not-a-locked-value';
+  store.apply([files]);
+  assert.equal(store.r2(), null);
 });
 
 test('a document for a service that no longer exists is ignored', () => {
@@ -152,28 +152,31 @@ test('the limits are numbers, whichever place they come from', (t) => {
   assert.equal(config.timeoutMs, env.openai.timeoutMs);
 });
 
-test('photo storage is an account or nothing: part of one is not used', (t) => {
-  withEnv(t, { cloudinary: null });
-  assert.equal(store.cloudinary(), null);
-  assert.equal(storage.activeProvider, 'local');
-
-  store.apply([saved('cloudinary', { values: { cloudName: 'splix' }, secrets: { apiKey: '123456789012345' } })]);
-  assert.equal(store.cloudinary(), null);
+test('file storage is a whole bucket or nothing: part of one is not used', (t) => {
+  withEnv(t, { r2: null });
+  assert.equal(store.r2(), null);
   assert.equal(storage.activeProvider, 'local');
 
   store.apply([
-    saved('cloudinary', {
-      values: { cloudName: 'splix' },
-      secrets: { apiKey: '123456789012345', apiSecret: 'a-secret-from-the-panel' },
+    saved('r2', { values: { accountId: 'a'.repeat(32), bucket: 'splitx-media' }, secrets: { accessKeyId: 'k'.repeat(32) } }),
+  ]);
+  assert.equal(store.r2(), null);
+  assert.equal(storage.activeProvider, 'local');
+
+  store.apply([
+    saved('r2', {
+      values: { accountId: 'a'.repeat(32), bucket: 'splitx-media' },
+      secrets: { accessKeyId: 'k'.repeat(32), secretAccessKey: 'a-secret-from-the-panel' },
     }),
   ]);
-  assert.deepEqual(store.cloudinary(), {
-    cloudName: 'splix',
-    apiKey: '123456789012345',
-    apiSecret: 'a-secret-from-the-panel',
+  assert.deepEqual(store.r2(), {
+    accountId: 'a'.repeat(32),
+    accessKeyId: 'k'.repeat(32),
+    secretAccessKey: 'a-secret-from-the-panel',
+    bucket: 'splitx-media',
   });
-  // Uploads move to Cloudinary the moment the account is complete, no restart.
-  assert.equal(storage.activeProvider, 'cloudinary');
+  // Uploads move to R2 the moment the bucket is complete, no restart.
+  assert.equal(storage.activeProvider, 'r2');
 });
 
 test('Google IDs saved in the panel are accepted as well as the server\'s, never instead', (t) => {

@@ -33,7 +33,7 @@ const ROLE_LABELS = {
 };
 
 // A picture uploaded through the app is stored as a path on the API
-// ('/uploads/...'); one from Google or Cloudinary is already a full address.
+// ('/uploads/...'); one from Google or file storage is already a full address.
 const avatarUrl = (avatar) => {
   if (!avatar) return undefined;
   return /^(https?:|data:)/.test(avatar) ? avatar : `${API_URL}${avatar}`;

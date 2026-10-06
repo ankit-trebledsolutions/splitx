@@ -22,11 +22,12 @@ const env = {
   MONGODB_URI: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/splitx_dev',
   ADMIN_ORIGINS: process.env.ADMIN_ORIGINS || 'http://localhost:5173',
   NODE_ENV: process.env.NODE_ENV || 'development',
-  // Uploads would otherwise go to the real Cloudinary account from .env. With
-  // these blank the API falls back to the local uploads folder (see config/env).
-  CLOUDINARY_CLOUD_NAME: '',
-  CLOUDINARY_API_KEY: '',
-  CLOUDINARY_API_SECRET: '',
+  // Uploads would otherwise go to the real R2 bucket from .env. With these
+  // blank the API falls back to the local uploads folder (see config/env).
+  R2_ACCOUNT_ID: '',
+  R2_ACCESS_KEY_ID: '',
+  R2_SECRET_ACCESS_KEY: '',
+  R2_BUCKET: '',
 };
 
 console.log(`[dev:local] database  : ${env.MONGODB_URI}`);

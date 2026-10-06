@@ -13,23 +13,28 @@ const required = (key, devFallback) => {
   return value;
 };
 
-// Image storage. All three values or none: with none, uploads fall back to the
-// local uploads folder, which is fine for development but is wiped on every
-// deploy by hosts like Render.
-const cloudinaryKeys = [
-  process.env.CLOUDINARY_CLOUD_NAME,
-  process.env.CLOUDINARY_API_KEY,
-  process.env.CLOUDINARY_API_SECRET,
-];
-const cloudinary = cloudinaryKeys.every(Boolean)
-  ? { cloudName: cloudinaryKeys[0], apiKey: cloudinaryKeys[1], apiSecret: cloudinaryKeys[2] }
-  : null;
-if (!cloudinary && cloudinaryKeys.some(Boolean)) {
-  throw new Error('Cloudinary is half configured: set CLOUDINARY_CLOUD_NAME, _API_KEY and _API_SECRET');
+// File storage (Cloudflare R2). All four values or none: with none, uploads
+// fall back to the local uploads folder, which is fine for development but is
+// only as safe as this server's disk.
+const r2Keys = {
+  accountId: process.env.R2_ACCOUNT_ID || '',
+  accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  bucket: process.env.R2_BUCKET || '',
+};
+const r2 = Object.values(r2Keys).every(Boolean) ? r2Keys : null;
+if (!r2 && Object.values(r2Keys).some(Boolean)) {
+  throw new Error('R2 is half configured: set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET');
 }
-if (!cloudinary && isProduction) {
-  console.warn('[storage] Cloudinary is not configured: uploaded photos will be lost on the next deploy');
+if (!r2 && isProduction) {
+  console.warn('[storage] Cloudflare R2 is not configured: uploads are kept on this server\'s disk instead');
 }
+
+// Where stored files are fetched from. Each file's address is saved with it,
+// so this is fixed per upload: the server's own /media (which hands out
+// short-lived R2 links) until there is a domain, then R2's public domain.
+// Empty means "/media" on whatever origin the client used, for development.
+const mediaBaseUrl = (process.env.MEDIA_BASE_URL || '').trim().replace(/\/+$/, '');
 
 // Outgoing email (Resend). Without a key, emails are printed to the console
 // instead, which is fine for development but means nobody receives codes.
@@ -109,7 +114,8 @@ const adminOrigins = (process.env.ADMIN_ORIGINS || 'http://localhost:5173')
 const trustProxy = intEnv('TRUST_PROXY', 0);
 
 module.exports = {
-  cloudinary,
+  r2,
+  mediaBaseUrl,
   email,
   openai,
   port: parseInt(process.env.PORT || '4000', 10),

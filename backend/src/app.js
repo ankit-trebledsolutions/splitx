@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const routes = require('./routes');
+const mediaRoutes = require('./routes/media.routes');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const env = require('./config/env');
 
@@ -36,6 +37,8 @@ app.use(
 
 // Uploaded gallery photos are served as static files.
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Files in Cloudflare R2: answered with a short-lived link (routes/media.routes.js).
+app.use('/media', mediaRoutes);
 app.use(express.json({ limit: '1mb' }));
 if (env.nodeEnv !== 'test') {
   app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));

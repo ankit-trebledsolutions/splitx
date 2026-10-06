@@ -32,7 +32,7 @@ const TINYMCE = [
 ];
 
 export default defineConfig(({ mode }) => {
-  // The browser only ever talks to this server; /api and /uploads are passed on
+  // The browser only ever talks to this server; /api, /uploads and /media are passed on
   // to the API named in .env. That keeps the admin session cookie same-origin.
   // The deployed site does the same job with a rewrite rule on the static host.
   const apiUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL || 'http://localhost:4000';
@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => {
       include: ['@tinymce/tinymce-react', ...TINYMCE],
     },
     server: {
-      proxy: { '/api': proxy, '/uploads': proxy },
+      proxy: { '/api': proxy, '/uploads': proxy, '/media': proxy },
     },
     build: {
       chunkSizeWarningLimit: 3000,

@@ -50,8 +50,9 @@ server {
   root /usr/share/nginx/html;
 
   # The panel calls /api on its own origin so its session cookie stays
-  # same-site (admin/src/lib/api.js); pass those on to the API.
-  location ~ ^/(api|uploads)/ {
+  # same-site (admin/src/lib/api.js); pass those on to the API, along with
+  # the stored files it shows (/media).
+  location ~ ^/(api|uploads|media)/ {
     set $api http://api:4000;
     proxy_pass $api;
     proxy_http_version 1.1;

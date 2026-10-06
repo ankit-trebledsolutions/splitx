@@ -156,9 +156,9 @@ const openai = () => ({ ...env.openai, ...valuesOf('openai') });
 
 // Null unless the account is complete, which is what sends uploads to the
 // local folder on a machine with no storage account.
-const cloudinary = () => {
-  const values = valuesOf('cloudinary');
-  return values.cloudName && values.apiKey && values.apiSecret ? values : null;
+const r2 = () => {
+  const values = valuesOf('r2');
+  return values.accountId && values.accessKeyId && values.secretAccessKey && values.bucket ? values : null;
 };
 
 const stream = () => valuesOf('stream');
@@ -184,7 +184,7 @@ module.exports = {
   valuesOf,
   resend,
   openai,
-  cloudinary,
+  r2,
   stream,
   googleClientIds,
 };

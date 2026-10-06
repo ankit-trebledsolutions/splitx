@@ -2,8 +2,8 @@
 # Hostinger name (srvXXXX.hstgr.cloud), with a Let's Encrypt certificate from
 # certbot on the host. ${API_DOMAIN} is that name; see .env.example.
 #
-#   /api, /uploads, /socket.io  -> API container
-#   everything else             -> admin panel
+#   /api, /uploads, /media, /socket.io  -> API container
+#   everything else                     -> admin panel
 # The panel already calls /api on its own origin, and the mobile app calls
 # <origin>/api/v1 and <origin>/socket.io, so one name serves both.
 
@@ -30,7 +30,7 @@ server {
 
   root /usr/share/nginx/html;
 
-  location ~ ^/(api|uploads|socket\.io)/ {
+  location ~ ^/(api|uploads|media|socket\.io)/ {
     set $api http://api:4000;
     proxy_pass $api;
     proxy_http_version 1.1;

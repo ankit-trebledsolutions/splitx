@@ -61,11 +61,11 @@ test('a stored value that was altered does not open', () => {
 });
 
 test('a value stored for one service cannot be moved to another', () => {
-  // Somebody who can write to the database copies the Cloudinary secret into
+  // Somebody who can write to the database copies the R2 secret into
   // the Resend slot, hoping the server sends it to Resend as a Resend key.
-  const sealed = vault.seal('cloudinary-secret-value', 'cloudinary.apiSecret');
+  const sealed = vault.seal('r2-secret-value', 'r2.secretAccessKey');
   assert.throws(() => vault.open(sealed, 'resend.apiKey'));
-  assert.equal(vault.open(sealed, 'cloudinary.apiSecret'), 'cloudinary-secret-value');
+  assert.equal(vault.open(sealed, 'r2.secretAccessKey'), 'r2-secret-value');
 });
 
 test('a different encryption key opens nothing', () => {

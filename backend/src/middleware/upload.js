@@ -1,8 +1,8 @@
 const multer = require('multer');
 const ApiError = require('../utils/ApiError');
 
-// 10MB is the largest image (and raw file) Cloudinary's free plan accepts, and
-// phones compress before uploading.
+// Phones compress before uploading, so 10MB is plenty; the Nginx in front
+// allows a little more than this (deploy/nginx) so this limit is the one hit.
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 // Held in memory only long enough to hand to the storage provider (see

@@ -11,7 +11,7 @@ const env = require('../config/env');
  *
  * Every value is also tied to the place it was stored for ("resend.apiKey").
  * Without that, somebody able to write to the database could copy the locked
- * Cloudinary secret into the Resend slot and have the server send it to
+ * R2 secret into the Resend slot and have the server send it to
  * Resend as if it were a Resend key.
  */
 const VERSION = 'v1';

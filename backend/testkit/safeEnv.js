@@ -1,7 +1,7 @@
 /**
  * Makes it impossible for a test or the smoke script to touch anything real.
  *
- * backend/.env points at the live database, live Cloudinary and real API keys,
+ * backend/.env points at the live database, the live file bucket and real API keys,
  * and src/config/env.js loads it the moment anything under src/ is required.
  * So this file must be the FIRST statement of every test file and script that
  * runs backend code:
@@ -37,9 +37,11 @@ Object.assign(process.env, {
   JWT_SECRET: 'test-only-secret',
   STREAM_API_KEY: 'test-stream-key',
   STREAM_API_SECRET: 'test-stream-secret',
-  CLOUDINARY_CLOUD_NAME: '',
-  CLOUDINARY_API_KEY: '',
-  CLOUDINARY_API_SECRET: '',
+  R2_ACCOUNT_ID: '',
+  R2_ACCESS_KEY_ID: '',
+  R2_SECRET_ACCESS_KEY: '',
+  R2_BUCKET: '',
+  MEDIA_BASE_URL: '',
   RESEND_API_KEY: '',
   // Locks nothing real: only what the tests themselves store.
   SETTINGS_ENCRYPTION_KEY: 'test-only-settings-key-0123456789abcdef',

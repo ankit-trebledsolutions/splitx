@@ -406,7 +406,7 @@ The message `type` is taken from the file's mimetype: `image/*` → `image`, `au
 | `thumbUrl` | small square preview for `image` messages; equals `url` otherwise |
 | `name`, `mimeType`, `size` | as uploaded (`size` in bytes) |
 | `durationMs` | voice notes only, `0` otherwise |
-| `storageProvider` | `cloudinary` or `local` |
+| `storageProvider` | `r2` or `local` (`cloudinary` on rows from before the move to R2) |
 
 ---
 
@@ -771,7 +771,7 @@ Add a photo entry by URL or as an emoji/colour placeholder tile.
 
 `multipart/form-data` with a single file field named **`photo`** (and an optional `caption`). Only `image/*` mimetypes, max **10 MB** (`413` above that); the caller must be a group member.
 
-The image is sent to the configured storage provider and never written to the API server's disk. With the three `CLOUDINARY_*` variables set that is Cloudinary (stored as JPG under `splix/groups/<groupId>/`); without them it falls back to the local `uploads/` folder, for development only.
+The image is sent to the configured storage provider and never written to the API server's disk. With the four `R2_*` variables set that is Cloudflare R2 (stored as uploaded under `splix/groups/<groupId>/`, with a 400px square JPG next to it for the grid); without them it falls back to the local `uploads/` folder, for development only.
 
 The created photo carries:
 
@@ -779,9 +779,11 @@ The created photo carries:
 | --- | --- |
 | `imageUrl` | the full-size image: what the app downloads to the phone and shows full-screen |
 | `thumbUrl` | a small square (400px) for the gallery grid |
-| `storageProvider` | `cloudinary` or `local` |
+| `storageProvider` | `r2` or `local` (`cloudinary` on rows from before the move to R2) |
 
-Absolute URLs (`https://…`) are used as-is; relative ones (`/uploads/…`) are relative to the API origin.
+Absolute URLs (`https://…`) are used as-is; relative ones (`/uploads/…`, `/media/…`) are relative to the API origin.
+
+An R2 address is `MEDIA_BASE_URL/<key>`. Until there is a domain that is this server's `GET /media/<key>`, which needs no sign-in and answers `302` to a link signed for an hour (`404` when no bucket is set up). Image, audio and download clients follow the redirect.
 
 ### `DELETE /photos/:photoId`
 

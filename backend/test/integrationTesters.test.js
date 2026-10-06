@@ -26,12 +26,13 @@ const outsideAnswers = (t, respond) => t.mock.method(testers.outside, 'fetch', a
 
 const RESEND = { apiKey: 're_a_key_0123456789', from: 'Splix <noreply@splix.app>' };
 const OPENAI = { apiKey: 'sk-a-key-0123456789abcdef', model: 'gpt-main', fallbackModel: 'gpt-small' };
-const CLOUDINARY = { cloudName: 'splix', apiKey: '123456789012345', apiSecret: 'a-cloudinary-secret' };
+const R2 = { accountId: 'a'.repeat(32), accessKeyId: 'k'.repeat(32), secretAccessKey: 's'.repeat(64), bucket: 'splitx-media' };
 const STREAM = { apiKey: 'abcdef123456', apiSecret: 'a'.repeat(64) };
 
 test('in tests, a call that was not replaced is refused rather than sent', async () => {
   await assert.rejects(async () => testers.outside.fetch('https://api.resend.com/domains'), /No outside calls in tests/);
   await assert.rejects(async () => testers.outside.streamApp('key', 'secret'), /No outside calls in tests/);
+  await assert.rejects(async () => testers.outside.r2PutAndRemove(R2), /No outside calls in tests/);
 });
 
 // ---- Resend -----------------------------------------------------------------
@@ -118,38 +119,56 @@ test('OpenAI: a model name it does not know is caught before a plan is ever aske
   assert.match(neither.message, /no access to the model "gpt-main" or to the fallback "gpt-small"/);
 });
 
-// ---- Cloudinary -------------------------------------------------------------
+// ---- Cloudflare R2 ----------------------------------------------------------
 
-test('Cloudinary: three values it accepts', async (t) => {
-  const asked = outsideAnswers(t, () => answer(200, { status: 'ok' }));
-  assert.deepEqual(await testers.cloudinary(CLOUDINARY), { ok: true, message: 'Cloudinary accepted the keys.' });
+// What the S3 client throws when R2 answers with an error.
+const r2Error = (name, status) => Object.assign(new Error(name), { name, $metadata: { httpStatusCode: status } });
+const r2Answers = (t, respond) => t.mock.method(testers.outside, 'r2PutAndRemove', async (keys) => respond(keys));
 
-  const [url, init] = asked.mock.calls[0].arguments;
-  assert.equal(url, 'https://api.cloudinary.com/v1_1/splix/ping');
-  assert.equal(
-    Buffer.from(init.headers.Authorization.replace('Basic ', ''), 'base64').toString(),
-    '123456789012345:a-cloudinary-secret'
-  );
+test('R2: keys that can store a file in the bucket', async (t) => {
+  const asked = r2Answers(t, () => undefined);
+  assert.deepEqual(await testers.r2(R2), {
+    ok: true,
+    message: 'Cloudflare R2 accepted the keys, and files can be stored in the bucket.',
+  });
+  assert.deepEqual(asked.mock.calls[0].arguments[0], R2);
 });
 
-test('Cloudinary: values from two different accounts are not saved', async (t) => {
-  outsideAnswers(t, () => answer(401));
-  const result = await testers.cloudinary(CLOUDINARY);
-  assert.equal(result.ok, false);
-  assert.match(result.message, /all come from the same account/);
+test('R2: keys it refuses, or a token without access to the bucket, are not saved', async (t) => {
+  for (const refusal of [r2Error('InvalidAccessKeyId', 403), r2Error('SignatureDoesNotMatch', 403), r2Error('AccessDenied', 403)]) {
+    r2Answers(t, () => {
+      throw refusal;
+    });
+    const result = await testers.r2(R2);
+    assert.equal(result.ok, false, refusal.name);
+    assert.match(result.message, /did not accept these keys/, refusal.name);
+  }
 });
 
-test('Cloudinary: part of an account is refused without asking anybody', async (t) => {
-  const asked = outsideAnswers(t, () => answer(200));
-  assert.equal((await testers.cloudinary({ ...CLOUDINARY, apiSecret: '' })).ok, false);
+test('R2: a bucket that does not exist is named in the answer', async (t) => {
+  r2Answers(t, () => {
+    throw r2Error('NoSuchBucket', 404);
+  });
+  assert.deepEqual(await testers.r2(R2), {
+    ok: false,
+    message: 'Cloudflare R2 has no bucket called "splitx-media" in this account.',
+  });
+});
+
+test('R2: part of the set is refused without asking anybody', async (t) => {
+  const asked = r2Answers(t, () => undefined);
+  for (const field of Object.keys(R2)) {
+    assert.equal((await testers.r2({ ...R2, [field]: '' })).ok, false, field);
+  }
   assert.equal(asked.mock.callCount(), 0);
 });
 
-test('Cloudinary: the cloud name cannot steer the request somewhere else', async (t) => {
-  // definitions.js refuses such a name before it gets here; this is the second lock.
-  const asked = outsideAnswers(t, () => answer(404));
-  await testers.cloudinary({ ...CLOUDINARY, cloudName: '../../evil?x=' });
-  assert.equal(new URL(asked.mock.calls[0].arguments[0]).pathname, '/v1_1/..%2F..%2Fevil%3Fx%3D/ping');
+test('R2: the account ID cannot steer the keys to another address', async (t) => {
+  // definitions.js refuses such an ID before it gets here; this is the second lock.
+  const asked = r2Answers(t, () => undefined);
+  const result = await testers.r2({ ...R2, accountId: 'evil.example.com/x?' });
+  assert.equal(result.ok, false);
+  assert.equal(asked.mock.callCount(), 0);
 });
 
 // ---- Stream -----------------------------------------------------------------
@@ -180,11 +199,14 @@ test('a provider that cannot be reached is a failed check, not a passed one', as
   t.mock.method(testers.outside, 'streamApp', async () => {
     throw new Error('fetch failed');
   });
+  r2Answers(t, () => {
+    throw new Error('getaddrinfo ENOTFOUND');
+  });
 
   for (const [name, run] of [
     ['Resend', () => testers.resend(RESEND)],
     ['OpenAI', () => testers.openai(OPENAI)],
-    ['Cloudinary', () => testers.cloudinary(CLOUDINARY)],
+    ['Cloudflare R2', () => testers.r2(R2)],
     ['Stream', () => testers.stream(STREAM)],
   ]) {
     const result = await run();
@@ -195,18 +217,26 @@ test('a provider that cannot be reached is a failed check, not a passed one', as
 
 test('a provider having a bad day is a failed check too', async (t) => {
   outsideAnswers(t, () => answer(503));
+  r2Answers(t, () => {
+    throw r2Error('InternalError', 503);
+  });
   assert.equal((await testers.resend(RESEND)).ok, false);
   assert.equal((await testers.openai(OPENAI)).ok, false);
-  assert.equal((await testers.cloudinary(CLOUDINARY)).ok, false);
+  const r2 = await testers.r2(R2);
+  assert.equal(r2.ok, false);
+  assert.match(r2.message, /answered with an error \(503\)/);
 });
 
 test('no answer ever repeats the key it was asked about', async (t) => {
   for (const status of [200, 401, 403, 404, 500]) {
     outsideAnswers(t, () => answer(status, { data: [], name: 'invalid_api_key' }));
-    const results = [await testers.resend(RESEND), await testers.openai(OPENAI), await testers.cloudinary(CLOUDINARY)];
+    r2Answers(t, () => {
+      if (status !== 200) throw r2Error('AccessDenied', status);
+    });
+    const results = [await testers.resend(RESEND), await testers.openai(OPENAI), await testers.r2(R2)];
     for (const result of results) {
       const said = `${result.message} ${result.note || ''}`;
-      for (const secret of [RESEND.apiKey, OPENAI.apiKey, CLOUDINARY.apiKey, CLOUDINARY.apiSecret]) {
+      for (const secret of [RESEND.apiKey, OPENAI.apiKey, R2.accessKeyId, R2.secretAccessKey]) {
         assert.ok(!said.includes(secret), `${status}: ${said}`);
       }
     }
