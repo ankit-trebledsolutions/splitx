@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "db299ce4-d5ab-4d9f-9827-7ff4373e3b81"
+      }
+    },
+    "android": {
+      "package": "com.rajeeva07steam.javascript"
+    }
+  }
+}
