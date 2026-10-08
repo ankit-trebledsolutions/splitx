@@ -4,7 +4,8 @@ const Reminder = require('../models/Reminder');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const storedFileService = require('./storedFile.service');
-const { emitToGroup } = require('../realtime/socket');
+// Called as realtime.emitToGroup(...), never destructured, so tests can swap the function.
+const realtime = require('../realtime/socket');
 
 const SENDER_FIELDS = 'name email';
 
@@ -25,8 +26,15 @@ const POPULATE = [
       { path: 'source.user', select: SENDER_FIELDS },
     ],
   },
+  // A task card's assignees as they were when it was posted.
+  { path: 'assignees', select: SENDER_FIELDS },
   // Without who muted it or has the alarm set: that is per member, not for the chat.
   { path: 'reminder', select: '-mutedBy -armedBy' },
+  { path: 'stay', populate: { path: 'bookedBy', select: SENDER_FIELDS } },
+  // Without who bookmarked it: that is each member's own list.
+  { path: 'attraction', select: '-savedBy' },
+  // Just enough of each photo or video to draw the card's tiles.
+  { path: 'photos', select: 'imageUrl thumbUrl mediaType durationMs emoji color caption createdAt' },
   // Just enough of the quoted message to draw the reply preview.
   {
     path: 'replyTo',
@@ -80,7 +88,14 @@ const listMessages = async (groupId, userId, { limit = 100, before, after } = {}
 // Push a freshly created message to everyone with the group open. The HTTP
 // caller still receives it in the response, so the sender never waits on this.
 const publish = (groupId, message) => {
-  emitToGroup(groupId, 'message:new', { message });
+  realtime.emitToGroup(groupId, 'message:new', { message });
+  return message;
+};
+
+// A card already in the feed changed (a gallery card gained or lost a photo):
+// open chats swap it for this copy.
+const publishUpdate = (message) => {
+  realtime.emitToGroup(String(message.group), 'message:updated', { message });
   return message;
 };
 
@@ -182,15 +197,29 @@ const deleteMessage = async (messageId, groupId, userId) => {
   }
 
   await message.populate(POPULATE);
-  emitToGroup(groupId, 'message:deleted', { message });
+  realtime.emitToGroup(groupId, 'message:deleted', { message });
   return message;
 };
 
 /**
- * Internal: drop an activity card into the group chat. Called by the expense,
- * task and reminder services so anything created anywhere shows up in the chat.
+ * Internal: drop an activity card into the group chat. Called by the services
+ * that create things (expenses, tasks, reminders, stays, attractions, gallery
+ * uploads) so anything added anywhere shows up in the chat.
  */
-const postActivity = async ({ groupId, senderId, type, text, expense, task, reminder }) => {
+const postActivity = async ({
+  groupId,
+  senderId,
+  type,
+  text,
+  expense,
+  task,
+  reminder,
+  stay,
+  attraction,
+  assignees,
+  photos,
+  batch,
+}) => {
   const message = await Message.create({
     group: groupId,
     sender: senderId ?? null,
@@ -199,6 +228,12 @@ const postActivity = async ({ groupId, senderId, type, text, expense, task, remi
     expense: expense ?? null,
     task: task ?? null,
     reminder: reminder ?? null,
+    stay: stay ?? null,
+    attraction: attraction ?? null,
+    // Only cards that use these get them; everything else leaves them out.
+    assignees,
+    photos,
+    batch: batch || undefined,
     readBy: senderId ? [senderId] : [],
   });
   return publish(groupId, await message.populate(POPULATE));
@@ -207,6 +242,79 @@ const postActivity = async ({ groupId, senderId, type, text, expense, task, remi
 const postSystem = (groupId, text) =>
   postActivity({ groupId, senderId: null, type: 'system', text });
 
-const deleteForEntity = (field, entityId) => Message.deleteMany({ [field]: entityId });
+// A later file from the same upload joins the card its first file posted, as
+// long as that was recent: a retry straight after a failed upload still lands
+// on that card, while an old batch key never revives a card from long ago.
+const BATCH_WINDOW_MS = 30 * 60 * 1000;
 
-module.exports = { listMessages, sendMessage, sendAttachment, deleteMessage, postActivity, postSystem, deleteForEntity, POPULATE };
+/**
+ * Shows a new gallery photo or video in the chat. Files picked together share
+ * a `batch` key, so ten photos make one card rather than ten. Resolves to
+ * `{ message, created }`; `created` is false when the file joined a card.
+ */
+const addToGalleryCard = async ({ groupId, senderId, photoId, batch }) => {
+  if (batch) {
+    const card = await Message.findOneAndUpdate(
+      {
+        group: groupId,
+        sender: senderId,
+        type: 'gallery',
+        batch,
+        createdAt: { $gte: new Date(Date.now() - BATCH_WINDOW_MS) },
+      },
+      { $addToSet: { photos: photoId } },
+      { new: true }
+    );
+    if (card) return { message: publishUpdate(await card.populate(POPULATE)), created: false };
+  }
+  const message = await postActivity({ groupId, senderId, type: 'gallery', photos: [photoId], batch });
+  return { message, created: true };
+};
+
+/**
+ * Deletes cards and tells every open chat to drop them (`message:removed`),
+ * so a card never outlives what it was about on someone's screen.
+ */
+const removeCards = async (filter) => {
+  const removed = await Message.find(filter).select('_id group').lean();
+  await Message.deleteMany(filter);
+  const byGroup = new Map();
+  for (const { _id, group } of removed) {
+    const groupId = String(group);
+    byGroup.set(groupId, [...(byGroup.get(groupId) ?? []), String(_id)]);
+  }
+  for (const [groupId, messageIds] of byGroup) {
+    realtime.emitToGroup(groupId, 'message:removed', { groupId, messageIds });
+  }
+};
+
+const deleteForEntity = (field, entityId) => removeCards({ [field]: entityId });
+
+/**
+ * Gallery photos or videos were deleted: they come off the cards that showed
+ * them, and a card left with nothing on it goes.
+ */
+const dropFromGalleryCards = async (photoIds) => {
+  if (!photoIds.length) return;
+  const cards = await Message.find({ type: 'gallery', photos: { $in: photoIds } }).select('_id');
+  if (!cards.length) return;
+  const cardIds = cards.map((card) => card._id);
+  await Message.updateMany({ _id: { $in: cardIds } }, { $pull: { photos: { $in: photoIds } } });
+  await removeCards({ _id: { $in: cardIds }, photos: { $size: 0 } });
+  const left = await Message.find({ _id: { $in: cardIds } }).populate(POPULATE);
+  left.forEach(publishUpdate);
+};
+
+module.exports = {
+  listMessages,
+  sendMessage,
+  sendAttachment,
+  deleteMessage,
+  postActivity,
+  postSystem,
+  addToGalleryCard,
+  removeCards,
+  deleteForEntity,
+  dropFromGalleryCards,
+  POPULATE,
+};

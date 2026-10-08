@@ -89,7 +89,7 @@ const DirectChatScreen = ({ route, navigation }) => {
   const { socket, connected } = useSocket();
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
-  const { lift, onLayout } = useKeyboardLift();
+  const { lift, ref: liftRef } = useKeyboardLift();
 
   const [peer, setPeer] = useState(initialPeer ?? null);
   const [conversationId, setConversationId] = useState(initialConversationId ?? null);
@@ -322,7 +322,7 @@ const DirectChatScreen = ({ route, navigation }) => {
 
       <Root
         style={[styles.flex, !IS_IOS && { paddingBottom: lift }]}
-        {...(IS_IOS ? { behavior: 'padding' } : { onLayout })}
+        {...(IS_IOS ? { behavior: 'padding' } : { ref: liftRef })}
       >
         {loading ? (
           <View style={styles.center}>

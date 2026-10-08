@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const fs = require('fs');
 const {
   S3Client,
   PutObjectCommand,
@@ -90,12 +91,14 @@ const squareOf = async (buffer) => {
   }
 };
 
-const put = (client, bucket, key, body, contentType, name) =>
+// `length` is only needed for a stream, whose size the SDK cannot work out.
+const put = (client, bucket, key, body, contentType, name, length) =>
   client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: body,
+      ...(length !== undefined ? { ContentLength: length } : {}),
       ContentType: contentType || 'application/octet-stream',
       CacheControl: CACHE_FOREVER,
       // Keeps the original name when a document is saved from the link.
@@ -105,15 +108,19 @@ const put = (client, bucket, key, body, contentType, name) =>
 
 const drop = (client, bucket, key) => client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 
-const upload = async (file, { folder = 'splix' } = {}) => {
+const upload = async (file, { folder = 'splix', poster = null } = {}) => {
   const { client, bucket } = connection();
   const name = safeName(file.originalname);
   const key = `${folder}/${Date.now()}-${crypto.randomBytes(12).toString('hex')}-${name}`;
-  const square = isImage(file) ? await squareOf(file.buffer) : null;
+  // A video's square is made from the frame the phone sent along with it.
+  const squareFrom = poster ?? (isImage(file) && file.buffer ? file.buffer : null);
+  const square = squareFrom ? await squareOf(squareFrom) : null;
+  // Videos arrive on disk and are streamed from there; everything else is in memory.
+  const body = file.path ? fs.createReadStream(file.path) : file.buffer;
 
   try {
     await Promise.all([
-      put(client, bucket, key, file.buffer, file.mimetype, name),
+      put(client, bucket, key, body, file.mimetype, name, file.path ? file.size : undefined),
       square && put(client, bucket, `${key}${THUMB_SUFFIX}`, square, 'image/jpeg', `thumb-${name}`),
     ]);
   } catch (err) {

@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
-const { photoUpload, chatUpload } = require('../middleware/upload');
+const { photoUpload, chatUpload, videoUpload } = require('../middleware/upload');
 const aiLimiter = require('../middleware/aiLimiter');
 const { TIME_12H } = require('../utils/itineraryTime');
 const groupController = require('../controllers/group.controller');
@@ -281,6 +281,15 @@ router.post(
   validate(groupParams),
   photoUpload.single('photo'),
   photoController.uploadPhoto
+);
+router.post(
+  '/:groupId/videos/upload',
+  validate(groupParams),
+  videoUpload.fields([
+    { name: 'video', maxCount: 1 },
+    { name: 'poster', maxCount: 1 },
+  ]),
+  photoController.uploadVideo
 );
 
 router.get('/:groupId/attractions', validate(groupParams), attractionController.listAttractions);

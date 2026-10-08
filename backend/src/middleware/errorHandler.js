@@ -1,4 +1,7 @@
 const env = require('../config/env');
+const { MAX_UPLOAD_BYTES, MAX_VIDEO_BYTES } = require('./upload');
+
+const megabytes = (bytes) => `${Math.round(bytes / (1024 * 1024))}MB`;
 
 const notFound = (req, res) => {
   res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` });
@@ -18,7 +21,12 @@ const errorHandler = (err, _req, res, _next) => {
   } else if (err.name === 'MulterError') {
     // Upload problems are the sender's to fix, not a server fault.
     statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
-    message = err.code === 'LIMIT_FILE_SIZE' ? 'That file is too large (max 10MB)' : err.message;
+    message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? err.field === 'video'
+          ? `That video is too large (max ${megabytes(MAX_VIDEO_BYTES)})`
+          : `That file is too large (max ${megabytes(MAX_UPLOAD_BYTES)})`
+        : err.message;
   } else if (err.code === 11000) {
     statusCode = 409;
     const field = Object.keys(err.keyValue || {})[0] || 'field';

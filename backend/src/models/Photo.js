@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 
 /**
- * A gallery tile: an uploaded image, or (older rows) an emoji on a coloured tile.
+ * A gallery tile: an uploaded image or video, or (older rows) an emoji on a
+ * coloured tile. A video keeps the file in `imageUrl` like a photo does, and
+ * its poster frame (if the phone could make one) in `thumbUrl`.
  */
 const photoSchema = new mongoose.Schema(
   {
@@ -22,6 +24,9 @@ const photoSchema = new mongoose.Schema(
     storageProvider: { type: String, trim: true, maxlength: 20, default: '' },
     storageKey: { type: String, trim: true, maxlength: 500, default: '', select: false },
     caption: { type: String, trim: true, maxlength: 200, default: '' },
+    mediaType: { type: String, enum: ['image', 'video'], default: 'image' },
+    // Videos only: length of the clip, shown on its tile before it is played.
+    durationMs: { type: Number, min: 0, default: 0 },
     // Members who appear in the photo — drives the "👥 3" badge and, later,
     // the Face Scan filter.
     taggedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

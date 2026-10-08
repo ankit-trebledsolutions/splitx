@@ -21,20 +21,69 @@ export const USER_TYPES = ['text', 'image', 'audio', 'file'];
 const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
 
 const PRIORITY_COLOR = { high: '#F87171', med: '#F5B342', low: '#17E695' };
+const DONE_COLOR = '#22C55E';
+const STAY_COLOR = '#B79CFF';
+const ATTRACTION_COLOR = '#F5B342';
+const GALLERY_COLOR = '#2DD4BF';
 
-const CardShell = ({ accent, icon, label, children }) => (
-  <View style={styles.card}>
-    <View style={[styles.cardHeader, { backgroundColor: `${accent}1F` }]}>
-      <Ionicons name={icon} size={13} color={accent} />
-      <Text style={[styles.cardHeaderText, { color: accent }]}>{label}</Text>
-    </View>
-    <View style={styles.cardBody}>{children}</View>
+const STAY_STATUS = {
+  pending: { label: 'Pending', color: '#F5B342' },
+  confirmed: { label: 'Confirmed', color: dark.accentGreen },
+  cancelled: { label: 'Cancelled', color: '#F87171' },
+};
+
+const shortDate = (value) =>
+  new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const nightsBetween = (checkIn, checkOut) =>
+  Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000));
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/**
+ * People named on a card: the viewer as "you", the rest by name; first names
+ * only when `short` (headings). "you & Asha", "Asha, Ben & 2 more".
+ */
+const peopleLabel = (users, currentUserId, { short = false } = {}) => {
+  const people = users.filter(Boolean);
+  const names = [
+    ...(people.some((u) => u._id === currentUserId) ? ['you'] : []),
+    ...people
+      .filter((u) => u._id !== currentUserId)
+      .map((u) => (short ? (u.name ?? '').trim().split(/\s+/)[0] : u.name) || 'a member'),
+  ];
+  if (names.length <= 2) return names.join(' & ');
+  return `${names.slice(0, 2).join(', ')} & ${names.length - 2} more`;
+};
+const capitalise = (text) => (text ? `${text[0].toUpperCase()}${text.slice(1)}` : text);
+
+// Activity cards are buttons as a whole: a tap opens what the card is about.
+const CardShell = ({ accent, icon, label, onPress, children }) => {
+  const Shell = onPress ? TouchableOpacity : View;
+  return (
+    <Shell style={styles.card} {...(onPress ? { onPress, activeOpacity: 0.8 } : {})}>
+      <View style={[styles.cardHeader, { backgroundColor: `${accent}1F` }]}>
+        <Ionicons name={icon} size={13} color={accent} />
+        <Text style={[styles.cardHeaderText, { color: accent }]} numberOfLines={2}>
+          {label}
+        </Text>
+      </View>
+      <View style={styles.cardBody}>{children}</View>
+    </Shell>
+  );
+};
+
+// The "View ›" at the foot of a card. Not a button of its own: the card is.
+const ViewLink = ({ label = 'View' }) => (
+  <View style={styles.viewLink}>
+    <Text style={styles.viewText}>{label}</Text>
+    <Ionicons name="chevron-forward" size={13} color={dark.accentBlue} />
   </View>
 );
 
 /**
- * One row of the group chat. Text messages render as bubbles; expenses, tasks
- * and reminders render as activity cards referencing the entity they came from.
+ * One row of the group chat. Text messages render as bubbles; everything added
+ * to the group (expenses, tasks, reminders, stays, attractions, gallery
+ * uploads, completed tasks) renders as an activity card referencing what it is
+ * about, and tapping the card opens that.
  */
 const ChatMessage = ({
   message,
@@ -45,6 +94,10 @@ const ChatMessage = ({
   onOpenExpense,
   onOpenTask,
   onOpenReminders,
+  onOpenStay,
+  onOpenAttraction,
+  // (photo) a photo or video on a gallery card.
+  onOpenMedia,
   onOpenImage,
   onOpenFile,
   onSaveFile,
@@ -272,7 +325,12 @@ const ChatMessage = ({
     const isEqual = expense.splits?.every((s) => Math.abs(s.amount - perHead) < 0.01);
 
     return wrapper(
-      <CardShell accent={dark.accentGreen} icon="cash-outline" label="EXPENSE ADDED">
+      <CardShell
+        accent={dark.accentGreen}
+        icon="cash-outline"
+        label="EXPENSE ADDED"
+        onPress={() => onOpenExpense?.(expense)}
+      >
         <Text style={styles.cardTitle}>{expense.description}</Text>
 
         <View style={styles.cardRow}>
@@ -292,14 +350,7 @@ const ChatMessage = ({
           <Text style={styles.cardFootnote}>
             {isEqual ? 'Split equally' : 'Custom split'} · {expense.splits?.length ?? 0} people
           </Text>
-          <TouchableOpacity
-            style={styles.viewLink}
-            activeOpacity={0.7}
-            onPress={() => onOpenExpense?.(expense)}
-          >
-            <Text style={styles.viewText}>View</Text>
-            <Ionicons name="chevron-forward" size={13} color={dark.accentBlue} />
-          </TouchableOpacity>
+          <ViewLink />
         </View>
       </CardShell>
     );
@@ -309,24 +360,66 @@ const ChatMessage = ({
     const task = message.task;
     if (!task) return wrapper(<Text style={styles.deleted}>This task was deleted</Text>);
     const accent = PRIORITY_COLOR[task.priority] ?? dark.accentBlue;
+    // Who it was for when the card was posted. Cards from before that was
+    // recorded only have the task's own list.
+    const recorded = Array.isArray(message.assignees) ? message.assignees : task.assignees ?? [];
+    const assignees = recorded.filter(Boolean);
+    const forWhom = assignees.length
+      ? ` FOR ${peopleLabel(assignees, currentUserId, { short: true }).toUpperCase()}`
+      : '';
 
     return wrapper(
-      <CardShell accent={accent} icon="checkbox-outline" label="TASK ADDED">
+      <CardShell
+        accent={accent}
+        icon="checkbox-outline"
+        label={`TASK ADDED${forWhom}`}
+        onPress={() => onOpenTask?.(task)}
+      >
         <Text style={styles.cardTitle}>{task.title}</Text>
         <View style={styles.cardFooter}>
           <Text style={styles.cardFootnote}>
             {task.dueAt ? `Due ${formatDateTime(task.dueAt)}` : 'No due date'}
           </Text>
-          {task.assignees?.length ? <MemberAvatars users={task.assignees} size={20} max={4} /> : null}
+          {assignees.length ? <MemberAvatars users={assignees} size={20} max={4} /> : null}
         </View>
-        <TouchableOpacity
-          style={styles.viewLink}
-          activeOpacity={0.7}
-          onPress={() => onOpenTask?.(task)}
-        >
-          <Text style={styles.viewText}>Open task</Text>
-          <Ionicons name="chevron-forward" size={13} color={dark.accentBlue} />
-        </TouchableOpacity>
+        <ViewLink label="Open task" />
+      </CardShell>
+    );
+  }
+
+  if (type === 'task_done') {
+    const task = message.task;
+    if (!task) return wrapper(<Text style={styles.deleted}>This task was deleted</Text>);
+    const assignees = (message.assignees ?? []).filter(Boolean);
+    // The card's sender is whoever ticked it off.
+    const doneBy = sender ? (isMine ? 'You' : sender.name) : 'A former member';
+
+    return wrapper(
+      <CardShell
+        accent={DONE_COLOR}
+        icon="checkmark-done-outline"
+        label="TASK COMPLETED"
+        onPress={() => onOpenTask?.(task)}
+      >
+        <View style={styles.doneTitleRow}>
+          <Ionicons name="checkmark-circle" size={18} color={DONE_COLOR} />
+          <Text style={[styles.cardTitle, styles.doneTitle]}>{task.title}</Text>
+        </View>
+        <View style={styles.personRow}>
+          <Text style={styles.cardLabel}>Assigned to</Text>
+          <Text style={styles.personValue} numberOfLines={2}>
+            {assignees.length ? capitalise(peopleLabel(assignees, currentUserId)) : 'Unassigned'}
+          </Text>
+        </View>
+        <View style={styles.personRow}>
+          <Text style={styles.cardLabel}>Completed by</Text>
+          <Text style={[styles.personValue, { color: DONE_COLOR }]} numberOfLines={1}>
+            {doneBy}
+          </Text>
+        </View>
+        <View style={[styles.cardFooter, styles.cardFooterEnd]}>
+          <ViewLink label="Open task" />
+        </View>
       </CardShell>
     );
   }
@@ -336,18 +429,154 @@ const ChatMessage = ({
     if (!reminder) return wrapper(<Text style={styles.deleted}>This reminder was deleted</Text>);
 
     return wrapper(
-      <CardShell accent={dark.accentBlue} icon="alarm-outline" label="REMINDER SET">
+      <CardShell
+        accent={dark.accentBlue}
+        icon="alarm-outline"
+        label="REMINDER SET"
+        onPress={() => onOpenReminders?.(reminder)}
+      >
         <Text style={styles.cardTitle}>{reminder.title}</Text>
         <View style={styles.cardFooter}>
           <Text style={styles.cardFootnote}>{formatDateTime(reminder.remindAt)}</Text>
-          <TouchableOpacity
-            style={styles.viewLink}
-            activeOpacity={0.7}
-            onPress={() => onOpenReminders?.(reminder)}
-          >
-            <Text style={styles.viewText}>View</Text>
-            <Ionicons name="chevron-forward" size={13} color={dark.accentBlue} />
-          </TouchableOpacity>
+          <ViewLink />
+        </View>
+      </CardShell>
+    );
+  }
+
+  if (type === 'stay') {
+    const stay = message.stay;
+    if (!stay) return wrapper(<Text style={styles.deleted}>This stay was deleted</Text>);
+    const nights = nightsBetween(stay.checkIn, stay.checkOut);
+    const status = STAY_STATUS[stay.status] ?? STAY_STATUS.pending;
+
+    return wrapper(
+      <CardShell accent={STAY_COLOR} icon="bed-outline" label="STAY ADDED" onPress={() => onOpenStay?.(stay)}>
+        <View style={styles.entityRow}>
+          <Text style={styles.entityEmoji}>{stay.emoji || '🏨'}</Text>
+          <View style={styles.entityBody}>
+            <Text style={styles.entityTitle} numberOfLines={2}>
+              {stay.name}
+            </Text>
+            {stay.address ? (
+              <Text style={styles.entityMeta} numberOfLines={1}>
+                {stay.address}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <View style={styles.cardRow}>
+          <Text style={styles.cardLabel}>
+            {shortDate(stay.checkIn)} → {shortDate(stay.checkOut)}
+          </Text>
+          <Text style={styles.cardValue}>{usd(nights * stay.pricePerNight)}</Text>
+        </View>
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardFootnote}>
+            {plural(nights, 'night')} · {plural(stay.guests ?? 1, 'guest')} ·{' '}
+            <Text style={{ color: status.color }}>{status.label}</Text>
+          </Text>
+          <ViewLink label="View stay" />
+        </View>
+      </CardShell>
+    );
+  }
+
+  if (type === 'attraction') {
+    const attraction = message.attraction;
+    if (!attraction) return wrapper(<Text style={styles.deleted}>This attraction was deleted</Text>);
+    const meta = [
+      attraction.category,
+      attraction.rating != null ? `★ ${attraction.rating.toFixed(1)}` : null,
+      attraction.distanceKm != null ? `${attraction.distanceKm} km away` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    return wrapper(
+      <CardShell
+        accent={ATTRACTION_COLOR}
+        icon="compass-outline"
+        label="ATTRACTION ADDED"
+        onPress={() => onOpenAttraction?.(attraction)}
+      >
+        <View style={styles.entityRow}>
+          <Text style={styles.entityEmoji}>{attraction.emoji || '📍'}</Text>
+          <View style={styles.entityBody}>
+            <Text style={styles.entityTitle} numberOfLines={2}>
+              {attraction.name}
+            </Text>
+            {meta ? (
+              <Text style={styles.entityMeta} numberOfLines={1}>
+                {meta}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <View style={[styles.cardFooter, styles.cardFooterEnd]}>
+          <ViewLink />
+        </View>
+      </CardShell>
+    );
+  }
+
+  if (type === 'gallery') {
+    const items = (message.photos ?? []).filter(Boolean);
+    if (!items.length) return wrapper(<Text style={styles.deleted}>These were deleted from the gallery</Text>);
+    const videos = items.filter((item) => item.mediaType === 'video').length;
+    const photos = items.length - videos;
+    // "PHOTO ADDED" for one, "3 PHOTOS & 1 VIDEO ADDED" for more.
+    const counted = (count, word) => (items.length === 1 ? word : plural(count, word));
+    const added = [photos && counted(photos, 'photo'), videos && counted(videos, 'video')]
+      .filter(Boolean)
+      .join(' & ');
+    const shown = items.slice(0, 4);
+    const more = items.length - shown.length;
+    const single = shown.length === 1;
+
+    return wrapper(
+      <CardShell
+        accent={GALLERY_COLOR}
+        icon={photos ? 'images-outline' : 'videocam-outline'}
+        label={`${added} added`.toUpperCase()}
+        onPress={() => onOpenMedia?.(items[0])}
+      >
+        <View style={styles.mediaGrid}>
+          {shown.map((item, index) => {
+            const isVideo = item.mediaType === 'video';
+            // A video's picture is its poster frame; one sent without stays a plain tile.
+            const thumb = absoluteUrl(item.thumbUrl || (isVideo ? '' : item.imageUrl));
+            return (
+              <TouchableOpacity
+                key={item._id}
+                style={[styles.mediaTile, single && styles.mediaTileSingle]}
+                activeOpacity={0.85}
+                onPress={() => onOpenMedia?.(item)}
+              >
+                {thumb ? (
+                  <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : (
+                  <Ionicons name={isVideo ? 'videocam' : 'image-outline'} size={22} color={dark.textMuted} />
+                )}
+                {isVideo && (
+                  <View style={styles.mediaPlay} pointerEvents="none">
+                    <Ionicons name="play" size={13} color="#FFFFFF" style={styles.mediaPlayIcon} />
+                  </View>
+                )}
+                {isVideo && item.durationMs ? (
+                  <Text style={styles.mediaDuration}>{formatDuration(item.durationMs)}</Text>
+                ) : null}
+                {index === shown.length - 1 && more > 0 && (
+                  <View style={styles.mediaMore} pointerEvents="none">
+                    <Text style={styles.mediaMoreText}>+{more}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <View style={[styles.cardFooter, styles.cardFooterEnd]}>
+          <ViewLink label="View in gallery" />
         </View>
       </CardShell>
     );
@@ -468,7 +697,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 6,
   },
-  cardHeaderText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  cardHeaderText: { flexShrink: 1, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   cardBody: { padding: spacing.md },
   cardTitle: { color: dark.text, fontSize: 15, fontWeight: '700', marginBottom: spacing.sm },
   cardRow: {
@@ -489,9 +718,81 @@ const styles = StyleSheet.create({
     borderTopColor: dark.border,
   },
   cardFootnote: { color: dark.textMuted, fontSize: 11, flexShrink: 1 },
+  // Cards whose footer holds only the "View" link keep it on the right.
+  cardFooterEnd: { justifyContent: 'flex-end' },
   viewLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   viewText: { color: dark.accentBlue, fontSize: 12, fontWeight: '700' },
   deleted: { color: dark.textMuted, fontSize: 12, fontStyle: 'italic' },
+
+  // "Task completed": the title with a tick, then who it was for and who did it.
+  doneTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  doneTitle: { flexShrink: 1 },
+  personRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: 4,
+  },
+  personValue: {
+    flexShrink: 1,
+    textAlign: 'right',
+    color: dark.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Stays and attractions: their emoji beside the name.
+  entityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, marginBottom: spacing.sm },
+  entityEmoji: { fontSize: 24 },
+  entityBody: { flexShrink: 1 },
+  entityTitle: { color: dark.text, fontSize: 15, fontWeight: '700' },
+  entityMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+
+  // Gallery cards: up to four tiles, two to a row; a single one is larger.
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, width: 204 },
+  mediaTile: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#0B1116',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaTileSingle: { width: 204, height: 204 },
+  mediaPlay: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The triangle looks off-centre when centred exactly.
+  mediaPlayIcon: { marginLeft: 2 },
+  mediaDuration: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 6,
+    overflow: 'hidden',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  mediaMore: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaMoreText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
 });
 
 // Memoised: a new message must not re-render every row already on screen.

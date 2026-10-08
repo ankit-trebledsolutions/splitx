@@ -96,7 +96,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
   const { groupId, groupName, from } = route.params;
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
-  const { lift, onLayout } = useKeyboardLift();
+  const { lift, ref: liftRef } = useKeyboardLift();
   const scrollRef = useRef(null);
 
   const [step, setStep] = useState(1);
@@ -494,7 +494,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
     <DarkScreen edges={TOP_ONLY}>
       <Root
         style={[styles.flex, !IS_IOS && { paddingBottom: lift }]}
-        {...(IS_IOS ? { behavior: 'padding' } : { onLayout })}
+        {...(IS_IOS ? { behavior: 'padding' } : { ref: liftRef })}
       >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={goBackOneStep} activeOpacity={0.7}>

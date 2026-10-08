@@ -7,10 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  BackHandler,
   Linking,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
@@ -176,7 +178,7 @@ const InviteFriendsScreen = ({ route, navigation }) => {
 
   // After Create Group: drop the create/invite screens and land on the Groups
   // tab, which opens the new group. Otherwise this is just "back".
-  const finish = () => {
+  const finish = useCallback(() => {
     if (!isNew) {
       navigation.goBack();
       return;
@@ -186,7 +188,21 @@ const InviteFriendsScreen = ({ route, navigation }) => {
       screen: 'Groups',
       params: { newGroupId: group._id, offerItinerary: group.groupType === 'trip' },
     });
-  };
+  }, [isNew, navigation, group]);
+
+  // Android's own back button does what the header's does. After Create Group
+  // that is into the new group, rather than back to the Create / Join choice
+  // (Create Group replaced itself with this screen).
+  useFocusEffect(
+    useCallback(() => {
+      if (!isNew) return undefined;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        finish();
+        return true;
+      });
+      return () => sub.remove();
+    }, [isNew, finish])
+  );
 
   return (
     <DarkScreen>
@@ -358,9 +374,15 @@ const InviteFriendsScreen = ({ route, navigation }) => {
             Showing {visible.length} of {matches.length}. Search to find someone.
           </Text>
         )}
-
-        {isNew && <GradientButton title="Continue to Group" onPress={finish} style={styles.continue} />}
       </ScrollView>
+
+      {/* Pinned under the scroll, so the way on is always in sight: at the end
+          of the page it sat below the contacts and people never found it. */}
+      {isNew && (
+        <View style={styles.footer}>
+          <GradientButton title="Continue to Group" onPress={finish} />
+        </View>
+      )}
     </DarkScreen>
   );
 };
@@ -554,8 +576,15 @@ const styles = StyleSheet.create({
   inviteChipText: { color: dark.accentGreen, fontSize: 12.5, fontWeight: '800' },
   sentChip: { backgroundColor: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.40)' },
   sentChipText: { color: '#22C55E' },
-  continue: { marginTop: spacing.lg },
   more: { color: dark.textMuted, fontSize: 12, textAlign: 'center', marginTop: spacing.sm + 4 },
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm + 4,
+    paddingBottom: spacing.sm + 4,
+    borderTopWidth: 1,
+    borderTopColor: dark.border,
+    backgroundColor: dark.background,
+  },
 });
 
 export default InviteFriendsScreen;

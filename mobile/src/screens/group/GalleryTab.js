@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { avatarColor } from '../../components/Avatar';
 import ImageViewer from '../../components/ImageViewer';
+import VideoViewer from '../../components/VideoViewer';
 import { API_ORIGIN } from '../../api/client';
 import { dark, radius, spacing } from '../../theme';
 import { initials } from '../../utils/format';
+import { formatDuration } from '../../utils/attachments';
+import { isVideo } from '../../utils/video';
 import AppAlert from '../../components/AppAlert';
 import {
   loadSavedPhotoIds,
@@ -33,13 +36,25 @@ const DANGER = '#F87171';
 
 const absolute = (url) => (url ? (url.startsWith('http') ? url : `${API_ORIGIN}${url}`) : null);
 
-// Full-size image: what gets downloaded and shown full-screen.
+// Full-size image (or the video itself): what gets downloaded and shown full-screen.
 const uriOf = (photo) => absolute(photo.imageUrl);
 // Small square for the grid, so opening the gallery doesn't pull every full
 // photo over the network. Older photos have none and fall back to the original.
-const thumbOf = (photo) => absolute(photo.thumbUrl) ?? uriOf(photo);
+// A video's square is its poster frame, if the phone that sent it made one:
+// never the video itself, which an image cannot show.
+const thumbOf = (photo) =>
+  isVideo(photo) ? absolute(photo.thumbUrl) : absolute(photo.thumbUrl) ?? uriOf(photo);
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+const nounOf = (item) => (isVideo(item) ? 'video' : 'photo');
+
+// "3 photos", "1 video", "2 photos and 1 video"
+const describe = (items) => {
+  const videos = items.filter(isVideo).length;
+  const photos = items.length - videos;
+  const parts = [photos && plural(photos, 'photo'), videos && plural(videos, 'video')].filter(Boolean);
+  return parts.length ? parts.join(' and ') : plural(0, 'photo');
+};
 
 const alertSavePermission = (err) =>
   AppAlert.alert(
@@ -54,7 +69,7 @@ const alertSavePermission = (err) =>
   );
 
 /**
- * Photo grid with per-member filter chips, per the Gallery mockup.
+ * Photo and video grid with per-member filter chips, per the Gallery mockup.
  *
  * Other members' photos carry a download icon: tapping the tile saves the
  * image to the phone's own gallery (WhatsApp-style), after which the icon
@@ -64,8 +79,20 @@ const alertSavePermission = (err) =>
  * where taps tick photos and the bar on top downloads or deletes them all at
  * once. Only your own uploads can be deleted; `onDeletePhotos(photos)` does it
  * and resolves to true once they are gone.
+ *
+ * Videos play straight away when tapped (their download is in the player).
+ * `focusId` is a photo or video a chat card asked to show: it opens, and
+ * `onFocusDone` lets the parent forget the request.
  */
-const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos }) => {
+const GalleryTab = ({
+  photos,
+  loading,
+  currentUserId,
+  onAddPhoto,
+  onDeletePhotos,
+  focusId,
+  onFocusDone,
+}) => {
   const [filter, setFilter] = useState('all');
   const [savedIds, setSavedIds] = useState(() => new Set());
   const [savingIds, setSavingIds] = useState(() => new Set());
@@ -88,6 +115,19 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
       active = false;
     };
   }, []);
+
+  // A chat card asked for this one: open it, from the full list.
+  const focusDone = useRef(onFocusDone);
+  focusDone.current = onFocusDone;
+  useEffect(() => {
+    if (!focusId || loading) return;
+    const item = photos.find((p) => p._id === focusId);
+    if (!item) return;
+    setFilter('all');
+    setSelectedIds(null);
+    setViewing(item);
+    focusDone.current?.();
+  }, [focusId, loading, photos]);
 
   // Android's back button leaves selection mode before it leaves the screen.
   useEffect(() => {
@@ -121,9 +161,11 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
     async (photo) => {
       try {
         await savePhoto(photo);
+        // A photo's tile turns to a tick; a video's has no download mark, so say so.
+        if (isVideo(photo)) AppAlert.alert('Video saved', 'It is in your phone’s gallery now.');
       } catch (err) {
         if (err instanceof SavePermissionError) alertSavePermission(err);
-        else AppAlert.alert('Could not save photo', err.message);
+        else AppAlert.alert(`Could not save ${nounOf(photo)}`, err.message);
       }
     },
     [savePhoto]
@@ -170,7 +212,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
   const downloadSelected = async () => {
     if (!selectedDownloadable.length || bulkBusy) return;
     setBulkBusy(true);
-    let saved = 0;
+    const saved = [];
     let failed = 0;
     try {
       for (const photo of selectedDownloadable) {
@@ -178,7 +220,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
           // One at a time: a phone on mobile data copes better than with 30 at once.
           // eslint-disable-next-line no-await-in-loop
           await savePhoto(photo);
-          saved += 1;
+          saved.push(photo);
         } catch (err) {
           // Without permission none of them can be saved, so stop asking.
           if (err instanceof SavePermissionError) {
@@ -195,26 +237,27 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
     if (failed) {
       AppAlert.alert(
         'Download finished',
-        `${plural(saved, 'photo')} saved, ${failed} failed — try those again.`
+        `${describe(saved)} saved, ${failed} failed — try those again.`
       );
     } else {
-      AppAlert.alert('Photos saved', `${plural(saved, 'photo')} saved to your phone’s gallery.`);
+      AppAlert.alert('Saved to your phone', `${describe(saved)} saved to your phone’s gallery.`);
     }
   };
 
   const confirmDelete = (toDelete, othersCount = 0) => {
     const message = [
       toDelete.length === 1
-        ? 'Remove this photo from the gallery for everyone?'
-        : `Remove these ${toDelete.length} photos from the gallery for everyone?`,
+        ? `Remove this ${nounOf(toDelete[0])} from the gallery for everyone?`
+        : `Remove these ${describe(toDelete)} from the gallery for everyone?`,
       othersCount
-        ? `${plural(othersCount, 'selected photo')} from other members will stay: only the person who uploaded a photo can delete it.`
+        ? `${othersCount} selected from other members will stay: only the person who uploaded something can delete it.`
         : null,
     ]
       .filter(Boolean)
       .join('\n\n');
 
-    AppAlert.alert(toDelete.length === 1 ? 'Delete photo' : 'Delete photos', message, [
+    const title = toDelete.length === 1 ? `Delete ${nounOf(toDelete[0])}` : `Delete ${describe(toDelete)}`;
+    AppAlert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -234,7 +277,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
     if (!selectedMine.length) {
       AppAlert.alert(
         'Nothing to delete',
-        'Only the person who uploaded a photo can delete it, and none of the selected photos are yours.'
+        'Only the person who uploaded a photo or video can delete it, and none of the selected ones are yours.'
       );
       return;
     }
@@ -255,10 +298,13 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
     const isMine = item.uploadedBy?._id === currentUserId;
 
     const imageUri = uriOf(item);
+    const video = isVideo(item);
+    const thumb = thumbOf(item);
     const isSaving = savingIds.has(item._id);
     const isSelected = selecting && selectedIds.has(item._id);
-    // Your own uploads are already on your phone, so they skip the download step.
-    const needsDownload = Boolean(imageUri) && !isMine && !savedIds.has(item._id);
+    // Your own uploads are already on your phone, so they skip the download
+    // step. Videos stream, so they skip it too: theirs is in the player.
+    const needsDownload = Boolean(imageUri) && !video && !isMine && !savedIds.has(item._id);
 
     const onPress = () => {
       if (selecting) {
@@ -281,15 +327,25 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
         onPress={onPress}
         onLongPress={() => !selecting && setSelectedIds(new Set([item._id]))}
       >
-        {imageUri ? (
-          <Image
-            source={{ uri: thumbOf(item) }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-          />
+        {imageUri && thumb ? (
+          <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : imageUri ? (
+          // A video sent without a poster frame.
+          <Ionicons name="videocam" size={26} color={dark.textMuted} />
         ) : (
           <Text style={styles.tileEmoji}>{item.emoji || '🖼️'}</Text>
         )}
+
+        {video && (
+          <View style={styles.playBadge} pointerEvents="none">
+            <Ionicons name="play" size={15} color="#FFFFFF" style={styles.playIcon} />
+          </View>
+        )}
+        {video && item.durationMs ? (
+          <View style={styles.durationChip} pointerEvents="none">
+            <Text style={styles.durationText}>{formatDuration(item.durationMs)}</Text>
+          </View>
+        ) : null}
 
         {isSelected && <View style={styles.tileSelected} />}
 
@@ -307,7 +363,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
               isSelected && <Ionicons name="checkmark" size={15} color="#04241A" />
             )}
           </View>
-        ) : imageUri && !isMine ? (
+        ) : imageUri && !isMine && !video ? (
           <View style={[styles.downloadBadge, !needsDownload && styles.downloadBadgeDone]}>
             {isSaving ? (
               <ActivityIndicator size="small" color={dark.text} />
@@ -334,6 +390,20 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
   };
 
   const viewingMine = viewing?.uploadedBy?._id === currentUserId;
+  const viewingVideo = isVideo(viewing);
+  // Close first: the confirmation is a modal of its own.
+  const deleteViewing = viewingMine
+    ? () => {
+        const photo = viewing;
+        setViewing(null);
+        confirmDelete([photo]);
+      }
+    : undefined;
+  const viewed = viewing && {
+    uri: uriOf(viewing),
+    title: viewingMine ? 'You' : viewing.uploadedBy?.name,
+    caption: viewing.caption,
+  };
 
   return (
     <>
@@ -425,7 +495,7 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
               onPress={() => setFilter('all')}
             >
               <Text style={[styles.chipText, filter === 'all' && styles.chipTextActive]}>
-                All photos
+                All
               </Text>
               <Text style={[styles.chipCount, filter === 'all' && styles.chipTextActive]}>
                 {photos.length}
@@ -456,32 +526,25 @@ const GalleryTab = ({ photos, loading, currentUserId, onAddPhoto, onDeletePhotos
       }
       ListEmptyComponent={
         <Text style={styles.empty}>
-          No photos yet — tap the camera (or +) to add the first memory.
+          No photos or videos yet — tap the camera (or +) to add the first memory.
         </Text>
       }
     />
 
     <ImageViewer
-      image={
-        viewing && {
-          uri: uriOf(viewing),
-          title: viewingMine ? 'You' : viewing.uploadedBy?.name,
-          caption: viewing.caption,
-        }
-      }
+      image={!viewingVideo && viewed}
       onClose={() => setViewing(null)}
       onSave={() => saveOne(viewing)}
       saving={Boolean(viewing) && savingIds.has(viewing._id)}
-      // Close first: the confirmation is a modal of its own.
-      onDelete={
-        viewingMine
-          ? () => {
-              const photo = viewing;
-              setViewing(null);
-              confirmDelete([photo]);
-            }
-          : undefined
-      }
+      onDelete={deleteViewing}
+    />
+
+    <VideoViewer
+      video={viewingVideo && viewed}
+      onClose={() => setViewing(null)}
+      onSave={() => saveOne(viewing)}
+      saving={Boolean(viewing) && savingIds.has(viewing._id)}
+      onDelete={deleteViewing}
     />
     </>
   );
@@ -656,6 +719,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   downloadBadgeDone: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
+
+  // Videos: a play mark in the middle and the length in the bottom-left corner.
+  playBadge: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The triangle looks off-centre when centred exactly.
+  playIcon: { marginLeft: 2 },
+  durationChip: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  durationText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700' },
 
   peopleBadge: {
     position: 'absolute',

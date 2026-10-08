@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '../../components/Avatar';
+import useListFocus from '../../hooks/useListFocus';
 import { dark, radius, spacing } from '../../theme';
 import { usd } from '../../utils/format';
 
@@ -40,8 +41,17 @@ const shortDate = (value) =>
 const nightsBetween = (checkIn, checkOut) =>
   Math.max(1, Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000));
 
-// Booking cards with status gradients, per the Stays mockup.
-const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete }) => {
+// Booking cards with status gradients, per the Stays mockup. `focusId` is a
+// stay a chat card asked to show: the list scrolls to it and marks it, then
+// `onFocusDone` lets the parent forget the request.
+const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete, focusId, onFocusDone }) => {
+  const { highlightId, listProps } = useListFocus({
+    // Waits for the list itself: nothing to scroll while it is loading.
+    items: loading ? [] : stays,
+    focusId,
+    onDone: onFocusDone,
+  });
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -62,7 +72,7 @@ const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete }) => 
           colors={status.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.card}
+          style={[styles.card, item._id === highlightId && styles.cardHighlighted]}
         >
           <View style={styles.topRow}>
             <View style={styles.emojiTile}>
@@ -148,9 +158,11 @@ const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete }) => 
 
   return (
     <FlatList
+      {...listProps}
       data={stays}
       keyExtractor={(item) => item._id}
       renderItem={renderStay}
+      extraData={highlightId}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={
@@ -181,6 +193,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
+  cardHighlighted: { borderColor: dark.accentGreen, borderWidth: 1.5 },
   topRow: { flexDirection: 'row', alignItems: 'center' },
   emojiTile: {
     width: 42,

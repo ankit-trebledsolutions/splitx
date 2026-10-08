@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,53 +11,60 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DarkScreen from '../components/DarkScreen';
 import GradientButton from '../components/GradientButton';
-import { uploadPhotoFile } from '../api/gallery.api';
+import { uploadPhotoFile, uploadVideoFile } from '../api/gallery.api';
+import { formatDuration } from '../utils/attachments';
+import { MAX_VIDEO_BYTES, makePoster } from '../utils/video';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 const prettySize = (bytes) =>
   bytes ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : '';
 
-// Pick images from the device and upload them to the group gallery with
-// per-file progress, per the upload-photos mockup.
+// What differs between uploading photos and uploading videos.
+const KINDS = {
+  photo: {
+    title: 'Upload Photos',
+    noun: 'photo',
+    mediaTypes: ['images'],
+    selectionLimit: 10,
+    maxBytes: MAX_PHOTO_BYTES,
+    browse: 'Tap to browse your photos',
+    formats: 'Supports JPG, PNG, HEIC (Max 10MB)',
+    fallbackName: (index) => `photo-${Date.now()}-${index}.jpg`,
+    fallbackType: 'image/jpeg',
+  },
+  video: {
+    title: 'Upload Videos',
+    noun: 'video',
+    mediaTypes: ['videos'],
+    selectionLimit: 5,
+    maxBytes: MAX_VIDEO_BYTES,
+    browse: 'Tap to browse your videos',
+    formats: 'Supports MP4, MOV (Max 90MB each)',
+    fallbackName: (index) => `video-${Date.now()}-${index}.mp4`,
+    fallbackType: 'video/mp4',
+  },
+};
+
+const capitalised = (word) => `${word[0].toUpperCase()}${word.slice(1)}`;
+
+// One key for everything sent from this visit to the screen, retries of a
+// failed file included, so the chat shows it all as one card.
+const newBatchKey = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+// Pick images (or, with `media: 'video'`, videos) from the device and upload
+// them to the group gallery with per-file progress, per the upload-photos mockup.
 const UploadPhotosScreen = ({ route, navigation }) => {
-  const { groupId, groupName } = route.params;
+  const { groupId, groupName, media } = route.params;
+  const videos = media === 'video';
+  const kind = videos ? KINDS.video : KINDS.photo;
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
-
-  const pickImages = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      AppAlert.alert('Permission needed', 'Allow photo library access to upload pictures.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-
-    const picked = result.assets
-      .filter((asset) => !asset.fileSize || asset.fileSize <= MAX_BYTES)
-      .map((asset, index) => ({
-        id: `${Date.now()}-${index}`,
-        uri: asset.uri,
-        name: asset.fileName ?? `photo-${Date.now()}-${index}.jpg`,
-        size: asset.fileSize ?? null,
-        type: asset.mimeType ?? 'image/jpeg',
-        progress: 0,
-        status: 'pending',
-      }));
-
-    if (picked.length < result.assets.length) {
-      AppAlert.alert('Some photos skipped', 'Files over 10MB were left out.');
-    }
-    setFiles((prev) => [...prev, ...picked]);
-  };
+  const batch = useRef(newBatchKey()).current;
+  // Each video's poster frame, being made while the list is reviewed (file id -> promise).
+  const posters = useRef({});
 
   const removeFile = (id) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
@@ -65,6 +72,52 @@ const UploadPhotosScreen = ({ route, navigation }) => {
 
   const patchFile = (id, patch) => {
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  };
+
+  const pick = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      AppAlert.alert('Permission needed', `Allow photo library access to upload ${kind.noun}s.`);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: kind.mediaTypes,
+      allowsMultipleSelection: true,
+      selectionLimit: kind.selectionLimit,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+
+    const picked = result.assets
+      .filter((asset) => !asset.fileSize || asset.fileSize <= kind.maxBytes)
+      .map((asset, index) => ({
+        id: `${Date.now()}-${index}`,
+        uri: asset.uri,
+        name: asset.fileName ?? kind.fallbackName(index),
+        size: asset.fileSize ?? null,
+        type: asset.mimeType ?? kind.fallbackType,
+        durationMs: asset.duration ?? 0,
+        poster: null,
+        progress: 0,
+        status: 'pending',
+        error: null,
+      }));
+
+    if (picked.length < result.assets.length) {
+      AppAlert.alert(
+        `Some ${kind.noun}s skipped`,
+        `Files over ${Math.round(kind.maxBytes / (1024 * 1024))}MB were left out.`
+      );
+    }
+    setFiles((prev) => [...prev, ...picked]);
+
+    // A frame of each video: its picture in the list now, and its gallery tile once sent.
+    if (videos) {
+      for (const file of picked) {
+        posters.current[file.id] = makePoster(file.uri, file.durationMs);
+        posters.current[file.id].then((poster) => poster && patchFile(file.id, { poster }));
+      }
+    }
   };
 
   const pending = files.filter((f) => f.status !== 'done');
@@ -76,29 +129,42 @@ const UploadPhotosScreen = ({ route, navigation }) => {
     if (!pending.length) return;
     setUploading(true);
     let failed = 0;
+    const together = { batch, batchCount: pending.length };
 
     for (const file of pending) {
-      patchFile(file.id, { status: 'uploading' });
+      patchFile(file.id, { status: 'uploading', error: null });
+      const upload = { uri: file.uri, name: file.name, type: file.type };
+      const onProgress = (progress) => patchFile(file.id, { progress });
       try {
-        // eslint-disable-next-line no-await-in-loop
-        await uploadPhotoFile(
-          groupId,
-          { uri: file.uri, name: file.name, type: file.type },
-          '',
-          (progress) => patchFile(file.id, { progress })
-        );
+        if (videos) {
+          // eslint-disable-next-line no-await-in-loop
+          const poster = await posters.current[file.id];
+          // eslint-disable-next-line no-await-in-loop
+          await uploadVideoFile(
+            groupId,
+            upload,
+            { poster, durationMs: file.durationMs, batch: together },
+            onProgress
+          );
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          await uploadPhotoFile(groupId, upload, '', onProgress, together);
+        }
         patchFile(file.id, { status: 'done', progress: 1 });
-      } catch {
+      } catch (err) {
         failed += 1;
-        patchFile(file.id, { status: 'error', progress: 0 });
+        patchFile(file.id, { status: 'error', progress: 0, error: err.message });
       }
     }
 
     setUploading(false);
     if (failed) {
-      AppAlert.alert('Upload finished', `${failed} photo${failed === 1 ? '' : 's'} failed — try again.`);
+      AppAlert.alert(
+        'Upload finished',
+        `${failed} ${kind.noun}${failed === 1 ? '' : 's'} failed — try again.`
+      );
     } else {
-      AppAlert.alert('Uploaded!', 'Your photos are in the group gallery.', [
+      AppAlert.alert('Uploaded!', `Your ${kind.noun}s are in the group gallery.`, [
         { text: 'OK', onPress: navigation.goBack },
       ]);
     }
@@ -114,7 +180,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
         >
           <Ionicons name="chevron-back" size={18} color={dark.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upload Photos</Text>
+        <Text style={styles.headerTitle}>{kind.title}</Text>
         <View style={styles.backButtonGhost} />
       </View>
 
@@ -127,12 +193,16 @@ const UploadPhotosScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.dropZone} activeOpacity={0.8} onPress={pickImages}>
+        <TouchableOpacity style={styles.dropZone} activeOpacity={0.8} onPress={pick}>
           <View style={styles.dropIcon}>
-            <Ionicons name="cloud-upload-outline" size={24} color={dark.accentGreen} />
+            <Ionicons
+              name={videos ? 'videocam-outline' : 'cloud-upload-outline'}
+              size={24}
+              color={dark.accentGreen}
+            />
           </View>
-          <Text style={styles.dropTitle}>Tap to browse your photos</Text>
-          <Text style={styles.dropMeta}>Supports JPG, PNG, HEIC (Max 10MB)</Text>
+          <Text style={styles.dropTitle}>{kind.browse}</Text>
+          <Text style={styles.dropMeta}>{kind.formats}</Text>
         </TouchableOpacity>
 
         {files.length > 0 && (
@@ -146,7 +216,13 @@ const UploadPhotosScreen = ({ route, navigation }) => {
 
             {files.map((file) => (
               <View key={file.id} style={styles.fileRow}>
-                <Image source={{ uri: file.uri }} style={styles.thumb} />
+                {videos && !file.poster ? (
+                  <View style={[styles.thumb, styles.videoThumb]}>
+                    <Ionicons name="videocam" size={16} color={dark.textMuted} />
+                  </View>
+                ) : (
+                  <Image source={{ uri: file.poster ?? file.uri }} style={styles.thumb} />
+                )}
                 <View style={styles.fileBody}>
                   <View style={styles.fileTop}>
                     <Text style={styles.fileName} numberOfLines={1}>
@@ -165,10 +241,18 @@ const UploadPhotosScreen = ({ route, navigation }) => {
                       ]}
                     />
                   </View>
-                  <Text style={styles.fileMeta}>
-                    {[prettySize(file.size), file.status === 'uploading' ? 'Uploading…' : null]
-                      .filter(Boolean)
-                      .join(' · ')}
+                  <Text
+                    style={[styles.fileMeta, file.error && styles.fileError]}
+                    numberOfLines={2}
+                  >
+                    {file.error ??
+                      [
+                        videos && file.durationMs ? formatDuration(file.durationMs) : null,
+                        prettySize(file.size),
+                        file.status === 'uploading' ? 'Uploading…' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                   </Text>
                 </View>
                 {file.status !== 'uploading' && (
@@ -189,7 +273,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
       {pending.length > 0 && (
         <View style={styles.footer}>
           <GradientButton
-            title={`Upload ${pending.length} Photo${pending.length === 1 ? '' : 's'}`}
+            title={`Upload ${pending.length} ${capitalised(kind.noun)}${pending.length === 1 ? '' : 's'}`}
             onPress={uploadAll}
             loading={uploading}
           />
@@ -285,6 +369,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   thumb: { width: 38, height: 38, borderRadius: 8, marginRight: spacing.sm + 2 },
+  videoThumb: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fileBody: { flex: 1, marginRight: spacing.sm },
   fileTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   fileName: { flex: 1, color: dark.text, fontSize: 12, fontWeight: '600', marginRight: spacing.sm },
@@ -303,6 +392,7 @@ const styles = StyleSheet.create({
   },
   progressError: { backgroundColor: '#F87171' },
   fileMeta: { color: dark.textMuted, fontSize: 10, marginTop: 4 },
+  fileError: { color: '#F87171' },
   removeButton: {
     width: 26,
     height: 26,

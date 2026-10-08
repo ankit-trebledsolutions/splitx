@@ -99,9 +99,13 @@ const ChatTab = ({
   onDeleteMessage,
   onTyping,
   typingUsers = [],
+  // Taps on activity cards: each opens what its card is about.
   onOpenExpense,
   onOpenTask,
   onOpenReminders,
+  onOpenStay,
+  onOpenAttraction,
+  onOpenMedia,
 }) => {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -142,7 +146,7 @@ const ChatTab = ({
   }, []);
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
-  const { lift, onLayout } = useKeyboardLift();
+  const { lift, ref: liftRef } = useKeyboardLift();
 
   // Newest first, with each day's divider placed after that day's messages so
   // the inverted list draws it above them.
@@ -380,10 +384,20 @@ const ChatTab = ({
   // The parent passes fresh closures every render; routing them through a ref
   // keeps renderRow stable so memoised rows don't all re-render per message.
   const handlers = useRef({});
-  handlers.current = { onOpenExpense, onOpenTask, onOpenReminders };
+  handlers.current = {
+    onOpenExpense,
+    onOpenTask,
+    onOpenReminders,
+    onOpenStay,
+    onOpenAttraction,
+    onOpenMedia,
+  };
   const openExpense = useCallback((...args) => handlers.current.onOpenExpense?.(...args), []);
   const openTask = useCallback((...args) => handlers.current.onOpenTask?.(...args), []);
   const openReminders = useCallback((...args) => handlers.current.onOpenReminders?.(...args), []);
+  const openStay = useCallback((...args) => handlers.current.onOpenStay?.(...args), []);
+  const openAttraction = useCallback((...args) => handlers.current.onOpenAttraction?.(...args), []);
+  const openMedia = useCallback((...args) => handlers.current.onOpenMedia?.(...args), []);
 
   const renderRow = useCallback(
     ({ item }) => {
@@ -405,6 +419,9 @@ const ChatTab = ({
           onOpenExpense={openExpense}
           onOpenTask={openTask}
           onOpenReminders={openReminders}
+          onOpenStay={openStay}
+          onOpenAttraction={openAttraction}
+          onOpenMedia={openMedia}
           onOpenImage={setViewing}
           onOpenFile={openFile}
           onSaveFile={saveFile}
@@ -423,6 +440,9 @@ const ChatTab = ({
       openExpense,
       openTask,
       openReminders,
+      openStay,
+      openAttraction,
+      openMedia,
       openFile,
       saveFile,
       startReply,
@@ -436,7 +456,7 @@ const ChatTab = ({
   return (
     <Root
       style={[styles.flex, !IS_IOS && { paddingBottom: lift }]}
-      {...(IS_IOS ? { behavior: 'padding', keyboardVerticalOffset: 90 } : { onLayout })}
+      {...(IS_IOS ? { behavior: 'padding', keyboardVerticalOffset: 90 } : { ref: liftRef })}
     >
       {loading ? (
         <View style={styles.loading}>
@@ -490,7 +510,10 @@ const ChatTab = ({
         </View>
       )}
 
-      {suggestion && (
+      {/* Steps aside while the keyboard is up: in the little room left above
+          it, the card would push the chat, and the message being written, out
+          of sight. It is back as soon as the keyboard closes. */}
+      {suggestion && !keyboardVisible && (
         <View style={styles.suggest}>
           <View style={styles.suggestHeader}>
             <View style={styles.suggestBadge}>

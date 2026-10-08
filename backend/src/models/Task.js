@@ -15,6 +15,8 @@ const taskSchema = new mongoose.Schema(
     dueAt: { type: Date, default: null },
     status: { type: String, enum: ['open', 'done'], default: 'open' },
     completedAt: { type: Date, default: null },
+    // Who marked it done: not necessarily an assignee. Cleared when reopened.
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     subtasks: [
       {
         title: { type: String, required: true, trim: true, maxlength: 200 },

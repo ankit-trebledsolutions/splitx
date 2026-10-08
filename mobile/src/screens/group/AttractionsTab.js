@@ -10,9 +10,25 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { dark, radius, spacing } from '../../theme';
 import AppAlert from '../../components/AppAlert';
+import useListFocus from '../../hooks/useListFocus';
 
 // "Nearby attractions" list with per-user bookmark toggles, per the mockup.
-const AttractionsTab = ({ attractions, loading, currentUserId, onToggleSave, onDelete }) => {
+// `focusId` is an attraction a chat card asked to show (see StaysTab).
+const AttractionsTab = ({
+  attractions,
+  loading,
+  currentUserId,
+  onToggleSave,
+  onDelete,
+  focusId,
+  onFocusDone,
+}) => {
+  const { highlightId, listProps } = useListFocus({
+    items: loading ? [] : attractions,
+    focusId,
+    onDone: onFocusDone,
+  });
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -30,7 +46,7 @@ const AttractionsTab = ({ attractions, loading, currentUserId, onToggleSave, onD
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, item._id === highlightId && styles.cardHighlighted]}
         activeOpacity={0.85}
         onLongPress={() => onDelete?.(item)}
       >
@@ -72,9 +88,11 @@ const AttractionsTab = ({ attractions, loading, currentUserId, onToggleSave, onD
 
   return (
     <FlatList
+      {...listProps}
       data={attractions}
       keyExtractor={(item) => item._id}
       renderItem={renderAttraction}
+      extraData={highlightId}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
@@ -132,6 +150,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm + 2,
   },
+  cardHighlighted: { borderColor: dark.accentGreen, backgroundColor: 'rgba(0,196,208,0.10)' },
   emojiTile: {
     width: 44,
     height: 44,

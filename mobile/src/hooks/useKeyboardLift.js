@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Platform } from 'react-native';
 
 /**
@@ -11,23 +11,28 @@ import { Keyboard, Platform } from 'react-native';
  * than the screen bottom, which leaves a strip of padding behind. Here the
  * lift is measured on open and reset to exactly zero on close.
  *
- * Usage: spread `onLayout` on the container and add `lift` as its paddingBottom.
+ * The keyboard's top edge comes in screen coordinates, and the container is
+ * measured in the same ones: `measure`'s page position, from the top of the
+ * app's root view, which edge-to-edge is the top of the screen. (Its layout
+ * position is relative to its parent, and measureInWindow starts below the
+ * status bar on Android; with either, the composer came up short by the height
+ * of everything above that point, and the bottom of the input, where the line
+ * being typed is, sat behind the keyboard's suggestion strip.)
+ *
+ * Usage: put `ref` on the container and add `lift` as its paddingBottom.
  * Returns 0 on iOS, where KeyboardAvoidingView behaves.
  */
 const useKeyboardLift = () => {
-  const frame = useRef(null);
+  const ref = useRef(null);
   const [lift, setLift] = useState(0);
-
-  const onLayout = useCallback((event) => {
-    frame.current = event.nativeEvent.layout;
-  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return undefined;
     const show = Keyboard.addListener('keyboardDidShow', (event) => {
-      const box = frame.current;
-      if (!box) return;
-      setLift(Math.max(box.y + box.height - event.endCoordinates.screenY, 0));
+      const keyboardTop = event.endCoordinates.screenY;
+      ref.current?.measure((x, y, width, height, pageX, pageY) => {
+        setLift(Math.max(Math.round(pageY + height - keyboardTop), 0));
+      });
     });
     const hide = Keyboard.addListener('keyboardDidHide', () => setLift(0));
     return () => {
@@ -36,7 +41,7 @@ const useKeyboardLift = () => {
     };
   }, []);
 
-  return { lift, onLayout };
+  return { lift, ref };
 };
 
 export default useKeyboardLift;

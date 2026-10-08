@@ -8,8 +8,10 @@ const localStorage = require('./local.storage');
  * file here and nothing else.
  *
  * A provider exports:
- *   upload(file, { folder })  -> { url, thumbUrl, key }
- *       file is a multer memory file: { buffer, mimetype, originalname }
+ *   upload(file, { folder, poster })  -> { url, thumbUrl, key }
+ *       file is a multer file, either in memory { buffer, mimetype, originalname }
+ *       or, for videos, on disk { path, size, mimetype, originalname }
+ *       poster   optional image buffer to make thumbUrl from (a video's frame)
  *       url      the file itself
  *       thumbUrl small square for grids (may equal url if no square was made)
  *       key      whatever the provider needs later to delete the file

@@ -29,7 +29,14 @@ const createAttraction = async (userId, groupId, payload) => {
   await attraction.populate(POPULATE);
 
   const adder = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
-  await messageService.postSystem(groupId, `${adder} added ${attraction.name} to attractions`);
+  // A card in the chat that opens this attraction in the Attractions tab.
+  await messageService.postActivity({
+    groupId,
+    senderId: userId,
+    type: 'attraction',
+    text: attraction.name,
+    attraction: attraction._id,
+  });
 
   await notificationService.notifyGroup({
     groupId,
@@ -76,6 +83,7 @@ const deleteAttraction = async (attractionId, userId) => {
   if (!attraction.addedBy._id.equals(userId)) {
     throw ApiError.forbidden('Only the member who added this attraction can delete it');
   }
+  await messageService.deleteForEntity('attraction', attraction._id);
   await attraction.deleteOne();
 };
 

@@ -16,6 +16,23 @@ const listPhotos = async (groupId, userId) => {
   return Photo.find({ group: groupId }).populate(POPULATE).sort({ createdAt: -1 });
 };
 
+// "Photo Added" / "3 Videos Added", and "a photo" / "3 videos" for the body.
+const uploadWords = (mediaType, count) => {
+  const noun = mediaType === 'video' ? 'video' : 'photo';
+  const many = count > 1;
+  return {
+    title: `${noun[0].toUpperCase()}${noun.slice(1)}${many ? 's' : ''} Added`,
+    what: many ? `${count} ${noun}s` : `a ${noun}`,
+  };
+};
+
+/**
+ * A new gallery photo or video. Besides the create fields, uploads may pass:
+ *   mediaType   'image' (default) or 'video'
+ *   durationMs  a video's length
+ *   batch       key shared by the files picked together: they make one chat card
+ *   batchCount  how many files that pick had, for the notification's wording
+ */
 const addPhoto = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
   const memberIds = new Set(group.members.map((m) => m._id.toString()));
@@ -36,22 +53,33 @@ const addPhoto = async (userId, groupId, payload) => {
     storageProvider: payload.storageProvider,
     storageKey: payload.storageKey,
     caption: payload.caption,
+    mediaType: payload.mediaType,
+    durationMs: payload.durationMs,
     taggedMembers,
     uploadedBy: userId,
   });
 
   await photo.populate(POPULATE);
 
-  const uploader = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
-  await messageService.postSystem(groupId, `${uploader} added a photo to the gallery`);
-
-  await notificationService.notifyGroup({
+  const { created } = await messageService.addToGalleryCard({
     groupId,
-    actorId: userId,
-    type: 'photo',
-    title: 'Photo Added',
-    body: `${uploader} added a photo to the "${group.name}" gallery.`,
+    senderId: userId,
+    photoId: photo._id,
+    batch: payload.batch,
   });
+
+  // Once per card: the rest of a batch joins a card that was already announced.
+  if (created) {
+    const uploader = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
+    const { title, what } = uploadWords(photo.mediaType, payload.batchCount ?? 1);
+    await notificationService.notifyGroup({
+      groupId,
+      actorId: userId,
+      type: 'photo',
+      title,
+      body: `${uploader} added ${what} to the "${group.name}" gallery.`,
+    });
+  }
 
   return photo;
 };
@@ -79,6 +107,7 @@ const deletePhoto = async (photoId, userId) => {
   // storageKey is hidden from normal reads, so fetch it just for the clean-up.
   const stored = await Photo.findById(photoId).select('+storageKey storageProvider');
   await photo.deleteOne();
+  await messageService.dropFromGalleryCards([photo._id]);
   await storedFileService.removeIfUnused(fileOf(photo.imageUrl, stored));
 };
 
@@ -107,6 +136,7 @@ const deletePhotos = async (photoIds, userId) => {
 
   const deletable = photos.filter((p) => memberOf.has(p.group.toString()));
   await Photo.deleteMany({ _id: { $in: deletable.map((p) => p._id) } });
+  await messageService.dropFromGalleryCards(deletable.map((p) => p._id));
   await Promise.all(deletable.map((p) => storedFileService.removeIfUnused(fileOf(p.imageUrl, p))));
   return deletable.map((p) => p._id);
 };

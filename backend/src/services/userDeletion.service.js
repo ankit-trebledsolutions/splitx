@@ -206,9 +206,11 @@ const deleteUser = async (userId) => {
   // remaining members' history does not develop holes.
   await Promise.all([
     Task.updateMany({ assignees: userId }, { $pull: { assignees: userId } }),
+    Task.updateMany({ completedBy: userId }, { $set: { completedBy: null } }),
     Photo.updateMany({ taggedMembers: userId }, { $pull: { taggedMembers: userId } }),
     Message.updateMany({ readBy: userId }, { $pull: { readBy: userId } }),
     Message.updateMany({ sender: userId }, { $set: { sender: null } }),
+    Message.updateMany({ assignees: userId }, { $pull: { assignees: userId } }),
     // Rows that only concerned this person.
     Notification.deleteMany({ user: userId }),
     SupportMessage.deleteMany({ user: userId }),

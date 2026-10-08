@@ -9,8 +9,11 @@ const USER_FIELDS = 'name email';
 const POPULATE = [
   { path: 'assignees', select: USER_FIELDS },
   { path: 'createdBy', select: USER_FIELDS },
+  { path: 'completedBy', select: USER_FIELDS },
   { path: 'source.user', select: USER_FIELDS },
 ];
+
+const idsOf = (users) => users.map((user) => user?._id ?? user);
 
 const listTasks = async (groupId, userId) => {
   await groupService.getGroupForMember(groupId, userId);
@@ -42,12 +45,14 @@ const createTask = async (userId, groupId, payload) => {
   });
 
   await task.populate(POPULATE);
+  // The card names who the task is for ("Task added for Rajeev").
   await messageService.postActivity({
     groupId,
     senderId: userId,
     type: 'task',
     text: task.title,
     task: task._id,
+    assignees: idsOf(task.assignees),
   });
 
   await notificationService.notifyGroup({
@@ -71,19 +76,45 @@ const getTaskForMember = async (taskId, userId) => {
 
 const updateTask = async (taskId, userId, payload) => {
   const task = await getTaskForMember(taskId, userId);
+  const wasDone = task.status === 'done';
 
   const fields = ['title', 'notes', 'priority', 'assignees', 'dueAt', 'subtasks', 'links'];
   for (const field of fields) {
     if (payload[field] !== undefined) task[field] = payload[field];
   }
 
-  if (payload.status !== undefined) {
-    task.status = payload.status;
-    task.completedAt = payload.status === 'done' ? new Date() : null;
+  // Only a real change of status moves these: sending "done" again for a task
+  // that is already done keeps who finished it and when.
+  if (payload.status === 'done' && !wasDone) {
+    task.status = 'done';
+    task.completedAt = new Date();
+    task.completedBy = userId;
+  } else if (payload.status === 'open') {
+    task.status = 'open';
+    task.completedAt = null;
+    task.completedBy = null;
   }
 
   await task.save();
-  return task.populate(POPULATE);
+  await task.populate(POPULATE);
+
+  // "Task completed" in the chat, naming who it was for and who did it (the
+  // card's sender). Reopening takes the card back, so the chat never says a
+  // task is done while it is open, and ticking it again posts a fresh one.
+  if (task.status === 'done' && !wasDone) {
+    await messageService.postActivity({
+      groupId: task.group,
+      senderId: userId,
+      type: 'task_done',
+      text: task.title,
+      task: task._id,
+      assignees: idsOf(task.assignees),
+    });
+  } else if (task.status === 'open' && wasDone) {
+    await messageService.removeCards({ task: task._id, type: 'task_done' });
+  }
+
+  return task;
 };
 
 const deleteTask = async (taskId, userId) => {

@@ -40,7 +40,14 @@ const createStay = async (userId, groupId, payload) => {
   await stay.populate(POPULATE);
 
   const booker = group.members.find((m) => m._id.equals(userId))?.name ?? 'A member';
-  await messageService.postSystem(groupId, `${booker} added ${stay.name} to stays`);
+  // A card in the chat that opens this stay in the Stays tab.
+  await messageService.postActivity({
+    groupId,
+    senderId: userId,
+    type: 'stay',
+    text: stay.name,
+    stay: stay._id,
+  });
 
   await notificationService.notifyGroup({
     groupId,
@@ -102,6 +109,7 @@ const deleteStay = async (stayId, userId) => {
   if (!stay.bookedBy._id.equals(userId)) {
     throw ApiError.forbidden('Only the member who added this stay can delete it');
   }
+  await messageService.deleteForEntity('stay', stay._id);
   await stay.deleteOne();
 };
 

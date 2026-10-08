@@ -3,7 +3,7 @@
 REST API for Splix — the expense-splitting and group trip-planning app.
 
 - **Base URL (local):** `http://localhost:4000/api/v1`
-- **Format:** JSON request and response bodies (`Content-Type: application/json`), except photo upload which is `multipart/form-data`.
+- **Format:** JSON request and response bodies (`Content-Type: application/json`), except photo, video and chat file uploads, which are `multipart/form-data`.
 - **Uploaded images** are served statically from `http://localhost:4000/uploads/<filename>` (no auth required).
 
 ## Conventions
@@ -370,6 +370,30 @@ Delete an expense.
 
 Response: `{ "data": { "messages": [ ... ] } }`. Messages include system/activity entries (`type`) as well as plain `text` messages and `image` / `audio` / `file` messages with an `attachment` (see the upload endpoint below), with `sender` populated.
 
+Everything added to a group also lands in its chat as an **activity card**: a message whose `sender` is the member who did it and which carries the thing itself, populated. The app draws each as a card that opens the item in its tab.
+
+| `type` | Posted when | Carries |
+| --- | --- | --- |
+| `expense` | an expense is added | `expense` (with `paidBy`, `splits.user`) |
+| `task` | a task is added | `task` (with `assignees`), and `assignees`: who the task was for when the card was posted (`[]` for nobody; missing on cards from before this field) |
+| `task_done` | a task goes from open to done | `task`, and `assignees` as above. The `sender` is whoever completed it, who need not be an assignee. Reopening the task deletes the card |
+| `reminder` | a shared ("Everyone") reminder is set | `reminder` (without `mutedBy` / `armedBy`) |
+| `stay` | a stay is added | `stay` (with `bookedBy`) |
+| `attraction` | an attraction is added | `attraction` (without `savedBy`) |
+| `gallery` | photos or videos are uploaded to the gallery | `photos`: `[{ _id, imageUrl, thumbUrl, mediaType, durationMs, emoji, color, caption, createdAt }]`. Files picked together (same `batch`, see the photo upload) share one card |
+| `system` | members join or leave, a stay changes status, the itinerary changes | `text` only |
+
+A card goes when what it is about is deleted (an expense, task, reminder, stay or attraction). A deleted gallery photo or video comes off its card, and a card left empty goes. Stay status changes and itinerary days stay one-line `system` messages.
+
+Socket events for the group chat (to everyone with the group open):
+
+| Event | Payload | When |
+| --- | --- | --- |
+| `message:new` | `{ message }` | a message or card is posted |
+| `message:updated` | `{ message }` | a card already in the feed changed: a `gallery` card gained or lost a photo. Replace it by `_id` |
+| `message:removed` | `{ groupId, messageIds }` | cards were deleted along with what they were about, or a `task_done` card because the task was reopened. Drop them |
+| `message:deleted` | `{ message }` | "Delete for everyone" (below): the message stays as a placeholder |
+
 ### `POST /groups/:groupId/messages`
 
 | Body field | Type | Rules |
@@ -469,6 +493,8 @@ Single task detail.
 ### `PATCH /tasks/:taskId`
 
 Any subset of the create fields plus `status`: `open` \| `done`.
+
+Moving a task to `done` sets `completedAt` and `completedBy` (the caller, populated as `{ _id, name, email }`) and posts a `task_done` card to the chat; sending `done` for a task that is already done changes nothing. Moving it back to `open` clears both and deletes that card (`message:removed`). Any member may do either.
 
 ### `DELETE /tasks/:taskId`
 
@@ -753,7 +779,7 @@ The state of AI planning for this group. Any member.
 
 ### `GET /groups/:groupId/photos`
 
-Response: `{ "data": { "photos": [ ... ] } }`
+Response: `{ "data": { "photos": [ ... ] } }`, newest first. Each row is a photo or a video: `mediaType` is `image` (also on rows from before videos) or `video`, and a video has its length in `durationMs`.
 
 ### `POST /groups/:groupId/photos`
 
@@ -771,6 +797,13 @@ Add a photo entry by URL or as an emoji/colour placeholder tile.
 
 `multipart/form-data` with a single file field named **`photo`** (and an optional `caption`). Only `image/*` mimetypes, max **10 MB** (`413` above that); the caller must be a group member.
 
+Optional text fields, so that photos picked together make one chat card:
+
+| Field | Rules |
+| --- | --- |
+| `batch` | 1–64 letters, digits, `_` or `-`, shared by every file of one pick. A file joins the `gallery` card that an earlier file of the same batch (same member, within 30 minutes) posted, and the card is pushed again as `message:updated`. Missing or malformed: the file gets a card of its own, as older app versions expect |
+| `batchCount` | how many files the pick has (1–50). Only words the one notification sent per card ("added 3 photos") |
+
 The image is sent to the configured storage provider and never written to the API server's disk. With the four `R2_*` variables set that is Cloudflare R2 (stored as uploaded under `splix/groups/<groupId>/`, with a 400px square JPG next to it for the grid); without them it falls back to the local `uploads/` folder, for development only.
 
 The created photo carries:
@@ -785,9 +818,22 @@ Absolute URLs (`https://…`) are used as-is; relative ones (`/uploads/…`, `/m
 
 An R2 address is `MEDIA_BASE_URL/<key>`. Until there is a domain that is this server's `GET /media/<key>`, which needs no sign-in and answers `302` to a link signed for an hour (`404` when no bucket is set up). Image, audio and download clients follow the redirect.
 
+### `POST /groups/:groupId/videos/upload`
+
+A video for the gallery. `multipart/form-data` with:
+
+| Field | Rules |
+| --- | --- |
+| `video` | file, required. Only `video/*` mimetypes, max **90 MB** (`413` "That video is too large (max 90MB)"); kept under the 100 MB a request may carry through Cloudflare's proxy |
+| `poster` | file, optional. An `image/*` frame of the video that the phone makes; stored as the 400px square `thumbUrl`. One over 10 MB is left out (the video still uploads, with no `thumbUrl`) |
+| `durationMs` | number, optional; the clip's length |
+| `caption`, `batch`, `batchCount` | as on the photo upload |
+
+The video is written to a temp file on the API server (not held in memory) and streamed to storage from there; the temp files are deleted either way. It is listed with the photos, as a row with `mediaType: "video"`, the file in `imageUrl`, the poster in `thumbUrl` (`""` when no poster was sent or it could not be read) and `durationMs`. Deleting it (below) removes the video and its poster. Response: `{ "data": { "photo": { ... } } }`, `201`.
+
 ### `DELETE /photos/:photoId`
 
-Uploader only. Also deletes the image from the storage provider.
+Uploader only. Also deletes the image (or the video and its poster) from the storage provider, and takes it off its chat card.
 
 ### `POST /photos/bulk-delete`
 
@@ -797,7 +843,7 @@ Multi-select delete from the gallery.
 | --- | --- | --- |
 | `photoIds` | ObjectId[] | required, 1–100 ids |
 
-Same rule as the single delete, applied per photo: only the caller's own uploads are removed (and their images deleted from storage). Ids that belong to someone else, or don't exist, are skipped rather than failing the batch.
+Same rule as the single delete, applied per photo: only the caller's own uploads are removed (and their images deleted from storage, and taken off their chat cards). Ids that belong to someone else, or don't exist, are skipped rather than failing the batch.
 
 Response: `{ "data": { "deletedIds": [ ... ] } }` — the photos that were actually deleted.
 
@@ -808,6 +854,8 @@ Response: `{ "data": { "deletedIds": [ ... ] } }` — the photos that were actua
 ### `GET /groups/:groupId/attractions` · `POST /groups/:groupId/attractions`
 
 Attractions belong to trip groups. `POST` on any other kind of group answers `400` with code `TRIP_ONLY` ("Only trip groups have attractions."), and the app does not show the Attractions tab there. `GET` still answers for every group.
+
+Adding one posts an `attraction` card to the chat; deleting it deletes the card.
 
 Create body:
 
@@ -834,6 +882,8 @@ Any subset of the create fields (`rating`/`distanceKm` also accept `null` to cle
 ## Stays
 
 ### `GET /groups/:groupId/stays` · `POST /groups/:groupId/stays`
+
+Adding one posts a `stay` card to the chat; deleting it deletes the card. A status change is still announced as a one-line `system` message.
 
 Create body:
 

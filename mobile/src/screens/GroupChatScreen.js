@@ -157,6 +157,13 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [sheetSeed, setSheetSeed] = useState(null);
   const [savedTask, setSavedTask] = useState(null);
   const [actionsOpen, setActionsOpen] = useState(false);
+  // A stay, attraction or gallery item a chat card asked to show: { tab, id }.
+  // The tab scrolls to it or opens it, then clears this.
+  const [focus, setFocus] = useState(null);
+  const clearFocus = useCallback(() => setFocus(null), []);
+  // The card tap still fetching its item ({ tab }); leaving that tab, or
+  // tapping another card, cancels it so it can't open anything later.
+  const pendingCard = useRef(null);
   // Bumped once an AI plan has landed, to remount the Itinerary tab: it picks
   // the day to open when it mounts, and after a replan that day is gone.
   const [itineraryKey, setItineraryKey] = useState(0);
@@ -277,15 +284,32 @@ const GroupChatScreen = ({ route, navigation }) => {
     );
   }, []);
 
+  // The other tabs' lists change under this screen too: a card arriving in the
+  // chat says which one (see the socket effect). Only the latest fetch of each
+  // list is shown, so two quick changes can't land in the wrong order.
+  const listFetch = useRef({});
+  const refreshList = useCallback(
+    async (key, fetcher, setter) => {
+      const ticket = (listFetch.current[key] ?? 0) + 1;
+      listFetch.current[key] = ticket;
+      try {
+        const data = await fetcher(groupId);
+        if (mounted.current && listFetch.current[key] === ticket) setter(data);
+        return data;
+      } catch {
+        // The next focus reloads it.
+        return null;
+      }
+    },
+    [groupId]
+  );
+
   // Photos sent in the chat are listed in the gallery too, so that tab is
   // refreshed whenever one goes out or comes in.
-  const refreshPhotos = useCallback(async () => {
-    try {
-      setPhotos(await fetchPhotos(groupId));
-    } catch {
-      // The next focus reloads it.
-    }
-  }, [groupId]);
+  const refreshPhotos = useCallback(
+    () => refreshList('gallery', fetchPhotos, setPhotos),
+    [refreshList]
+  );
 
   // Reminders are set, moved and deleted by other members too; the server says
   // when this list is out of date.
@@ -296,6 +320,18 @@ const GroupChatScreen = ({ route, navigation }) => {
       // The next focus reloads it.
     }
   }, [groupId]);
+
+  // Which list a chat card is about.
+  const refreshForCard = useCallback(
+    (type) => {
+      if (type === 'image' || type === 'gallery') refreshPhotos();
+      else if (type === 'task' || type === 'task_done') refreshList('tasks', fetchTasks, setTasks);
+      else if (type === 'expense') refreshList('expenses', fetchExpenses, setExpenses);
+      else if (type === 'stay') refreshList('stays', fetchStays, setStays);
+      else if (type === 'attraction') refreshList('attractions', fetchAttractions, setAttractions);
+    },
+    [refreshPhotos, refreshList]
+  );
 
   // The itinerary changes under this screen: AI writes it in the background
   // and other members edit it, so the server says when to fetch it again.
@@ -359,7 +395,11 @@ const GroupChatScreen = ({ route, navigation }) => {
     };
   }, [groupId]);
 
+  // The feed as it stands, for socket handlers that need to know what a
+  // removed card was about.
+  const messagesRef = useRef(messages);
   useEffect(() => {
+    messagesRef.current = messages;
     latestMessageAt.current = messages.length ? messages[messages.length - 1].createdAt : null;
   }, [messages]);
 
@@ -373,17 +413,36 @@ const GroupChatScreen = ({ route, navigation }) => {
     const appendUnique = (message) =>
       setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [...prev, message]));
 
+    const inThisGroup = (message) =>
+      String(message?.group?._id ?? message?.group) === String(groupId);
+
+    // Something added anywhere arrives as a card: its tab is brought up to date too.
     const onMessage = ({ message } = {}) => {
-      if (!message) return;
-      const g = message.group?._id ?? message.group;
-      if (String(g) !== String(groupId)) return;
+      if (!message || !inThisGroup(message)) return;
       appendUnique(message);
-      if (message.type === 'image') refreshPhotos();
+      refreshForCard(message.type);
     };
 
     const onMessageDeleted = ({ message } = {}) => {
-      const g = message?.group?._id ?? message?.group;
-      if (String(g) === String(groupId)) applyDeleted(message);
+      if (inThisGroup(message)) applyDeleted(message);
+    };
+
+    // A card changed in place: a gallery card gained or lost a photo.
+    const onMessageUpdated = ({ message } = {}) => {
+      if (!message || !inThisGroup(message)) return;
+      setMessages((prev) => prev.map((m) => (m._id === message._id ? message : m)));
+      refreshForCard(message.type);
+    };
+
+    // Cards whose subject is gone (deleted, or a completed task reopened).
+    const onMessagesRemoved = ({ groupId: g, messageIds = [] } = {}) => {
+      if (String(g) !== String(groupId) || !messageIds.length) return;
+      const gone = new Set(messageIds);
+      const types = new Set(
+        messagesRef.current.filter((m) => gone.has(m._id)).map((m) => m.type)
+      );
+      setMessages((prev) => prev.filter((m) => !gone.has(m._id)));
+      types.forEach(refreshForCard);
     };
 
     const hideTyping = (userId) => {
@@ -441,6 +500,8 @@ const GroupChatScreen = ({ route, navigation }) => {
 
     socket.on('message:new', onMessage);
     socket.on('message:deleted', onMessageDeleted);
+    socket.on('message:updated', onMessageUpdated);
+    socket.on('message:removed', onMessagesRemoved);
     socket.on('typing', onTyping);
     socket.on('group:member-left', onMemberLeft);
     socket.on('group:deleted', onGroupDeleted);
@@ -448,6 +509,8 @@ const GroupChatScreen = ({ route, navigation }) => {
     return () => {
       socket.off('message:new', onMessage);
       socket.off('message:deleted', onMessageDeleted);
+      socket.off('message:updated', onMessageUpdated);
+      socket.off('message:removed', onMessagesRemoved);
       socket.off('typing', onTyping);
       socket.off('group:member-left', onMemberLeft);
       socket.off('group:deleted', onGroupDeleted);
@@ -460,7 +523,7 @@ const GroupChatScreen = ({ route, navigation }) => {
     currentUserId,
     navigation,
     applyDeleted,
-    refreshPhotos,
+    refreshForCard,
     refreshReminders,
   ]);
 
@@ -622,6 +685,8 @@ const GroupChatScreen = ({ route, navigation }) => {
     try {
       const updated = await updateTask(task._id, { status: nextStatus });
       setTasks((prev) => prev.map((t) => (t._id === updated._id ? updated : t)));
+      // "Task completed" comes and goes in the chat with this.
+      await refreshMessages();
     } catch (err) {
       setTasks((prev) => prev.map((t) => (t._id === task._id ? task : t))); // roll back
       AppAlert.alert('Could not update task', err.message);
@@ -721,9 +786,69 @@ const GroupChatScreen = ({ route, navigation }) => {
     navigation.navigate('UploadPhotos', { groupId, groupName: group?.name });
   };
 
+  const openUploadVideos = () => {
+    navigation.navigate('UploadPhotos', { groupId, groupName: group?.name, media: 'video' });
+  };
+
   const openTaskDetail = (task) => {
     if (task?._id) navigation.navigate('TaskDetail', { taskId: task._id });
   };
+
+  // ---- Chat cards ----------------------------------------------------------
+  // A tap on a card goes to that thing's tab and opens it there: tasks and
+  // expenses on their own screens, a reminder in its sheet, and stays,
+  // attractions and gallery items by the tab itself (see `focus`).
+
+  const openTaskFromCard = (task) => {
+    setTab('tasks');
+    openTaskDetail(task);
+  };
+
+  const openExpenseFromCard = (expense) => {
+    setTab('expenses');
+    if (expense?._id) openExpense(expense);
+  };
+
+  // The list on screen if it has the item, else a fresh one from the server
+  // (another member's card can arrive before their item is in this phone's
+  // list), or null when the server can't be reached.
+  const listWith = async (key, list, fetcher, setter, id) =>
+    list.some((item) => item._id === id) ? list : refreshList(key, fetcher, setter);
+
+  // Switches to the card's tab and resolves to the list holding its item once
+  // there is one, or to null when the tap has been overtaken meanwhile (the
+  // person moved on) or the server can't be reached (the tab shows what it has).
+  const listForCard = async (tabKey, item, list, fetcher, setter) => {
+    const tap = { tab: tabKey };
+    pendingCard.current = tap;
+    setTab(tabKey);
+    if (!item?._id) return null;
+    const fresh = await listWith(tabKey, list, fetcher, setter, item._id);
+    if (pendingCard.current !== tap) return null;
+    pendingCard.current = null;
+    return fresh;
+  };
+
+  const openReminderFromCard = async (reminder) => {
+    const list = await listForCard('reminders', reminder, reminders, fetchReminders, setReminders);
+    const found = list?.find((item) => item._id === reminder._id);
+    if (found) reminderActions.openEdit(found);
+  };
+
+  const focusFromCard = async (tabKey, item, list, fetcher, setter) => {
+    const fresh = await listForCard(tabKey, item, list, fetcher, setter);
+    if (!fresh) return;
+    if (fresh.some((entry) => entry._id === item._id)) {
+      setFocus({ tab: tabKey, id: item._id });
+    } else {
+      AppAlert.alert('Not there any more', 'It was deleted after this card was posted.');
+    }
+  };
+  const openStayFromCard = (stay) => focusFromCard('stays', stay, stays, fetchStays, setStays);
+  const openAttractionFromCard = (attraction) =>
+    focusFromCard('attractions', attraction, attractions, fetchAttractions, setAttractions);
+  const openMediaFromCard = (photo) => focusFromCard('gallery', photo, photos, fetchPhotos, setPhotos);
+  const focusIdFor = (tabKey) => (focus?.tab === tabKey ? focus.id : null);
 
   // The gallery has already asked "are you sure?". Resolves to true once the
   // photos are gone, so it knows to leave selection mode.
@@ -734,8 +859,8 @@ const GroupChatScreen = ({ route, navigation }) => {
       const kept = toDelete.length - deletedIds.size;
       if (kept) {
         AppAlert.alert(
-          'Some photos were kept',
-          `${kept} photo${kept === 1 ? '' : 's'} could not be deleted. Only the person who uploaded a photo can delete it.`
+          'Some were kept',
+          `${kept} could not be deleted. Only the person who uploaded a photo or video can delete it.`
         );
       }
       return true;
@@ -784,6 +909,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           try {
             await deleteAttraction(attraction._id);
             setAttractions((prev) => prev.filter((a) => a._id !== attraction._id));
+            await refreshMessages();
           } catch (err) {
             AppAlert.alert('Could not delete attraction', err.message);
           }
@@ -826,6 +952,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           try {
             await deleteStay(stay._id);
             setStays((prev) => prev.filter((s) => s._id !== stay._id));
+            await refreshMessages();
           } catch (err) {
             AppAlert.alert('Could not delete stay', err.message);
           }
@@ -841,6 +968,81 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   const openExpense = (expense) => {
     navigation.navigate('ExpenseDetail', { expenseId: expense._id, groupName: group?.name });
+  };
+
+  // What the "+" offers on each tab: everything on Chat, only that tab's own
+  // things elsewhere. A tab with a single action skips the menu and opens it.
+  const ACTION = {
+    task: {
+      key: 'task',
+      icon: 'checkmark',
+      tint: '#22C55E',
+      label: 'Add Task',
+      onPress: () => openTaskSheet(null),
+    },
+    reminder: {
+      key: 'reminder',
+      icon: 'notifications-outline',
+      tint: '#2DD4BF',
+      label: 'Add Reminder',
+      onPress: () => reminderActions.openNew(),
+    },
+    expense: {
+      key: 'expense',
+      icon: 'cash-outline',
+      tint: '#22C55E',
+      label: 'Add Expense',
+      onPress: openAddExpense,
+    },
+    friends: {
+      key: 'friends',
+      icon: 'person-add-outline',
+      tint: '#2DD4BF',
+      label: 'Invite Friends',
+      onPress: () => navigation.navigate('GroupInvite', { group }),
+    },
+    stay: {
+      key: 'stay',
+      icon: 'bed-outline',
+      tint: '#2DD4BF',
+      label: 'Add Stay',
+      onPress: () => setStaySheetOpen(true),
+    },
+    attraction: {
+      key: 'attraction',
+      icon: 'compass-outline',
+      tint: '#2DD4BF',
+      label: 'Add Attraction',
+      onPress: () => setAttractionSheetOpen(true),
+    },
+    photos: {
+      key: 'photos',
+      icon: 'images-outline',
+      tint: '#2DD4BF',
+      label: 'Upload Photos',
+      onPress: openUploadPhotos,
+    },
+    videos: {
+      key: 'videos',
+      icon: 'videocam-outline',
+      tint: '#2DD4BF',
+      label: 'Upload Videos',
+      onPress: openUploadVideos,
+    },
+    day: {
+      key: 'day',
+      icon: 'map-outline',
+      tint: '#2DD4BF',
+      label: 'Add Day',
+      onPress: openDaySheet,
+    },
+    ai: {
+      key: 'ai',
+      icon: 'sparkles',
+      tint: '#4A8CFF',
+      label: itineraryDays.length ? 'Replan with AI' : 'Plan with AI',
+      onPress: openAiPlanner,
+    },
   };
 
   const memberCount = group?.members?.length ?? 0;
@@ -863,6 +1065,47 @@ const GroupChatScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (tripTabsHidden && TRIP_ONLY_TABS.has(tab)) setTab('chat');
   }, [tripTabsHidden, tab]);
+
+  const fabActions = (
+    {
+      chat: [
+        ACTION.task,
+        ACTION.reminder,
+        ACTION.expense,
+        ACTION.friends,
+        ACTION.stay,
+        // Attractions are a trip's alone (the server refuses them elsewhere).
+        !tripTabsHidden && ACTION.attraction,
+        ACTION.photos,
+        ACTION.videos,
+      ],
+      expenses: [ACTION.expense],
+      tasks: [ACTION.task],
+      reminders: [ACTION.reminder],
+      itinerary: [ACTION.day, group?.groupType === 'trip' && ACTION.ai],
+      gallery: [ACTION.photos, ACTION.videos],
+      attractions: [ACTION.attraction],
+      stays: [ACTION.stay],
+    }[tab] ?? []
+  ).filter(Boolean);
+
+  // One action: straight to it. Several: the menu.
+  const pressFab = () => {
+    if (fabActions.length === 1) {
+      setActionsOpen(false);
+      fabActions[0].onPress();
+    } else {
+      setActionsOpen((open) => !open);
+    }
+  };
+
+  // Each tab has its own actions, so a menu left open does not follow to the
+  // next. A card tap or focus meant for another tab is dropped as well.
+  useEffect(() => {
+    setActionsOpen(false);
+    if (pendingCard.current && pendingCard.current.tab !== tab) pendingCard.current = null;
+    setFocus((current) => (current && current.tab !== tab ? null : current));
+  }, [tab]);
 
   // Running, or done with the new days still on their way.
   const aiBusy = ai.running || ai.settling;
@@ -992,9 +1235,12 @@ const GroupChatScreen = ({ route, navigation }) => {
           onDeleteMessage={handleDeleteMessage}
           onTyping={handleTyping}
           typingUsers={Object.values(typingUsers)}
-          onOpenExpense={openExpense}
-          onOpenTask={(task) => (task?._id ? openTaskDetail(task) : setTab('tasks'))}
-          onOpenReminders={() => setTab('reminders')}
+          onOpenExpense={openExpenseFromCard}
+          onOpenTask={openTaskFromCard}
+          onOpenReminders={openReminderFromCard}
+          onOpenStay={openStayFromCard}
+          onOpenAttraction={openAttractionFromCard}
+          onOpenMedia={openMediaFromCard}
         />
       )}
 
@@ -1067,6 +1313,8 @@ const GroupChatScreen = ({ route, navigation }) => {
           currentUserId={currentUserId}
           onAddPhoto={openUploadPhotos}
           onDeletePhotos={handleDeletePhotos}
+          focusId={focusIdFor('gallery')}
+          onFocusDone={clearFocus}
         />
       )}
 
@@ -1077,6 +1325,8 @@ const GroupChatScreen = ({ route, navigation }) => {
           currentUserId={currentUserId}
           onToggleSave={handleToggleSaveAttraction}
           onDelete={handleDeleteAttraction}
+          focusId={focusIdFor('attractions')}
+          onFocusDone={clearFocus}
         />
       )}
 
@@ -1087,6 +1337,8 @@ const GroupChatScreen = ({ route, navigation }) => {
           organiserId={group?.admin ?? group?.createdBy?._id ?? group?.createdBy}
           onToggleStatus={handleToggleStayStatus}
           onDelete={handleDeleteStay}
+          focusId={focusIdFor('stays')}
+          onFocusDone={clearFocus}
         />
       )}
 
@@ -1106,99 +1358,28 @@ const GroupChatScreen = ({ route, navigation }) => {
             },
           ]}
         >
-          {actionsOpen && (
+          {actionsOpen && fabActions.length > 1 && (
             <View style={styles.actionMenu}>
-              {[
-                tab === 'itinerary' && {
-                  key: 'day',
-                  icon: 'map-outline',
-                  tint: '#2DD4BF',
-                  label: 'Add Day',
-                  onPress: openDaySheet,
-                },
-                tab === 'itinerary' &&
-                  group?.groupType === 'trip' && {
-                    key: 'ai',
-                    icon: 'sparkles',
-                    tint: '#4A8CFF',
-                    label: itineraryDays.length ? 'Replan with AI' : 'Plan with AI',
-                    onPress: openAiPlanner,
-                  },
-                tab === 'gallery' && {
-                  key: 'photo',
-                  icon: 'images-outline',
-                  tint: '#2DD4BF',
-                  label: 'Upload Photos',
-                  onPress: openUploadPhotos,
-                },
-                tab === 'attractions' && {
-                  key: 'attraction',
-                  icon: 'compass-outline',
-                  tint: '#2DD4BF',
-                  label: 'Add Attraction',
-                  onPress: () => setAttractionSheetOpen(true),
-                },
-                tab === 'stays' && {
-                  key: 'stay',
-                  icon: 'bed-outline',
-                  tint: '#2DD4BF',
-                  label: 'Add Stay',
-                  onPress: () => setStaySheetOpen(true),
-                },
-                {
-                  key: 'task',
-                  icon: 'checkmark',
-                  tint: '#22C55E',
-                  label: 'New Task',
-                  onPress: () => openTaskSheet(null),
-                },
-                {
-                  key: 'reminder',
-                  icon: 'notifications-outline',
-                  tint: '#2DD4BF',
-                  label: 'New Reminder',
-                  onPress: () => reminderActions.openNew(),
-                },
-                {
-                  key: 'expense',
-                  icon: 'cash-outline',
-                  tint: '#22C55E',
-                  label: 'Add Expense',
-                  onPress: openAddExpense,
-                },
-                {
-                  key: 'friends',
-                  icon: 'person-add-outline',
-                  tint: '#2DD4BF',
-                  label: 'Add Friends',
-                  onPress: () => navigation.navigate('GroupInvite', { group }),
-                },
-              ]
-                .filter(Boolean)
-                .map((item, index) => (
-                  <TouchableOpacity
-                    key={item.key}
-                    style={[styles.actionItem, index > 0 && styles.actionItemBorder]}
-                    onPress={() => {
-                      setActionsOpen(false);
-                      item.onPress();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.actionIcon, { backgroundColor: `${item.tint}26` }]}>
-                      <Ionicons name={item.icon} size={15} color={item.tint} />
-                    </View>
-                    <Text style={styles.actionText}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
+              {fabActions.map((item, index) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[styles.actionItem, index > 0 && styles.actionItemBorder]}
+                  onPress={() => {
+                    setActionsOpen(false);
+                    item.onPress();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.actionIcon, { backgroundColor: `${item.tint}26` }]}>
+                    <Ionicons name={item.icon} size={15} color={item.tint} />
+                  </View>
+                  <Text style={styles.actionText}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.fab}
-            activeOpacity={0.9}
-            onPress={() => setActionsOpen((open) => !open)}
-          >
+          <TouchableOpacity style={styles.fab} activeOpacity={0.9} onPress={pressFab}>
             <LinearGradient
               colors={dark.gradient}
               start={{ x: 0, y: 0 }}
