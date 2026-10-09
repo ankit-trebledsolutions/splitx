@@ -1,16 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Switch,
-  Platform,
-  TurboModuleRegistry,
-  StyleSheet,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FormSheet, { sheetStyles } from './FormSheet';
 import TextField from './TextField';
+import CalendarPanel from './CalendarPanel';
+import TimeWheel from './TimeWheel';
 import { dark, radius, spacing } from '../theme';
 import { formatTime } from '../utils/format';
 import { alarmsSupported, nextRingAt } from '../utils/reminderAlarms';
@@ -35,30 +29,19 @@ const onTheMinute = (value) => {
 const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
-// Android's own calendar and clock dialogs. Absent on iOS, and on a build from
-// before the picker package was added; there the chevrons are the only way.
-// Checked before the require: a failing require() is a fatal red screen.
-const pickerAvailable = () =>
-  Platform.OS === 'android' && Boolean(TurboModuleRegistry.get('RNCDatePicker'));
-const openPicker = (options) =>
-  require('@react-native-community/datetimepicker').DateTimePickerAndroid.open(options);
-
-// The middle of a date or time stepper. With `onPress` it opens the picker.
-const StepValue = ({ icon, text, onPress }) => {
-  const content = (
-    <>
-      <Ionicons name={icon} size={14} color={dark.accentGreen} />
-      <Text style={sheetStyles.stepText}>{text}</Text>
-    </>
-  );
-  return onPress ? (
-    <TouchableOpacity style={sheetStyles.stepValue} onPress={onPress} activeOpacity={0.7}>
-      {content}
-    </TouchableOpacity>
-  ) : (
-    <View style={sheetStyles.stepValue}>{content}</View>
-  );
-};
+// The middle of the date or time chip. Tapping it drops the picker down.
+const StepValue = ({ icon, text, open, onPress }) => (
+  <TouchableOpacity style={sheetStyles.stepValue} onPress={onPress} activeOpacity={0.7}>
+    <Ionicons name={icon} size={14} color={dark.accentGreen} />
+    <Text style={sheetStyles.stepText}>{text}</Text>
+    <Ionicons
+      name={open ? 'chevron-up' : 'chevron-down'}
+      size={12}
+      color={dark.textMuted}
+      style={styles.stepCaret}
+    />
+  </TouchableOpacity>
+);
 
 /**
  * The reminder sheet, per the add-reminder design. It creates a reminder and
@@ -69,6 +52,10 @@ const StepValue = ({ icon, text, onPress }) => {
  *   personal        it belongs to no group, so there is nobody else to remind
  *   canChangeScope  only the person who made a reminder decides who it is for
  *   onDelete        shows "Delete reminder"
+ *
+ * The date and time chips step by a day or half an hour with their chevrons;
+ * tapping the middle of one drops a calendar, or the time wheels, down under
+ * them to set it exactly.
  *
  * onSubmit receives only what should be saved; when editing, the time is left
  * out unless it was changed, so renaming an old reminder does not move it.
@@ -88,6 +75,8 @@ const ReminderSheet = ({
   const [title, setTitle] = useState('');
   const [remindAt, setRemindAt] = useState(defaultRemindAt);
   const [startedAt, setStartedAt] = useState(0);
+  // Which picker is dropped down: 'date', 'time' or null.
+  const [picker, setPicker] = useState(null);
   const [scope, setScope] = useState('group');
   const [repeatWeekly, setRepeatWeekly] = useState(false);
   const [notes, setNotes] = useState('');
@@ -104,6 +93,7 @@ const ReminderSheet = ({
     setTitle(from.title ?? '');
     setRemindAt(start);
     setStartedAt(start.getTime());
+    setPicker(null);
     setScope(from.scope ?? 'group');
     setRepeatWeekly(from.repeatWeekly ?? false);
     setNotes(from.subtitle ?? '');
@@ -112,7 +102,6 @@ const ReminderSheet = ({
     setSaving(false);
   }, [visible, reminder, seed]);
 
-  const canPick = useMemo(pickerAvailable, []);
   const timeChanged = !editing || remindAt.getTime() !== startedAt;
 
   const change = (next) => {
@@ -132,30 +121,19 @@ const ReminderSheet = ({
     change(next);
   };
 
-  const pickDate = () =>
-    openPicker({
-      mode: 'date',
-      value: remindAt,
-      minimumDate: new Date(),
-      onChange: (event, picked) => {
-        if (event.type !== 'set' || !picked) return;
-        const next = new Date(remindAt);
-        next.setFullYear(picked.getFullYear(), picked.getMonth(), picked.getDate());
-        change(next);
-      },
-    });
+  const toggle = (which) => setPicker((current) => (current === which ? null : which));
 
-  const pickTime = () =>
-    openPicker({
-      mode: 'time',
-      value: remindAt,
-      onChange: (event, picked) => {
-        if (event.type !== 'set' || !picked) return;
-        const next = new Date(remindAt);
-        next.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
-        change(next);
-      },
-    });
+  // Under the chips: a nudge, or that the time has gone. An old reminder
+  // being renamed keeps its old time, which is not a mistake.
+  const past = remindAt.getTime() <= Date.now();
+  const whenHint =
+    timeError ||
+    (past
+      ? timeChanged
+        ? 'That time has already passed. Pick a later one.'
+        : 'Already rang. Pick a new time to ring again.'
+      : 'Tap the date or the time to set it exactly.');
+  const whenHintIsError = Boolean(timeError) || (past && timeChanged);
 
   const submit = async () => {
     if (title.trim().length < 2) {
@@ -221,14 +199,17 @@ const ReminderSheet = ({
       <View style={[sheetStyles.row, styles.whenRow]}>
         <View style={styles.half}>
           <Text style={sheetStyles.label}>Date</Text>
-          <View style={[sheetStyles.stepper, styles.stepperTight]}>
+          <View
+            style={[sheetStyles.stepper, styles.stepperTight, picker === 'date' && styles.stepperOpen]}
+          >
             <TouchableOpacity onPress={() => shiftDate(-1)} style={sheetStyles.stepButton}>
               <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
             </TouchableOpacity>
             <StepValue
               icon="calendar-outline"
               text={dateLabel(remindAt)}
-              onPress={canPick ? pickDate : undefined}
+              open={picker === 'date'}
+              onPress={() => toggle('date')}
             />
             <TouchableOpacity onPress={() => shiftDate(1)} style={sheetStyles.stepButton}>
               <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
@@ -238,14 +219,17 @@ const ReminderSheet = ({
 
         <View style={styles.half}>
           <Text style={sheetStyles.label}>Time</Text>
-          <View style={[sheetStyles.stepper, styles.stepperTight]}>
+          <View
+            style={[sheetStyles.stepper, styles.stepperTight, picker === 'time' && styles.stepperOpen]}
+          >
             <TouchableOpacity onPress={() => shiftTime(-30)} style={sheetStyles.stepButton}>
               <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
             </TouchableOpacity>
             <StepValue
               icon="time-outline"
               text={formatTime(remindAt)}
-              onPress={canPick ? pickTime : undefined}
+              open={picker === 'time'}
+              onPress={() => toggle('time')}
             />
             <TouchableOpacity onPress={() => shiftTime(30)} style={sheetStyles.stepButton}>
               <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
@@ -253,9 +237,15 @@ const ReminderSheet = ({
           </View>
         </View>
       </View>
-      <Text style={[styles.whenHint, timeError && styles.whenError]}>
-        {timeError || (canPick ? 'Tap the date or the time to set it exactly.' : ' ')}
-      </Text>
+
+      {picker === 'date' ? (
+        <CalendarPanel value={remindAt} onChange={change} onDone={() => setPicker(null)} />
+      ) : null}
+      {picker === 'time' ? (
+        <TimeWheel value={remindAt} onChange={change} onDone={() => setPicker(null)} />
+      ) : null}
+
+      <Text style={[styles.whenHint, whenHintIsError && styles.whenError]}>{whenHint}</Text>
 
       {personal ? null : (
         <>
@@ -333,7 +323,9 @@ const styles = StyleSheet.create({
   titleCheck: { position: 'absolute', right: spacing.md, top: 15 },
   half: { flex: 1 },
   stepperTight: { marginBottom: 0 },
-  whenRow: { marginBottom: spacing.xs + 2 },
+  stepperOpen: { borderColor: 'rgba(0,196,208,0.55)' },
+  stepCaret: { marginLeft: 2 },
+  whenRow: { marginBottom: spacing.sm },
   whenHint: { color: dark.textMuted, fontSize: 11, marginBottom: spacing.md },
   whenError: { color: DANGER },
 

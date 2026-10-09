@@ -60,8 +60,11 @@ const SelectField = ({
       )}
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={[styles.sheet, { paddingBottom: sheetBottom }]}>
+        <View style={styles.backdrop}>
+          {/* Behind the sheet, not around it: on Android a pressable ancestor
+              takes slow drags away from the list, leaving only flicks (see FormSheet). */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          <View style={[styles.sheet, { paddingBottom: sheetBottom }]}>
             {label ? <Text style={styles.sheetTitle}>{label}</Text> : null}
             {/* A long list (the 14 days of a trip) scrolls inside the sheet
                 rather than pushing its top off the screen. A short one stays
@@ -91,8 +94,8 @@ const SelectField = ({
                 );
               })}
             </ScrollView>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );

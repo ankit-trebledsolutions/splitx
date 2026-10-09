@@ -428,8 +428,11 @@ const GroupDetailScreen = ({ route, navigation }) => {
         animationType="fade"
         onRequestClose={() => setPickingAdmin(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => !leaving && setPickingAdmin(false)}>
-          <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
+        <View style={styles.backdrop}>
+          {/* Behind the sheet, not around it: on Android a pressable ancestor
+              takes slow drags away from the list, leaving only flicks (see FormSheet). */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !leaving && setPickingAdmin(false)} />
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
             <Text style={styles.sheetTitle}>Choose a new admin</Text>
             <Text style={styles.sheetHint}>
               You're the admin of "{group.name}". Pick who takes over before you leave.
@@ -481,8 +484,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
                 )}
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </DarkScreen>
   );

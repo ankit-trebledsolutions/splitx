@@ -33,12 +33,16 @@ const FormSheet = ({
   const sheetBottom = useSheetBottom(spacing.lg);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <View style={styles.backdrop}>
+        {/* Behind the sheet, so a tap outside closes it. Not around the sheet: on
+            Android a pressable ancestor takes slow drags away from the native
+            scroll views inside (the body, a date wheel), leaving only flicks. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.sheetWrap}
         >
-          <Pressable style={[styles.sheet, { paddingBottom: sheetBottom }]}>
+          <View style={[styles.sheet, { paddingBottom: sheetBottom }]}>
             <View style={styles.grabber} />
 
             <View style={styles.headerRow}>
@@ -60,9 +64,9 @@ const FormSheet = ({
             </ScrollView>
 
             <GradientButton title={submitLabel} onPress={onSubmit} loading={saving} style={styles.save} />
-          </Pressable>
+          </View>
         </KeyboardAvoidingView>
-      </Pressable>
+      </View>
     </Modal>
   );
 };
