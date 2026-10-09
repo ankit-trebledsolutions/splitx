@@ -109,7 +109,8 @@ Scan the QR code with Expo Go, or press `a` / `i` for an emulator/simulator.
 - **Reminders** — ring like an alarm at the exact time, with the app closed or
   the phone locked (Android; see "Reminder alarms" below). For the whole
   group, just me, or personal with no group; weekly repeat; each member can
-  switch a reminder off for themselves. All of mine are listed on the
+  switch a reminder off for themselves. The date comes from a calendar and the
+  time from slide wheels, like a phone's alarm clock. All of mine are listed on the
   Reminders screen (alarm icon on Home)
 - **Itinerary** — days with timed activities
 - **Gallery** — photo upload (multipart, 15 MB max) or emoji/colour tiles
