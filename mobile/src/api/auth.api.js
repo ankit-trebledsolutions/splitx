@@ -39,6 +39,12 @@ export const meRequest = async () => {
   return data.data;
 };
 
+// Saves the person's own profile fields: name, username, phone, bio. Returns { user }.
+export const updateMeRequest = async (patch) => {
+  const { data } = await client.patch('/auth/me', patch);
+  return data.data;
+};
+
 export const forgotPasswordRequest = async (email) => {
   const { data } = await client.post('/auth/forgot-password', { email });
   return data.data;

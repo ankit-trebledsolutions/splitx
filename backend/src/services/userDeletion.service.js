@@ -7,7 +7,6 @@ const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const DirectMessage = require('../models/DirectMessage');
 const Notification = require('../models/Notification');
-const SupportMessage = require('../models/SupportMessage');
 const Reminder = require('../models/Reminder');
 const Attraction = require('../models/Attraction');
 const Stay = require('../models/Stay');
@@ -16,6 +15,7 @@ const ItineraryJob = require('../models/ItineraryJob');
 const storage = require('../storage');
 const ApiError = require('../utils/ApiError');
 const groupDeletion = require('./groupDeletion.service');
+const supportService = require('./support.service');
 
 /**
  * Deleting a person, properly.
@@ -211,9 +211,10 @@ const deleteUser = async (userId) => {
     Message.updateMany({ readBy: userId }, { $pull: { readBy: userId } }),
     Message.updateMany({ sender: userId }, { $set: { sender: null } }),
     Message.updateMany({ assignees: userId }, { $pull: { assignees: userId } }),
-    // Rows that only concerned this person.
+    // Rows that only concerned this person. Support reports carry screenshots,
+    // so they go through storage as the photos above did.
     Notification.deleteMany({ user: userId }),
-    SupportMessage.deleteMany({ user: userId }),
+    supportService.removeForUser(userId),
   ]);
 
   await User.deleteOne({ _id: userId });

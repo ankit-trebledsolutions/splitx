@@ -44,14 +44,21 @@ const notifyGroup = async ({ groupId, actorId, type, title, body, amount = null,
  * groupId: pass it only when the person can still open that group, so tapping
  * the push lands there. Left out (as for a removal), no group is attached and
  * the tap opens the notification list instead of a group they've lost.
+ *
+ * entityId: what the notification is about when it is not a group — the
+ * support report an admin answered — so the tap can open that instead.
  */
-const notifyUser = async ({ userId, type, title, body, groupId = null }) => {
+const notifyUser = async ({ userId, type, title, body, groupId = null, entityId = null }) => {
   try {
-    await Notification.create({ user: userId, group: groupId, type, title, body });
+    await Notification.create({ user: userId, group: groupId, type, title, body, entityId });
     pushService.sendToUsers([userId], {
       title,
       body,
-      data: { type, ...(groupId ? { groupId: groupId.toString() } : {}) },
+      data: {
+        type,
+        ...(groupId ? { groupId: groupId.toString() } : {}),
+        ...(entityId ? { entityId: entityId.toString() } : {}),
+      },
     });
   } catch (err) {
     console.error('notifyUser failed:', err.message);

@@ -1,10 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   Image,
   ScrollView,
   TouchableOpacity,
+  Animated,
+  Easing,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -124,6 +126,41 @@ const UploadPhotosScreen = ({ route, navigation }) => {
   const totalProgress = files.length
     ? files.reduce((sum, f) => sum + (f.status === 'done' ? 1 : f.progress), 0) / files.length
     : 0;
+
+  // Picking files is not sending them, and the button that does sits at the
+  // bottom where it is easy to miss once the list fills the screen. So while
+  // something is ready and nothing is on its way, the button breathes: a
+  // slow pulse with a glow behind it, and a line above saying what is left to
+  // do. Still and plain again as soon as the upload starts.
+  const pulse = useRef(new Animated.Value(0)).current;
+  const needsPress = pending.length > 0 && !uploading;
+  useEffect(() => {
+    if (!needsPress) {
+      pulse.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [needsPress, pulse]);
+  const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.5] });
+  const haloScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const buttonScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] });
 
   const uploadAll = async () => {
     if (!pending.length) return;
@@ -272,11 +309,27 @@ const UploadPhotosScreen = ({ route, navigation }) => {
 
       {pending.length > 0 && (
         <View style={styles.footer}>
-          <GradientButton
-            title={`Upload ${pending.length} ${capitalised(kind.noun)}${pending.length === 1 ? '' : 's'}`}
-            onPress={uploadAll}
-            loading={uploading}
-          />
+          {needsPress && (
+            <Text style={styles.footerHint}>
+              {pending.length === 1
+                ? `Not uploaded yet. Tap the button to add this ${kind.noun}.`
+                : `Not uploaded yet. Tap the button to add these ${pending.length} ${kind.noun}s.`}
+            </Text>
+          )}
+          <View>
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.halo, { opacity: haloOpacity, transform: [{ scale: haloScale }] }]}
+            />
+            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+              <GradientButton
+                title={`Upload ${pending.length} ${capitalised(kind.noun)}${pending.length === 1 ? '' : 's'}`}
+                onPress={uploadAll}
+                loading={uploading}
+                glow={needsPress}
+              />
+            </Animated.View>
+          </View>
         </View>
       )}
     </DarkScreen>
@@ -407,6 +460,23 @@ const styles = StyleSheet.create({
     left: spacing.lg,
     right: spacing.lg,
     bottom: spacing.lg,
+  },
+  footerHint: {
+    color: dark.accentGreen,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  // Sits just outside the button and fades in and out behind it.
+  halo: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: -6,
+    borderRadius: radius.lg + 10,
+    backgroundColor: dark.accentGreen,
   },
 });
 

@@ -32,6 +32,7 @@ const TYPE_STYLE = {
   photo: { icon: 'images-outline', tint: '#2DD4BF' },
   attraction: { icon: 'compass-outline', tint: '#2DD4BF' },
   stay: { icon: 'bed-outline', tint: '#4A7DF7' },
+  support: { icon: 'chatbubble-ellipses-outline', tint: '#00C4D0' },
   system: { icon: 'sparkles-outline', tint: dark.textMuted },
 };
 

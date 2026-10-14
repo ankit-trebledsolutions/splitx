@@ -1,5 +1,6 @@
-import { Layout, LayoutGrid, Settings, Shield } from 'lucide-react';
+import { Layout, LayoutGrid, LifeBuoy, Settings, Shield } from 'lucide-react';
 import { PERMISSIONS, ROLES } from '@/lib/permissions';
+import { SupportMenuBadge } from '@/components/layouts/layout-1/components/support-menu-badge';
 
 // The live navigation. Only entries that lead to a routed page belong here —
 // the template shipped ~1,100 lines of demo entries pointing at pages this
@@ -40,6 +41,16 @@ export const MENU_SIDEBAR = [
         permission: PERMISSIONS.EMAIL_TEMPLATE,
       },
     ],
+  },
+  {
+    title: 'Support',
+    icon: LifeBuoy,
+    path: '/support',
+    permission: PERMISSIONS.SUPPORT,
+    // How many reports are waiting, drawn beside the title. Only entries the
+    // signed-in admin can use are rendered, so the count is only ever asked
+    // for by someone the server would answer.
+    badge: SupportMenuBadge,
   },
   {
     title: 'General Settings',

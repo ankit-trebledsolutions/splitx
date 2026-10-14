@@ -12,6 +12,7 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import EnterOtpScreen from '../screens/EnterOtpScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import PasswordChangedScreen from '../screens/PasswordChangedScreen';
+import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import MainTabs from './MainTabs';
 import GroupActionScreen from '../screens/GroupActionScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
@@ -33,6 +34,9 @@ import TaskDetailScreen from '../screens/TaskDetailScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import ContributionsScreen from '../screens/ContributionsScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
+import ReportProblemScreen from '../screens/ReportProblemScreen';
+import MyReportsScreen from '../screens/MyReportsScreen';
+import ReportDetailScreen from '../screens/ReportDetailScreen';
 import CallScreen from '../screens/CallScreen';
 import FaqScreen from '../screens/FaqScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -69,7 +73,16 @@ const RootNavigator = () => {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      {user ? (
+      {/* `=== false`, not falsy: a user saved on the phone before the server
+          sent this flag must not be held here while offline. The next answer
+          from the server refreshes it. */}
+      {user && user.profileComplete === false ? (
+        <Stack.Screen
+          name="CompleteProfile"
+          component={CompleteProfileScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+      ) : user ? (
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
@@ -180,6 +193,21 @@ const RootNavigator = () => {
           <Stack.Screen
             name="ContactUs"
             component={ContactUsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportProblem"
+            component={ReportProblemScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MyReports"
+            component={MyReportsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportDetail"
+            component={ReportDetailScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen name="Faq" component={FaqScreen} options={{ headerShown: false }} />

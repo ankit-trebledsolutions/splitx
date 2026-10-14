@@ -17,7 +17,7 @@ splitx/
 │       ├── config/        # env + database connection
 │       ├── models/        # User, Group, Expense, Task, Reminder, Message,
 │       │                  # ItineraryDay, Photo, Attraction, Stay,
-│       │                  # Notification, SupportMessage
+│       │                  # Notification, SupportReport
 │       ├── services/      # business logic (auth, groups, expenses, balances,
 │       │                  # contributions)
 │       ├── controllers/   # request/response handling
@@ -170,9 +170,10 @@ locked phone is unlocked first); no answer in 45 seconds, or the call ending
 first, leaves a "Missed group call" notification. The pieces:
 
 - `backend/src/services/callRing.service.js` — on the app's "call started" it
-  sends the ring: an ordinary push (title and body) to everyone in the group
-  except the caller and those who muted the group. "Call ended" sends a silent
-  push that stops phones still ringing. Both also go over the socket.
+  sends the ring: a silent, data-only push to everyone in the group except the
+  caller and those who muted the group (a push with a title would be shown by
+  Android itself, and the app would never hear of it). "Call ended" sends
+  another that stops phones still ringing. Both also go over the socket.
 - `mobile/modules/splix-alarm/` — the same native module as the alarms.
   `SplixMessagingService` stands in front of expo-notifications' push service:
   it takes the pushes about calls and hands every other push on untouched.
@@ -189,9 +190,10 @@ notifications. They are on the same sheet as the alarm permissions, shown the
 first time the app is opened and again when someone starts a call while one is
 missing. The microphone and camera are asked for when a call is joined.
 
-**iOS, and an Android build from before this,** have no part that takes the
-push, so there it is shown as the notification it looks like ("Asha started a
-group video call"); tapping it opens the group, where the call can be joined.
+**iOS, and an Android build from before this,** have no part that rings, so
+there `reminderPushTask.js` turns the push into an ordinary notification
+("Asha started a group video call"); tapping it opens the group, where the
+call can be joined.
 
 **New native code:** like the alarms, it needs a new build
 (`npx expo run:android`, or a new EAS build for testers), and the backend has
@@ -214,4 +216,4 @@ Base URL: `http://localhost:4000/api/v1` — all non-auth routes require
 | Groups | `/groups`, `/groups/join`, `/groups/:id`, `/groups/:id/leave`, `/groups/:id/balances`, `/groups/:id/contributions` |
 | Per-group resources | `/groups/:id/expenses`, `/messages`, `/tasks`, `/reminders`, `/itinerary`, `/photos` (+ `/photos/upload`), `/attractions`, `/stays` |
 | Items | `/expenses/:id` (+ `/settle`), `/tasks/:id`, `/reminders/:id`, `/itinerary-days/:id` (+ `/activities`), `/photos/:id`, `/attractions/:id` (+ `/toggle-save`), `/stays/:id` |
-| Other | `/notifications` (read/clear), `/support/contact`, `/health` |
+| Other | `/notifications` (read/clear), `/support/reports` (Report a Problem, My Reports), `/support/contact`, `/health` |

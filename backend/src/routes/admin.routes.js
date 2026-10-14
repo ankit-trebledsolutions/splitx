@@ -5,8 +5,10 @@ const controller = require('../controllers/admin.controller');
 const dashboard = require('../controllers/adminDashboard.controller');
 const emailTemplates = require('../controllers/emailTemplate.controller');
 const integrations = require('../controllers/integration.controller');
+const support = require('../controllers/adminSupport.controller');
 const { INTEGRATION_KEYS } = require('../integrations/definitions');
 const { TEMPLATE_KEYS } = require('../emails/defaults');
+const { CATEGORIES, STATUSES, PRIORITIES } = require('../models/SupportReport');
 const {
   adminProtect,
   requirePermission,
@@ -28,6 +30,8 @@ const canReadUsers = requirePermission(PERMISSIONS.USER_MANAGEMENT, ACCESS_LEVEL
 const canWriteUsers = requirePermission(PERMISSIONS.USER_MANAGEMENT, ACCESS_LEVEL.READ_WRITE);
 const canReadEmails = requirePermission(PERMISSIONS.EMAIL_TEMPLATE, ACCESS_LEVEL.READ);
 const canWriteEmails = requirePermission(PERMISSIONS.EMAIL_TEMPLATE, ACCESS_LEVEL.READ_WRITE);
+const canReadSupport = requirePermission(PERMISSIONS.SUPPORT, ACCESS_LEVEL.READ);
+const canWriteSupport = requirePermission(PERMISSIONS.SUPPORT, ACCESS_LEVEL.READ_WRITE);
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -127,6 +131,26 @@ const dashboardSchema = z.object({
     .refine((value) => [7, 30, 90].includes(value), 'days must be 7, 30 or 90')
     .default(30),
   tz: z.string().max(64).refine(isTimeZone, 'Unknown time zone').default('UTC'),
+});
+
+// The support queue: the usual page and search, narrowed by status and by
+// what kind of report it is. Both are the model's own lists, so a status that
+// does not exist is a 400 rather than an empty page.
+const supportQueueSchema = paginationSchema.omit({ role: true }).extend({
+  status: z.enum(STATUSES, { message: 'Unknown status' }).optional(),
+  category: z.enum(CATEGORIES, { message: 'Unknown category' }).optional(),
+});
+
+const reportParams = z.object({ id: objectId });
+
+// `internal` makes it a note between admins; the reporter is told nothing.
+const replySchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, 'Write something first')
+    .max(2000, 'A reply can be 2000 characters at most'),
+  internal: z.boolean().default(false),
 });
 
 // --- Sign in / sign out -----------------------------------------------------
@@ -323,6 +347,63 @@ router.post(
   requireSuperAdmin,
   validate({ params: integrationKey, body: z.object({ password: passwordConfirmed }) }),
   integrations.reset
+);
+
+// --- Support ----------------------------------------------------------------
+// Reports people send from the app. A module of its own in the permission
+// matrix: reading them shows what every reporter wrote, answering them speaks
+// for Splix, and neither follows from being allowed to manage users or emails.
+//
+// Nothing here deletes. A report is closed, which keeps what was said and
+// done; the rows go only when the account that sent them does.
+router.get('/support/summary', adminReadLimiter, canReadSupport, support.summary);
+
+router.get(
+  '/support/reports',
+  adminReadLimiter,
+  canReadSupport,
+  validate({ query: supportQueueSchema }),
+  support.list
+);
+
+router.get(
+  '/support/reports/:id',
+  adminReadLimiter,
+  canReadSupport,
+  validate({ params: reportParams }),
+  support.get
+);
+
+// Both name the state rather than toggling it, so a repeated request lands on
+// the same result and the reporter is told about a change once.
+router.patch(
+  '/support/reports/:id/status',
+  adminWriteLimiter,
+  canWriteSupport,
+  validate({
+    params: reportParams,
+    body: z.object({ status: z.enum(STATUSES, { message: 'Unknown status' }) }),
+  }),
+  support.setStatus
+);
+
+router.patch(
+  '/support/reports/:id/priority',
+  adminWriteLimiter,
+  canWriteSupport,
+  validate({
+    params: reportParams,
+    body: z.object({ priority: z.enum(PRIORITIES, { message: 'Unknown priority' }) }),
+  }),
+  support.setPriority
+);
+
+router.post(
+  '/support/reports/:id/replies',
+  adminWriteLimiter,
+  canWriteSupport,
+  validate({ params: reportParams, body: replySchema }),
+  support.reply
 );
 
 module.exports = router;

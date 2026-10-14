@@ -21,6 +21,8 @@ import EmailTemplate from '@/pages/layout-1/manage-cms/email-template/email-temp
 import EmailPage from '@/pages/layout-1/manage-cms/email-template/email-page';
 import GeneralSettings from '@/pages/layout-1/general-settings/general-settings';
 import ThirdPartyApis from '@/pages/layout-1/general-settings/third-party-apis/third-party-apis';
+import Support from '@/pages/layout-1/support/support';
+import ReportPage from '@/pages/layout-1/support/report-page';
 
 // The editing screen brings the whole rich-text editor with it, which is
 // larger than the rest of the panel put together. Loaded when it is opened, so
@@ -155,6 +157,21 @@ export function AppRoutingSetup() {
               }
             />
           </Route>
+        </Route>
+
+        {/* Reports people send from the app. Reading the queue needs the
+            module; answering is decided per report, by the page, and refused
+            by the server either way. */}
+        <Route
+          path="support"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SUPPORT}>
+              <Outlet />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Support />} />
+          <Route path=":id" element={<ReportPage />} />
         </Route>
 
         <Route

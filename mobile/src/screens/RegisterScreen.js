@@ -9,6 +9,7 @@ import AuthFooter from '../components/AuthFooter';
 import GoogleIcon from '../assets/google.svg';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+import { phoneError } from '../utils/profileValidation';
 
 const RegisterScreen = ({ navigation }) => {
   const { register, loginWithGoogle } = useAuth();
@@ -24,6 +25,11 @@ const RegisterScreen = ({ navigation }) => {
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password) {
       AppAlert.alert('Missing details', 'Please fill in all fields.');
+      return;
+    }
+    // Optional here; Complete Profile asks for it after sign-up if left blank.
+    if (phone.trim() && phoneError(phone)) {
+      AppAlert.alert('Invalid phone number', 'Please check the phone number, or leave it blank.');
       return;
     }
     if (password.length < 8) {
@@ -43,7 +49,7 @@ const RegisterScreen = ({ navigation }) => {
     }
     setLoading(true);
     try {
-      const sent = await register(name.trim(), email.trim(), password);
+      const sent = await register(name.trim(), email.trim(), password, phone.trim());
       navigation.navigate('EnterOtp', {
         email: sent.email,
         purpose: 'verify-email',

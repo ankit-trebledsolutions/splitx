@@ -42,6 +42,13 @@ export const helpSupport = [
     screen: 'Faq',
   },
   {
+    key: 'report',
+    icon: 'bug',
+    label: 'Report a Problem',
+    value: 'Bugs, ideas and account trouble',
+    screen: 'ReportProblem',
+  },
+  {
     key: 'contact',
     icon: 'mail',
     label: 'Contact Us',

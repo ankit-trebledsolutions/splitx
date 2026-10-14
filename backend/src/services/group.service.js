@@ -22,10 +22,37 @@ const createGroup = async (userId, { name, description, groupType, totalDays, st
   return group.populate('members', MEMBER_FIELDS);
 };
 
-const listGroupsForUser = (userId) =>
-  Group.find({ members: userId })
+/**
+ * Every group the user belongs to, newest activity first. Each one carries
+ * what the user still owes and is still owed in it (see outstandingShares),
+ * found with a single expense query across all of their groups, so the
+ * groups list can show a balance per group without a request per group.
+ */
+const listGroupsForUser = async (userId) => {
+  const groups = await Group.find({ members: userId })
     .populate('members', MEMBER_FIELDS)
     .sort({ updatedAt: -1 });
+  if (!groups.length) return [];
+
+  const expenses = await Expense.find({
+    group: { $in: groups.map((g) => g._id) },
+    'splits.settled': false,
+  })
+    .select('group paidBy splits')
+    .lean();
+
+  const byGroup = new Map();
+  for (const expense of expenses) {
+    const key = expense.group.toString();
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key).push(expense);
+  }
+
+  return groups.map((group) => ({
+    ...group.toJSON(),
+    balance: outstandingShares(byGroup.get(group._id.toString()) ?? [], userId),
+  }));
+};
 
 const getGroupForMember = async (groupId, userId) => {
   const group = await Group.findById(groupId).populate('members', MEMBER_FIELDS);
@@ -71,24 +98,40 @@ const joinGroupByCode = async (userId, inviteCode) => {
 
 const sameId = (a, b) => a.toString() === b.toString();
 
+const round2 = (n) => Math.round(n * 100) / 100;
+
 /**
- * What a member still owes, or is owed, in a group. Only unsettled shares
- * count, matching the totals the app shows on the Expenses tab.
+ * What a member still owes, and is still owed, across some expenses. Only
+ * unsettled shares count: their share of someone else's expense is money they
+ * owe, and another member's share of their expense is money owed to them.
+ * Their own share of their own expense is neither. This is the same rule the
+ * Home tab's net balance and the Expenses tab's tiles use.
  */
-const outstandingFor = async (groupId, userId) => {
-  const expenses = await Expense.find({ group: groupId, 'splits.settled': false })
-    .select('paidBy splits')
-    .lean();
-  let total = 0;
+const outstandingShares = (expenses, userId) => {
+  let youOwe = 0;
+  let owedToYou = 0;
   for (const expense of expenses) {
     const paid = sameId(expense.paidBy, userId);
     for (const split of expense.splits) {
       if (split.settled) continue;
       const mine = sameId(split.user, userId);
-      if ((paid && !mine) || (!paid && mine)) total += split.amount;
+      if (paid && !mine) owedToYou += split.amount;
+      else if (!paid && mine) youOwe += split.amount;
     }
   }
-  return Math.round(total * 100) / 100;
+  return { youOwe: round2(youOwe), owedToYou: round2(owedToYou), net: round2(owedToYou - youOwe) };
+};
+
+/**
+ * Everything a member still owes or is owed in a group, as one sum: the amount
+ * that has to reach zero before they can leave or be removed.
+ */
+const outstandingFor = async (groupId, userId) => {
+  const expenses = await Expense.find({ group: groupId, 'splits.settled': false })
+    .select('paidBy splits')
+    .lean();
+  const { youOwe, owedToYou } = outstandingShares(expenses, userId);
+  return round2(youOwe + owedToYou);
 };
 
 // Takes someone out of the group document and off its live chat room.
@@ -250,8 +293,6 @@ const getBalances = async (groupId, userId) => {
   return { balances: [...balances], settlements: balances.settlements };
 };
 
-const round2 = (n) => Math.round(n * 100) / 100;
-
 // Ignore net differences under this when deciding contribution badges.
 const MONEY_EPSILON = 5;
 
@@ -361,4 +402,5 @@ module.exports = {
   setMuted,
   getBalances,
   getContributions,
+  outstandingShares,
 };

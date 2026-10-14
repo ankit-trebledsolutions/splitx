@@ -82,6 +82,7 @@ Email sign-up is two steps: `register` creates an **unverified** account and ema
 | `name` | string | required, 2–60 chars |
 | `email` | string | required, valid email |
 | `password` | string | required, min 8 chars |
+| `phone` | string | optional, 7–15 digits; `+`, spaces, `-` and `()` allowed |
 
 Before anything is sent, the address is checked: common typos get a suggestion (`gmial.com` → "Did you mean …@gmail.com?"), throwaway inbox domains are refused, and the domain must be able to receive mail (DNS). All `400`.
 
@@ -125,6 +126,21 @@ Body: `{ "idToken" }`. Signs up or logs in with Google; the account is verified 
 ### `GET /auth/me` 🔒
 
 Returns the authenticated user: `{ "data": { "user": { ... } } }`
+
+Every user object the app gets about itself carries `username`, `phone`, `bio` and a computed `profileComplete` (true once both `username` and `phone` are set). The app keeps a new account on the Complete Profile screen until it is true. `phone` is never included when other users are shown.
+
+### `PATCH /auth/me` 🔒
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `name` | string | optional, 2–60 chars |
+| `username` | string | optional, 3–20 of `a-z 0-9 . _`; stored lowercase; unique |
+| `phone` | string | optional, same rules as at register |
+| `bio` | string | optional, up to 160 chars, `""` clears it |
+
+Only the fields sent change; anything else (email included) is a `400`. A username someone else holds answers `409`.
+
+**Response `200`:** `{ "data": { "user" } }`
 
 ### `GET /auth/invite-code` 🔒
 
@@ -241,7 +257,15 @@ Create a group. The creator becomes `createdBy` (the group admin) and the first 
 
 ### `GET /groups`
 
-List all groups the caller belongs to (members populated with `name`, `email`).
+List all groups the caller belongs to (members populated with `name`, `email`), newest activity first. Each group also carries the caller's outstanding money in it, so the Groups tab can show a balance per group:
+
+| `balance` field | Meaning |
+| --- | --- |
+| `youOwe` | the caller's unsettled shares of other members' expenses |
+| `owedToYou` | other members' unsettled shares of the caller's expenses |
+| `net` | `owedToYou - youOwe` |
+
+Only unsettled splits count, the same rule as the `balance` on `GET /home` and the Expenses tab's tiles. A group with no outstanding money has all three at `0`.
 
 ### `POST /groups/join`
 
@@ -615,14 +639,14 @@ Body: `{ "groupId": "<groupId>", "event": "started" | "ended", "video"?: true | 
 
 **`started` rings the group.** Everyone in it, except the caller and those who muted the group, gets:
 
-- a push, with a title and a body so that an iPhone or an older build shows it as it is: title = the group's name, body = "Asha started a group video call" (or "voice call", or just "call"), and
+- a silent, data-only push (a push with a title would be shown by Android itself and never reach the app):
 
-  `data: { type: "call", action: "ring", groupId, groupName, callerId, callerName, video: true | false | null, at }`
+  `data: { type: "call", action: "ring", groupId, groupName, callerId, callerName, video: true | false | null, text, at }`
 
-  `at` is the server's time in epoch milliseconds; with the group it names the ring. The push is given up on after 45 seconds (as long as a phone rings), so a phone that was out of reach does not ring for a call long over;
+  `text` is the sentence for a phone that cannot ring: "Asha started a group video call" (or "voice call", or just "call"). `at` is the server's time in epoch milliseconds; with the group it names the ring. The push is given up on after 45 seconds (as long as a phone rings), so a phone that was out of reach does not ring for a call long over;
 - the realtime event `call:ring` with the same `data`, which is quicker while the app is open. A phone that gets both rings once.
 
-An Android app that knows about calls takes the push before it is shown and rings like a phone call instead. A second `started` for the same group within 15 seconds is the same call and rings nobody again.
+An Android app that knows about calls rings like a phone call from it; an iPhone, or an older Android build, shows `text` as an ordinary notification instead (made by the app's background push task), which opens the group when tapped. A second `started` for the same group within 15 seconds is the same call and rings nobody again.
 
 **`ended` stops the ringing.** Every other member (muted or not) gets a silent push `data: { type: "call", action: "end", groupId, at }` and the realtime event `call:end` with the same `data`. A phone still ringing for that group stops and shows the call as missed; one that has not had the ring yet shows it as missed when it arrives.
 
@@ -922,7 +946,7 @@ Unregister this device (call on logout). Body: `{ "token": "ExponentPushToken[..
 
 ### `GET /notifications`
 
-The caller's notifications, newest first. Each carries `type`, `group` and, for `expense` and `task` notifications, `entityId` (the expense/task id), which is what the app uses to decide where a tap leads.
+The caller's notifications, newest first. Each carries `type`, `group` and, for `expense`, `task` and `support` notifications, `entityId` (the expense, task or support report id), which is what the app uses to decide where a tap leads.
 
 ### `PATCH /notifications/read-all`
 
@@ -944,18 +968,56 @@ Clear all.
 
 ## Support
 
+Reports people send from Profile › Help & Support: a bug, an idea, trouble with a payment or their account, a member they want to report, or just a message. Each has a `category`, a `status` the admin panel moves it through (`open`, `in_progress`, `resolved`, `closed`) and a timeline of `events`, oldest first. The app is sent events of kind `reply` (an admin's answer, in `body`) and `status` (a change, with the new `status`), each with `byName` and `createdAt`. Admin-only notes and the priority never leave the panel.
+
+Categories: `bug`, `feature`, `payment`, `account`, `abuse` (a member or group), `general`.
+
+### `POST /support/reports`
+
+Report a Problem. JSON, or `multipart/form-data` when screenshots come along.
+
+| Field | Type | Rules |
+| --- | --- | --- |
+| `category` | string | required, one of the categories above |
+| `subject` | string | required, 3–150 |
+| `message` | string | required, 10–2000 |
+| `platform`, `model`, `osVersion`, `appVersion`, `build` | string | optional, ≤40 each (`model` ≤60): what the phone says about itself |
+| `screenshots` | file | multipart only; up to 3 images of 10MB each |
+
+A person may send 10 reports in 24 hours; the next is `429` with code `SUPPORT_DAILY_CAP`. A fourth screenshot, or a file that is not an image, is `400` and nothing is stored.
+
+**Response `201`:** `{ "data": { "report": { "_id", "category", "subject", "message", "attachments": [{ "url", "thumbUrl", "mimeType", "size" }], "status": "open", "device": { "platform", "model", "osVersion", "appVersion", "build" }, "events": [], "createdAt", "updatedAt" } } }`
+
+### `GET /support/reports`
+
+The caller's own reports, newest first, at most 50: `{ "data": { "reports": [ ... ] } }`.
+
+### `GET /support/reports/:id`
+
+One of the caller's reports, with its events. `404` for anyone else's.
+
 ### `POST /support/contact`
 
-Create a support ticket.
+Contact Us: a report of category `general` with no screenshots, at the address older builds of the app use. Body `subject` (2–150) and `message` (5–2000), plus the phone fields above if the app has them; `name` and `email` are accepted and ignored.
 
-| Body field | Type | Rules |
-| --- | --- | --- |
-| `name` | string | required, 2–80 |
-| `email` | string | required, valid email, ≤120 |
-| `subject` | string | required, 2–150 |
-| `message` | string | required, 5–2000 |
+**Response `201`:** `{ "data": { "report": { ... } } }`
 
-**Response `201`:** `{ "data": { "ticket": { ... } } }`
+### What the reporter is told
+
+When an admin replies or changes the status, the reporter gets an in-app notification and a push of type `support` whose `entityId` is the report, so a tap opens it. Notes between admins and priority changes tell nobody.
+
+### Admin panel
+
+The queue lives under `/admin/support`, behind the panel's cookie session and the `support` permission module: read access to see, read-write to act. Nothing deletes a report; closing it keeps the record, and the rows go when the account that sent them is deleted.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/support/summary` | counts per status, plus `pending` (open + in progress) and `total` |
+| `GET /admin/support/reports` | the queue, newest first: `page`, `limit`, `search` (the title, or the reporter's name or email), `status`, `category` |
+| `GET /admin/support/reports/:id` | one report with its reporter, device, screenshots and full timeline |
+| `PATCH /admin/support/reports/:id/status` | `{ "status" }`; tells the reporter |
+| `PATCH /admin/support/reports/:id/priority` | `{ "priority": "low" / "normal" / "high" }`; tells nobody |
+| `POST /admin/support/reports/:id/replies` | `{ "body", "internal" }`; a reply tells the reporter and moves an `open` report to `in_progress`; an internal note is seen by admins only |
 
 ---
 

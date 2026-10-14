@@ -1150,7 +1150,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           style={styles.headerIcon}
           activeOpacity={0.7}
           onPress={() => {
-            join(groupId, { audioOnly: true });
+            join(groupId, { audioOnly: true, groupName: group?.name });
             navigation.navigate('Call');
           }}
         >
@@ -1160,7 +1160,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           style={styles.headerIcon}
           activeOpacity={0.7}
           onPress={() => {
-            join(groupId, { audioOnly: false });
+            join(groupId, { audioOnly: false, groupName: group?.name });
             navigation.navigate('Call');
           }}
         >
@@ -1183,7 +1183,7 @@ const GroupChatScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <CallBanner groupId={groupId} navigation={navigation} />
+      <CallBanner groupId={groupId} groupName={group?.name} navigation={navigation} />
 
       <AiItineraryBanner
         banner={ai.banner}

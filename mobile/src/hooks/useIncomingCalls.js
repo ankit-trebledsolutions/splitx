@@ -95,7 +95,11 @@ const useIncomingCalls = ({ userId, ready }) => {
       setAnswered(null);
       // The group's chat first, so that leaving the call lands there.
       navigation.navigate('GroupChat', { groupId: call.groupId });
-      join(call.groupId, { audioOnly: call.video !== true, answering: true });
+      join(call.groupId, {
+        audioOnly: call.video !== true,
+        answering: true,
+        groupName: call.groupName,
+      });
       navigation.navigate('Call');
     } else if (streamError) {
       forgetAcceptedCall();

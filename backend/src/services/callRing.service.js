@@ -9,12 +9,15 @@ const realtime = require('../realtime/socket');
  * one leaves (stream.controller); this turns those two moments into "ring" and
  * "stop ringing" on everyone else's phone.
  *
- * The ring goes out as an ordinary push, with a title and a body. An Android
- * app that knows about calls takes it before anything is shown and rings like
- * a phone call instead; an iPhone, or an older build, shows it as the
- * notification it looks like. The "stop" is a silent push: there is nothing to
- * show for it. Both also go over the socket, which is quicker while the app is
- * open; the phone ignores whichever of the two arrives second.
+ * Both go out as silent pushes, carrying only data. That is deliberate for the
+ * ring: a push with a title is shown by Android's own push library whenever
+ * the app is in the background, and the app never hears of it. A silent push
+ * is always handed to the app, whose native side then rings like a phone call
+ * (SplixMessagingService). An iPhone, or an older Android build, has no such
+ * side: there the app's background task turns the data into an ordinary
+ * notification, with the words sent in `text`. Both also go over the socket,
+ * which is quicker while the app is open; the phone ignores whichever of the
+ * two arrives second.
  */
 const TYPE = 'call';
 
@@ -80,15 +83,13 @@ const ring = async ({ group, caller, video, now = Date.now() }) => {
       callerId: idOf(caller),
       callerName: caller.name,
       video: kind,
+      // For a phone that cannot ring: the notification it shows instead.
+      text: `${caller.name} started a ${describe(kind)}`,
       at: now,
     };
 
     for (const userId of to) realtime.emitToUser(userId, 'call:ring', data);
-    await pushService.sendToUsers(
-      to,
-      { title: group.name, body: `${caller.name} started a ${describe(kind)}`, data },
-      { ttl: RING_SECONDS }
-    );
+    await pushService.sendToUsers(to, { data }, { silent: true, ttl: RING_SECONDS });
     return { to, data };
   } catch (err) {
     console.error('Call ring failed:', err.message);

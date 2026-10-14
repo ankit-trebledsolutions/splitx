@@ -6,6 +6,7 @@ import {
   StreamCall,
   CallContent,
   FloatingParticipantView,
+  useCallStateHooks,
 } from '@stream-io/video-react-native-sdk';
 import { useActiveCall } from '../context/ActiveCallProvider';
 import { dark, radius, spacing } from '../theme';
@@ -23,11 +24,26 @@ const SelfView = (props) => {
   );
 };
 
+// Until somebody else is in the call, the big view is the caller's own
+// camera (or their avatar on a voice call) and this says who is being rung.
+const Ringing = ({ groupName }) => {
+  const insets = useSafeAreaInsets();
+  const { useRemoteParticipants } = useCallStateHooks();
+  const others = useRemoteParticipants();
+  if (others.length > 0) return null;
+  return (
+    <View pointerEvents="none" style={[styles.ringing, { top: insets.top + spacing.xl + 44 }]}>
+      {groupName ? <Text style={styles.ringingName}>{groupName}</Text> : null}
+      <Text style={styles.ringingText}>Ringing…</Text>
+    </View>
+  );
+};
+
 // Full-screen view of the call the user is in. The call itself lives in
 // ActiveCallProvider, so leaving this screen (back / minimize) keeps the call
 // running and shows the minimized bar in the chat — only Hang up ends it.
 const CallScreen = ({ navigation }) => {
-  const { call, status, error, leave } = useActiveCall();
+  const { call, groupName, status, error, leave } = useActiveCall();
   const insets = useSafeAreaInsets();
 
   const hangup = async () => {
@@ -64,6 +80,7 @@ const CallScreen = ({ navigation }) => {
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <StreamCall call={call}>
         <CallContent onHangupCallHandler={hangup} FloatingParticipantView={SelfView} />
+        <Ringing groupName={groupName} />
         {/* Minimize: return to the chat while staying in the call. */}
         <TouchableOpacity
           style={styles.minimize}
@@ -79,6 +96,22 @@ const CallScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: dark.background },
+  ringing: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+  ringingName: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 8,
+  },
+  ringingText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 15,
+    marginTop: 6,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 8,
+  },
   minimize: {
     position: 'absolute',
     top: spacing.xl,

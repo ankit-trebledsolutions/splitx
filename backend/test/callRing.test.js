@@ -56,15 +56,18 @@ test('a call rings everyone in the group except the person who started it', asyn
     callerId: ASHA,
     callerName: 'Asha',
     video: true,
+    text: 'Asha started a group video call',
     at: NOW,
   };
   assert.deepEqual(sent.pushes, [
     {
       to: [BEN, CARA],
-      // A title and a body: an iPhone, or a build from before calls rang, shows this as it is.
-      message: { title: 'Tokyo Trip', body: 'Asha started a group video call', data },
+      // Data only: a push with a title would be shown by Android itself, with
+      // the app never hearing of it. The words are inside, for phones that
+      // cannot ring and show a notification instead.
+      message: { data },
       // Not worth delivering once the phone would have stopped ringing.
-      options: { ttl: callRing.RING_SECONDS },
+      options: { silent: true, ttl: callRing.RING_SECONDS },
     },
   ]);
   assert.deepEqual(sent.events, [
@@ -78,7 +81,7 @@ test('a muted group does not ring', async (t) => {
   await callRing.ring({ group: trip({ mutedBy: [CARA] }), caller: asha(), video: false, now: NOW });
 
   assert.deepEqual(sent.pushes[0].to, [BEN]);
-  assert.equal(sent.pushes[0].message.body, 'Asha started a group voice call');
+  assert.equal(sent.pushes[0].message.data.text, 'Asha started a group voice call');
   assert.deepEqual(sent.events.map((e) => e.to), [BEN]);
 });
 
@@ -87,7 +90,7 @@ test('an app from before calls rang does not say what kind of call it is', async
   await callRing.ring({ group: trip(), caller: asha(), now: NOW });
 
   assert.equal(sent.pushes[0].message.data.video, null);
-  assert.equal(sent.pushes[0].message.body, 'Asha started a group call');
+  assert.equal(sent.pushes[0].message.data.text, 'Asha started a group call');
 });
 
 test('two people starting the same call ring the others once', async (t) => {

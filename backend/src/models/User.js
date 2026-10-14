@@ -40,6 +40,21 @@ const userSchema = new mongoose.Schema(
     },
     googleId: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: null },
+    // Filled in on the Complete Profile screen right after sign-up. Username
+    // is stored lowercase so "Jane" and "jane" can't both exist; sparse so the
+    // accounts that haven't picked one yet don't clash on null. Phone is
+    // private: none of the member/sender field lists hand it to other users.
+    username: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 20,
+    },
+    phone: { type: String, trim: true, maxlength: 20 },
+    bio: { type: String, trim: true, maxlength: 160, default: '' },
     // Personal invite code shown on the Invite Friends screen, e.g. SPLIX-ALEX-482.
     // Created the first time it is asked for; sparse so users without one don't clash.
     inviteCode: { type: String, unique: true, sparse: true },
@@ -101,6 +116,8 @@ userSchema.methods.toJSON = function toJSON() {
   delete obj.otp;
   // Older accounts have no flag and are treated as verified everywhere.
   obj.emailVerified = obj.emailVerified !== false;
+  // The app holds new accounts on the Complete Profile screen until this is true.
+  obj.profileComplete = Boolean(obj.username && obj.phone);
   return obj;
 };
 

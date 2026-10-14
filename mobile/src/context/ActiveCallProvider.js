@@ -39,6 +39,8 @@ export const ActiveCallProvider = ({ children }) => {
 
   const [call, setCall] = useState(null);
   const [groupId, setGroupId] = useState(null);
+  // For the call screen while nobody else has joined yet.
+  const [groupName, setGroupName] = useState('');
   const [status, setStatus] = useState('idle'); // idle | joining | joined | error
   const [error, setError] = useState(null);
 
@@ -54,7 +56,7 @@ export const ActiveCallProvider = ({ children }) => {
    * joining would start a new call and ring the whole group again.
    */
   const join = useCallback(
-    async (targetGroupId, { audioOnly = false, answering = false } = {}) => {
+    async (targetGroupId, { audioOnly = false, answering = false, groupName: name = '' } = {}) => {
       if (!client) return;
       // Already in this group's call — just surface it, don't rejoin.
       if (call && groupId === targetGroupId) return;
@@ -62,6 +64,7 @@ export const ActiveCallProvider = ({ children }) => {
       setStatus('joining');
       setError(null);
       setGroupId(targetGroupId);
+      setGroupName(name);
       try {
         if (!answering) await askToRingOnce();
 
@@ -83,7 +86,11 @@ export const ActiveCallProvider = ({ children }) => {
         }
         if (answering && isFirst) throw new Error('This call has already ended.');
 
+        // Said outright rather than left to the call type's defaults: a video
+        // call starts with the camera on, so the caller sees themselves while
+        // the others are still being rung.
         if (audioOnly) await nextCall.camera.disable();
+        else await nextCall.camera.enable();
         await nextCall.join({ create: true });
 
         setCall(nextCall);
@@ -111,14 +118,15 @@ export const ActiveCallProvider = ({ children }) => {
     }
     setCall(null);
     setGroupId(null);
+    setGroupName('');
     setStatus('idle');
     setError(null);
     if (wasLast && gid) postCallEvent(gid, 'ended').catch(() => {});
   }, [call, groupId]);
 
   const value = useMemo(
-    () => ({ call, groupId, status, error, join, leave }),
-    [call, groupId, status, error, join, leave]
+    () => ({ call, groupId, groupName, status, error, join, leave }),
+    [call, groupId, groupName, status, error, join, leave]
   );
 
   return <ActiveCallContext.Provider value={value}>{children}</ActiveCallContext.Provider>;

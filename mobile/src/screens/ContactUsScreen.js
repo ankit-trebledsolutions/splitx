@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
 } from 'react-native';
@@ -17,35 +18,42 @@ import { sendSupportMessage } from '../api/support.api';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
 
-// Filled teal glyphs, matching the Profile settings icons.
+// The address Splix's own emails name as the one to write to.
+const SUPPORT_EMAIL = 'support@splix.app';
+
+// Filled teal glyphs, matching the Profile settings icons. The first two are
+// screens in the app; the last opens the phone's mail app.
 const CHANNELS = [
+  {
+    key: 'report',
+    icon: 'bug',
+    title: 'Report a Problem',
+    subtitle: 'Bugs, ideas and account trouble, with screenshots',
+    screen: 'ReportProblem',
+  },
+  {
+    key: 'reports',
+    icon: 'chatbubbles',
+    title: 'My Reports',
+    subtitle: 'Replies, and where each report stands',
+    screen: 'MyReports',
+  },
   {
     key: 'email',
     icon: 'mail',
-    tint: '#00C4D0',
-    title: 'Email Support',
-    subtitle: 'support@splix.app · Response within 2h',
-  },
-  {
-    key: 'chat',
-    icon: 'chatbubble-ellipses',
-    tint: '#00C4D0',
-    title: 'Live Chat',
-    subtitle: 'Average wait time: 2 mins',
-  },
-  {
-    key: 'phone',
-    icon: 'call',
-    tint: '#00C4D0',
-    title: 'Phone Support',
-    subtitle: '+1 (555) 019-2834 · 9 AM – 6 PM EST',
+    title: 'Email us',
+    subtitle: SUPPORT_EMAIL,
+    href: `mailto:${SUPPORT_EMAIL}`,
   },
 ];
 
+/**
+ * Contact Us: a plain message to the team. It lands in the same place as a
+ * report, so the reply comes back in the app under My Reports. The account is
+ * the sender; there is nothing to type in about who you are.
+ */
 const ContactUsScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const [name, setName] = useState(user?.name ?? '');
-  const [email, setEmail] = useState(user?.email ?? '');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
@@ -53,10 +61,20 @@ const ContactUsScreen = ({ navigation }) => {
 
   const clearError = (key) => setErrors((prev) => ({ ...prev, [key]: undefined }));
 
+  const open = async (channel) => {
+    if (channel.screen) {
+      navigation.navigate(channel.screen);
+      return;
+    }
+    try {
+      await Linking.openURL(channel.href);
+    } catch {
+      AppAlert.alert('No mail app', `Write to ${SUPPORT_EMAIL} from any email account.`);
+    }
+  };
+
   const submit = async () => {
     const nextErrors = {};
-    if (name.trim().length < 2) nextErrors.name = 'Enter your full name';
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) nextErrors.email = 'Enter a valid email';
     if (subject.trim().length < 2) nextErrors.subject = 'Add a short subject';
     if (message.trim().length < 5) nextErrors.message = 'Tell us a little more';
     if (Object.keys(nextErrors).length) {
@@ -66,15 +84,13 @@ const ContactUsScreen = ({ navigation }) => {
 
     setSending(true);
     try {
-      await sendSupportMessage({
-        name: name.trim(),
-        email: email.trim(),
-        subject: subject.trim(),
-        message: message.trim(),
-      });
+      await sendSupportMessage({ subject: subject.trim(), message: message.trim() });
       setSubject('');
       setMessage('');
-      AppAlert.alert('Message sent', "Thanks for reaching out — we'll get back to you shortly.");
+      AppAlert.alert('Message sent', "Thanks for reaching out. We'll reply here in the app.", [
+        { text: 'See my reports', onPress: () => navigation.replace('MyReports') },
+        { text: 'Done', style: 'cancel' },
+      ]);
     } catch (err) {
       AppAlert.alert('Could not send', err.message);
     } finally {
@@ -107,12 +123,10 @@ const ContactUsScreen = ({ navigation }) => {
                 key={channel.key}
                 style={[styles.channelRow, index > 0 && styles.channelDivider]}
                 activeOpacity={0.7}
-                onPress={() =>
-                  AppAlert.alert(channel.title, `${channel.subtitle}\n\nComing soon in-app.`)
-                }
+                onPress={() => open(channel)}
               >
-                <View style={[styles.channelIcon, { backgroundColor: `${channel.tint}1F` }]}>
-                  <Ionicons name={channel.icon} size={17} color={channel.tint} />
+                <View style={styles.channelIcon}>
+                  <Ionicons name={channel.icon} size={17} color={dark.accentGreen} />
                 </View>
                 <View style={styles.channelBody}>
                   <Text style={styles.channelTitle}>{channel.title}</Text>
@@ -125,30 +139,6 @@ const ContactUsScreen = ({ navigation }) => {
 
           <Text style={styles.sectionLabel}>Send us a message</Text>
 
-          <Text style={styles.fieldLabel}>Name</Text>
-          <TextField
-            value={name}
-            onChangeText={(text) => {
-              setName(text);
-              clearError('name');
-            }}
-            placeholder="Enter your full name"
-            error={errors.name}
-          />
-
-          <Text style={styles.fieldLabel}>Email Address</Text>
-          <TextField
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              clearError('email');
-            }}
-            placeholder="you@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={errors.email}
-          />
-
           <Text style={styles.fieldLabel}>Subject</Text>
           <TextField
             value={subject}
@@ -157,6 +147,7 @@ const ContactUsScreen = ({ navigation }) => {
               clearError('subject');
             }}
             placeholder="How can we help you?"
+            maxLength={150}
             error={errors.subject}
           />
 
@@ -167,13 +158,20 @@ const ContactUsScreen = ({ navigation }) => {
               setMessage(text);
               clearError('message');
             }}
-            placeholder="Describe your issue or feedback in detail..."
+            placeholder="Describe your question or feedback in detail..."
+            maxLength={2000}
             error={errors.message}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
             inputStyle={styles.messageInput}
           />
+
+          <Text style={styles.note}>
+            {user?.email
+              ? `Sent as ${user.email}. Replies come back here in the app, under My Reports.`
+              : 'Replies come back here in the app, under My Reports.'}
+          </Text>
 
           <GradientButton
             title="Send Message  ✈"
@@ -226,6 +224,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 11,
+    backgroundColor: 'rgba(0,196,208,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -236,7 +235,8 @@ const styles = StyleSheet.create({
 
   fieldLabel: { color: dark.textMuted, fontSize: 12, fontWeight: '600', marginBottom: spacing.sm },
   messageInput: { minHeight: 110, paddingTop: spacing.md - 2 },
-  sendButton: { marginTop: spacing.sm },
+  note: { color: dark.textMuted, fontSize: 12, lineHeight: 17, marginBottom: spacing.md },
+  sendButton: { marginTop: spacing.xs },
 });
 
 export default ContactUsScreen;

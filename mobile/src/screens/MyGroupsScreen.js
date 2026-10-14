@@ -15,9 +15,40 @@ import SearchField from '../components/SearchField';
 import AiItineraryModal from '../components/AiItineraryModal';
 import { fetchGroups } from '../api/groups.api';
 import { fetchItineraryGeneration } from '../api/itinerary.api';
-import { initials } from '../utils/format';
+import { initials, usd } from '../utils/format';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+
+// Matches the "You Owe" tile on the Expenses tab.
+const OWE_COLOR = '#F5883C';
+
+// What the user still owes, and is still owed, in one group. Both can be true
+// at once (they paid for one thing, someone else for another), so each gets
+// its own line. A group with nothing outstanding says so. The server sends
+// the balance with the group; until it does, the row keeps its arrow.
+const GroupBalance = ({ balance }) => {
+  if (!balance) return <Ionicons name="chevron-forward" size={18} color={dark.textMuted} />;
+  const youOwe = balance.youOwe ?? 0;
+  const owedToYou = balance.owedToYou ?? 0;
+  if (youOwe < 0.005 && owedToYou < 0.005) {
+    return <Text style={styles.settled}>Settled up</Text>;
+  }
+  return (
+    <View style={styles.balance}>
+      {youOwe >= 0.005 && (
+        <Text style={styles.balanceLine}>
+          You owe <Text style={[styles.balanceValue, { color: OWE_COLOR }]}>{usd(youOwe)}</Text>
+        </Text>
+      )}
+      {owedToYou >= 0.005 && (
+        <Text style={styles.balanceLine}>
+          You get{' '}
+          <Text style={[styles.balanceValue, { color: dark.accentGreen }]}>{usd(owedToYou)}</Text>
+        </Text>
+      )}
+    </View>
+  );
+};
 
 const MyGroupsScreen = ({ navigation, route }) => {
   const [groups, setGroups] = useState([]);
@@ -122,7 +153,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={18} color={dark.textMuted} />
+        <GroupBalance balance={item.balance} />
       </TouchableOpacity>
     );
   };
@@ -270,6 +301,10 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1 },
   cardTitle: { color: dark.text, fontSize: 16, fontWeight: '700' },
   cardSubtitle: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  balance: { alignItems: 'flex-end', marginLeft: spacing.sm },
+  balanceLine: { color: dark.textMuted, fontSize: 12, lineHeight: 18 },
+  balanceValue: { fontSize: 13, fontWeight: '700' },
+  settled: { color: dark.textMuted, fontSize: 12, marginLeft: spacing.sm },
   empty: { alignItems: 'center', paddingVertical: spacing.xl * 2 },
   emptyTitle: { color: dark.text, fontSize: 17, fontWeight: '700' },
   emptyBody: {

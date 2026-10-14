@@ -26,7 +26,9 @@ const errorHandler = (err, _req, res, _next) => {
         ? err.field === 'video'
           ? `That video is too large (max ${megabytes(MAX_VIDEO_BYTES)})`
           : `That file is too large (max ${megabytes(MAX_UPLOAD_BYTES)})`
-        : err.message;
+        : err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT'
+          ? 'Too many files, or a file in an unexpected field'
+          : err.message;
   } else if (err.code === 11000) {
     statusCode = 409;
     const field = Object.keys(err.keyValue || {})[0] || 'field';

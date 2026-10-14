@@ -32,6 +32,11 @@ const me = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: req.user } });
 });
 
+const updateMe = asyncHandler(async (req, res) => {
+  const user = await authService.updateProfile(req.user._id, req.body);
+  res.json({ success: true, data: { user } });
+});
+
 const inviteCode = asyncHandler(async (req, res) => {
   const data = await authService.getInviteCode(req.user._id);
   res.json({ success: true, data });
@@ -59,6 +64,7 @@ module.exports = {
   login,
   googleLogin,
   me,
+  updateMe,
   inviteCode,
   forgotPassword,
   verifyOtp,

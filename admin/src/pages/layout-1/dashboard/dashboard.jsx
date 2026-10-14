@@ -30,6 +30,7 @@ import BreakdownCard from './components/breakdown-card';
 import DashboardSkeleton from './components/dashboard-skeleton';
 import KpiTiles from './components/kpi-tiles';
 import RecentSignups from './components/recent-signups';
+import SupportStrip from './components/support-strip';
 import UsersOverview from './components/users-overview';
 
 const PERIODS = [7, 30, 90];
@@ -149,6 +150,12 @@ const Dashboard = () => {
           </ToggleGroup>
         </ToolbarActions>
       </Toolbar>
+
+      {/* Outside the figures' own loading and error states: what is waiting
+          in Support comes from its own request and is useful on its own. */}
+      <div className="mb-5 lg:mb-7.5 empty:hidden">
+        <SupportStrip />
+      </div>
 
       {shownError ? (
         <Alert variant="destructive" appearance="light" size="md">

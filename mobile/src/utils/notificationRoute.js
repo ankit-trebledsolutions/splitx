@@ -30,6 +30,8 @@ export const routeForNotification = (notification = {}) => {
   if (type === 'task' && entityId) return ['TaskDetail', { taskId: entityId }];
   // A reminder that was set for a task opens that task.
   if (type === 'reminder' && entityId) return ['TaskDetail', { taskId: entityId }];
+  // An admin answered, or moved on, a report the person sent: open it.
+  if (type === 'support' && entityId) return ['ReportDetail', { reportId: entityId }];
   if (groupId) return ['GroupChat', { groupId, initialTab: GROUP_TAB[type] ?? 'chat' }];
   // A personal reminder belongs to no group: it lives in the list of all of mine.
   if (type === 'reminder') return ['Reminders'];

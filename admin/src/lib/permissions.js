@@ -22,6 +22,8 @@ export const PERMISSIONS = {
   USER_MANAGEMENT: 'user_management',
   GENERAL_SETTINGS: 'general_settings',
   EMAIL_TEMPLATE: 'email_template',
+  // Reports people send from the app (Profile > Help & Support).
+  SUPPORT: 'support',
 };
 
 const ACCESS_WEIGHT = {

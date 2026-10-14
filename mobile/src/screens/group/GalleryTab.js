@@ -330,15 +330,15 @@ const GalleryTab = ({
         {imageUri && thumb ? (
           <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : imageUri ? (
-          // A video sent without a poster frame.
-          <Ionicons name="videocam" size={26} color={dark.textMuted} />
+          // A video sent without a poster frame: the play mark below says what it is.
+          null
         ) : (
           <Text style={styles.tileEmoji}>{item.emoji || '🖼️'}</Text>
         )}
 
         {video && (
           <View style={styles.playBadge} pointerEvents="none">
-            <Ionicons name="play" size={15} color="#FFFFFF" style={styles.playIcon} />
+            <Ionicons name="play" size={20} color="#FFFFFF" style={styles.playIcon} />
           </View>
         )}
         {video && item.durationMs ? (
@@ -723,12 +723,12 @@ const styles = StyleSheet.create({
   // Videos: a play mark in the middle and the length in the bottom-left corner.
   playBadge: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },

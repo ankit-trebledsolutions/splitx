@@ -9,6 +9,8 @@ import { emailTemplateApi } from '@/features/email-template/emailTemplateApi';
 import emailTemplateReducer from '@/features/email-template/emailTemplateSlice';
 import { integrationsApi } from '@/features/integrations/integrationsApi';
 import { dashboardApi } from '@/features/dashboard/dashboardApi';
+import { supportApi } from '@/features/support/supportApi';
+import supportReducer from '@/features/support/supportSlice';
 
 // Only the modules that are wired to the ported API are registered. The slices
 // for the not-yet-ported modules (category, carousels, the rest of general
@@ -21,12 +23,14 @@ export const store = configureStore({
     users: usersReducer,
     admins: adminsReducer,
     emailTemplate: emailTemplateReducer,
+    support: supportReducer,
     [authApi.reducerPath]: authApi.reducer,
     [usersApi.reducerPath]: usersApi.reducer,
     [coAdminsApi.reducerPath]: coAdminsApi.reducer,
     [emailTemplateApi.reducerPath]: emailTemplateApi.reducer,
     [integrationsApi.reducerPath]: integrationsApi.reducer,
     [dashboardApi.reducerPath]: dashboardApi.reducer,
+    [supportApi.reducerPath]: supportApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -36,5 +40,6 @@ export const store = configureStore({
       emailTemplateApi.middleware,
       integrationsApi.middleware,
       dashboardApi.middleware,
+      supportApi.middleware,
     ),
 });

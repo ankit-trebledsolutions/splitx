@@ -52,6 +52,13 @@ export const adminBaseQuery = async (args, api, extraOptions) => {
   return result;
 };
 
+// A stored file's address as the server saved it: absolute when it points at
+// a storage host, or /uploads/... and /media/... on the API, which the dev
+// server and the static host both pass through (see vite.config.js). Same
+// origin, so the panel's own URL base is the right one to put in front.
+export const fileUrl = (url) =>
+  !url ? '' : /^https?:\/\//i.test(url) ? url : `${API_URL}${url}`;
+
 // The API answers { success, data: {...} }. Slices care about the payload, so it
 // is unwrapped here rather than in every endpoint's transformResponse.
 export const unwrap = (response) => response?.data ?? response;

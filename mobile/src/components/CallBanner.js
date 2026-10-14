@@ -86,7 +86,7 @@ const MiniBar = ({ onReturn, onHangup }) => {
  * call it shows the minimized control bar; otherwise it watches the group's
  * Stream call and shows a "Join" banner whenever anyone else is in it.
  */
-const CallBanner = ({ groupId, navigation }) => {
+const CallBanner = ({ groupId, groupName, navigation }) => {
   const { client } = useStreamClient();
   const { call: activeCall, groupId: activeGroupId, status, join, leave } = useActiveCall();
   const inThisCall = status === 'joined' && activeGroupId === groupId && !!activeCall;
@@ -133,7 +133,7 @@ const CallBanner = ({ groupId, navigation }) => {
     <StreamCall call={watchCall}>
       <JoinBanner
         onJoin={() => {
-          join(groupId, { audioOnly: false });
+          join(groupId, { audioOnly: false, groupName });
           navigation.navigate('Call');
         }}
       />

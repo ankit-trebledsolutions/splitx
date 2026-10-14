@@ -15,44 +15,63 @@ import Avatar from '../components/Avatar';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import { useAuth } from '../context/AuthContext';
-import { profileDefaults } from '../data/profile';
+import {
+  BIO_MAX,
+  normalizeUsername,
+  usernameError,
+  phoneError,
+  nameError,
+  bioError,
+} from '../utils/profileValidation';
 import { dark, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
 
 const EditProfileScreen = ({ navigation }) => {
   const { user, updateProfile } = useAuth();
-  const profile = { ...profileDefaults, ...(user ?? {}) };
-
+  // The real saved values only: the design placeholders in data/profile must
+  // never be saved over someone's profile.
   const [form, setForm] = useState({
-    name: profile.name,
-    username: profile.username,
-    email: profile.email,
-    phone: profile.phone,
-    bio: profile.bio,
+    name: user?.name ?? '',
+    username: user?.username ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? '',
+    bio: user?.bio ?? '',
   });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const setField = (key) => (value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const save = () => {
-    const next = {};
-    if (form.name.trim().length < 2) next.name = 'Enter your full name';
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = 'Enter a valid email address';
-    if (Object.keys(next).length) {
+  const save = async () => {
+    const next = {
+      name: nameError(form.name),
+      username: usernameError(form.username),
+      phone: phoneError(form.phone),
+      bio: bioError(form.bio),
+    };
+    if (Object.values(next).some(Boolean)) {
       setErrors(next);
       return;
     }
-    updateProfile({
-      name: form.name.trim(),
-      username: form.username.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      bio: form.bio.trim(),
-    });
-    navigation.goBack();
+    setSaving(true);
+    try {
+      // Email is not sent: changing it would need the new address verified.
+      await updateProfile({
+        name: form.name.trim(),
+        username: normalizeUsername(form.username),
+        phone: form.phone.trim(),
+        bio: form.bio.trim(),
+      });
+      navigation.goBack();
+    } catch (err) {
+      if (err.status === 409) setErrors({ username: err.message });
+      else AppAlert.alert('Could not save profile', err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -102,6 +121,8 @@ const EditProfileScreen = ({ navigation }) => {
             placeholder="janedoe"
             autoCapitalize="none"
             autoCorrect={false}
+            maxLength={21}
+            error={errors.username}
           />
           <TextField
             label="Email"
@@ -110,7 +131,8 @@ const EditProfileScreen = ({ navigation }) => {
             placeholder="jane.doe@outlook.com"
             keyboardType="email-address"
             autoCapitalize="none"
-            error={errors.email}
+            editable={false}
+            inputStyle={styles.readOnly}
           />
           <TextField
             label="Phone Number"
@@ -118,18 +140,27 @@ const EditProfileScreen = ({ navigation }) => {
             onChangeText={setField('phone')}
             placeholder="+1 (555) 019-2834"
             keyboardType="phone-pad"
+            maxLength={20}
+            error={errors.phone}
           />
           <TextField
-            label="Bio"
+            label="Bio (optional)"
             value={form.bio}
             onChangeText={setField('bio')}
             placeholder="Tell your friends a little about yourself"
             multiline
+            maxLength={BIO_MAX}
             textAlignVertical="top"
             inputStyle={styles.bioInput}
+            error={errors.bio}
           />
 
-          <GradientButton title="Save Changes" onPress={save} style={styles.button} />
+          <GradientButton
+            title="Save Changes"
+            onPress={save}
+            loading={saving}
+            style={styles.button}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </DarkScreen>
@@ -162,6 +193,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   bioInput: { height: 110, paddingTop: spacing.md },
+  readOnly: { opacity: 0.6 },
   button: { marginTop: spacing.md },
 });
 

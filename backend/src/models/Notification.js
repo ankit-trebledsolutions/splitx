@@ -22,14 +22,18 @@ const notificationSchema = new mongoose.Schema(
         'photo',
         'attraction',
         'stay',
+        // An admin answered or moved on a report the person sent; entityId
+        // is the report, so a tap opens it.
+        'support',
         'system',
       ],
       default: 'system',
     },
     title: { type: String, required: true, trim: true, maxlength: 120 },
     body: { type: String, trim: true, maxlength: 300, default: '' },
-    // The expense or task this is about, so tapping the notification can open
-    // it. Null for types that simply open their group (photo, stay, ...).
+    // The expense, task or support report this is about, so tapping the
+    // notification can open it. Null for types that simply open their group
+    // (photo, stay, ...).
     entityId: { type: mongoose.Schema.Types.ObjectId, default: null },
     // Signed money amount for transaction rows ("-$45.00"); null otherwise.
     amount: { type: Number, default: null },

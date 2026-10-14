@@ -139,7 +139,7 @@ const completeLogin = async (user) => {
  * session is issued here; that only happens once the code is entered
  * (verifyEmail), which is what proves the address is real and theirs.
  */
-const register = async ({ name, email: rawEmail, password }) => {
+const register = async ({ name, email: rawEmail, password, phone }) => {
   const email = await assertUsableEmail(rawEmail);
 
   let user = await User.findOne({ email }).select('+otp');
@@ -153,9 +153,10 @@ const register = async ({ name, email: rawEmail, password }) => {
     // could block a stranger's email just by typing it in.
     user.name = name;
     user.password = password;
+    if (phone) user.phone = phone;
     await user.save();
   } else {
-    user = await User.create({ name, email, password, emailVerified: false });
+    user = await User.create({ name, email, password, phone, emailVerified: false });
   }
 
   const sent = await issueOtp(user, PURPOSE.VERIFY);
@@ -348,8 +349,39 @@ const getInviteCode = async (userId) => {
   throw new ApiError(503, 'Could not create an invite code. Please try again.');
 };
 
+/**
+ * The person's own profile edits: the Complete Profile screen after sign-up
+ * and Edit Profile later. Only the fields sent are changed. Email is not
+ * editable here, since changing it would need the address verified again.
+ */
+const updateProfile = async (userId, { name, username, phone, bio }) => {
+  const user = await User.findById(userId);
+  if (!user) throw ApiError.notFound('User not found');
+
+  if (username !== undefined && username !== user.username) {
+    const taken = await User.exists({ username, _id: { $ne: userId } });
+    if (taken) throw ApiError.conflict('That username is already taken');
+    user.username = username;
+  }
+  if (name !== undefined) user.name = name;
+  if (phone !== undefined) user.phone = phone;
+  if (bio !== undefined) user.bio = bio;
+
+  try {
+    // A Google account has no password and would fail full validation; the
+    // route's schema has already checked every field being written.
+    await user.save({ validateBeforeSave: false });
+  } catch (err) {
+    // Two people claiming the same name at the same moment: the index decides.
+    if (err.code === 11000) throw ApiError.conflict('That username is already taken');
+    throw err;
+  }
+  return user;
+};
+
 module.exports = {
   getInviteCode,
+  updateProfile,
   register,
   verifyEmail,
   resendCode,

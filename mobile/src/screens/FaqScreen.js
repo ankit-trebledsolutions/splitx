@@ -21,7 +21,13 @@ const FAQS = [
     id: 'contact-support',
     question: 'How do I contact support?',
     answer:
-      "You can get in touch with our live support team directly by clicking 'Contact Us' under the Support section or sending an email to support@splix.app.",
+      "Open Profile, then Help & Support. 'Contact Us' sends us a message, and 'Report a Problem' is the quickest way to tell us about a bug or an idea. Replies come back in the app under My Reports, and you get a notification when one arrives.",
+  },
+  {
+    id: 'report-problem',
+    question: 'How do I report a bug or suggest a feature?',
+    answer:
+      'Go to Profile, Help & Support, then Report a Problem. Pick what it is about, describe what happened and attach a screenshot if you can. Your app version goes along automatically, so we can try it on the same build.',
   },
   {
     id: 'payment-methods',

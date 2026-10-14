@@ -140,7 +140,15 @@ export function SidebarMenu() {
             className="flex items-center justify-between grow gap-2"
           >
             {item.icon && <item.icon data-slot="accordion-menu-icon" />}
-            <span data-slot="accordion-menu-title">{item.title}</span>
+            {/* With a badge the title takes the room between, so the badge
+                sits at the edge; without one the row is laid out as before. */}
+            <span
+              data-slot="accordion-menu-title"
+              className={item.badge ? 'grow' : undefined}
+            >
+              {item.title}
+            </span>
+            {item.badge ? <item.badge /> : null}
           </Link>
         </AccordionMenuItem>
       );

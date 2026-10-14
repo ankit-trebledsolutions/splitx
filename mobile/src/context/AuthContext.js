@@ -12,6 +12,7 @@ import {
   verifyEmailRequest,
   meRequest,
   googleLoginRequest,
+  updateMeRequest,
 } from '../api/auth.api';
 import { signInWithGoogle, signOutOfGoogle } from '../utils/googleSignIn';
 import { unregisterFromPush } from '../utils/pushNotifications';
@@ -135,8 +136,10 @@ export const AuthProvider = ({ children }) => {
 
   // Creates the account and emails a code. There is no session yet: that comes
   // from verifyEmail once the code is entered. Resolves to { email, retryAfter, devOtp? }.
+  // phone is optional; whatever is missing is asked for on Complete Profile.
   const register = useCallback(
-    (name, email, password) => registerRequest({ name, email, password }),
+    (name, email, password, phone) =>
+      registerRequest({ name, email, password, ...(phone ? { phone } : {}) }),
     []
   );
 
@@ -157,10 +160,15 @@ export const AuthProvider = ({ children }) => {
     setUser(googleUser);
   }, []);
 
-  // Local-only for now: there is no PATCH /auth/me endpoint yet, so edits live
-  // in memory and reset on the next session restore.
-  const updateProfile = useCallback((patch) => {
-    setUser((current) => ({ ...(current ?? {}), ...patch }));
+  // Saves to the server first and only then shows the change, so a refused
+  // username leaves the screen as it was. Throws the server's message.
+  const updateProfile = useCallback(async (patch) => {
+    const startedIn = epoch;
+    const { user: updated } = await updateMeRequest(patch);
+    // Signed out while the save was on its way: nobody to update.
+    if (startedIn !== epoch) return;
+    setUser(updated);
+    AsyncStorage.setItem(USER_KEY, JSON.stringify(updated)).catch(() => {});
   }, []);
 
   const logout = useCallback(async () => {
