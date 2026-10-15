@@ -3,7 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FormSheet, { sheetStyles } from './FormSheet';
 import TextField from './TextField';
-import { dark, spacing } from '../theme';
+import DateChip from './DateChip';
+import CalendarPanel from './CalendarPanel';
+import { dark } from '../theme';
 
 const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -23,7 +25,7 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
   const [guests, setGuests] = useState(2);
   const [pricePerNight, setPricePerNight] = useState('');
   const [amenities, setAmenities] = useState('');
-  const [stars, setStars] = useState(4);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -36,18 +38,10 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
     setGuests(2);
     setPricePerNight('');
     setAmenities('');
-    setStars(4);
+    setCalendarOpen(false);
     setError('');
     setSaving(false);
   }, [visible]);
-
-  const shiftCheckIn = (days) => {
-    setCheckIn((prev) => {
-      const next = new Date(prev);
-      next.setDate(next.getDate() + days);
-      return next;
-    });
-  };
 
   const checkOut = new Date(checkIn);
   checkOut.setDate(checkOut.getDate() + nights);
@@ -76,7 +70,6 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
           .map((a) => a.trim())
           .filter(Boolean)
           .slice(0, 12),
-        stars,
       });
     } finally {
       setSaving(false);
@@ -107,23 +100,27 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
       <Text style={sheetStyles.label}>Address</Text>
       <TextField value={address} onChangeText={setAddress} placeholder="e.g. 16-12 Kabukicho, Shinjuku" />
 
-      <View style={sheetStyles.row}>
-        <View style={styles.half}>
-          <Text style={sheetStyles.label}>Check-In</Text>
-          <View style={[sheetStyles.stepper, styles.stepperTight]}>
-            <TouchableOpacity onPress={() => shiftCheckIn(-1)} style={sheetStyles.stepButton}>
-              <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
-            </TouchableOpacity>
-            <View style={sheetStyles.stepValue}>
-              <Ionicons name="calendar-outline" size={14} color={dark.accentGreen} />
-              <Text style={sheetStyles.stepText}>{dateLabel(checkIn)}</Text>
-            </View>
-            <TouchableOpacity onPress={() => shiftCheckIn(1)} style={sheetStyles.stepButton}>
-              <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
+      {/* Rating and review come later, from the stay's card, once the group
+          has actually stayed there. */}
+      <Text style={sheetStyles.label}>Check-In</Text>
+      <DateChip
+        value={checkIn}
+        onChange={setCheckIn}
+        open={calendarOpen}
+        onToggle={() => setCalendarOpen((open) => !open)}
+        label={(date) => `${dateLabel(date)} · out ${dateLabel(checkOut)}`}
+        style={calendarOpen ? styles.stepperTight : null}
+      />
+      {calendarOpen ? (
+        <CalendarPanel
+          value={checkIn}
+          onChange={setCheckIn}
+          onDone={() => setCalendarOpen(false)}
+          allowPast
+        />
+      ) : null}
 
+      <View style={sheetStyles.row}>
         <View style={styles.half}>
           <Text style={sheetStyles.label}>Nights</Text>
           <View style={[sheetStyles.stepper, styles.stepperTight]}>
@@ -133,9 +130,10 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
             >
               <Ionicons name="remove" size={16} color={dark.textMuted} />
             </TouchableOpacity>
-            <Text style={sheetStyles.stepText}>
-              {nights} · out {dateLabel(checkOut)}
-            </Text>
+            <View style={sheetStyles.stepValue}>
+              <Ionicons name="moon-outline" size={14} color={dark.accentGreen} />
+              <Text style={sheetStyles.stepText}>{nights}</Text>
+            </View>
             <TouchableOpacity
               onPress={() => setNights((n) => Math.min(60, n + 1))}
               style={sheetStyles.stepButton}
@@ -144,9 +142,7 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
 
-      <View style={sheetStyles.row}>
         <View style={styles.half}>
           <Text style={sheetStyles.label}>Guests</Text>
           <View style={[sheetStyles.stepper, styles.stepperTight]}>
@@ -168,31 +164,15 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
             </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.half}>
-          <Text style={sheetStyles.label}>Price / Night ($)</Text>
-          <TextField
-            value={pricePerNight}
-            onChangeText={setPricePerNight}
-            placeholder="95"
-            keyboardType="decimal-pad"
-            style={styles.fieldTight}
-          />
-        </View>
       </View>
 
-      <Text style={sheetStyles.label}>Stars</Text>
-      <View style={styles.starRow}>
-        {[1, 2, 3, 4, 5].map((value) => (
-          <TouchableOpacity key={value} onPress={() => setStars(value)} activeOpacity={0.7}>
-            <Ionicons
-              name={value <= stars ? 'star' : 'star-outline'}
-              size={26}
-              color={value <= stars ? '#F5B342' : dark.textMuted}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Text style={sheetStyles.label}>Price / Night ($)</Text>
+      <TextField
+        value={pricePerNight}
+        onChangeText={setPricePerNight}
+        placeholder="95"
+        keyboardType="decimal-pad"
+      />
 
       <Text style={sheetStyles.label}>Amenities</Text>
       <TextField
@@ -206,9 +186,7 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
 
 const styles = StyleSheet.create({
   half: { flex: 1 },
-  fieldTight: { marginBottom: 0 },
   stepperTight: { marginBottom: 0 },
-  starRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
 });
 
 export default NewStaySheet;

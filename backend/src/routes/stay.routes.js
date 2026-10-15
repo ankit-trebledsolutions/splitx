@@ -15,6 +15,7 @@ const updateStaySchema = {
   body: z.object({
     name: z.string().min(1).max(120).optional(),
     stars: z.number().int().min(1).max(5).optional(),
+    review: z.string().max(500).optional(),
     status: z.enum(['pending', 'confirmed', 'cancelled']).optional(),
     checkIn: z.coerce.date().optional(),
     checkOut: z.coerce.date().optional(),

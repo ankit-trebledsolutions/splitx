@@ -17,6 +17,7 @@ const activitySchema = z.object({
   location: z.string().max(200).optional(),
   icon: z.string().max(40).optional(),
   note: z.string().max(300).optional(),
+  done: z.boolean().nullable().optional(),
 });
 
 const updateDaySchema = {
@@ -51,6 +52,8 @@ const updateActivitySchema = {
       location: z.string().max(200).optional(),
       icon: z.string().max(40).optional(),
       note: z.string().max(300).optional(),
+      // true = ticked off, false = did not happen, null = back to the clock.
+      done: z.boolean().nullable().optional(),
       targetDayId: objectId.optional(),
     })
     .refine((body) => Object.keys(body).length > 0, 'Nothing to update'),

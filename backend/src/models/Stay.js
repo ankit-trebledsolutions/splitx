@@ -10,7 +10,11 @@ const staySchema = new mongoose.Schema(
       index: true,
     },
     name: { type: String, required: true, trim: true, maxlength: 120 },
-    stars: { type: Number, min: 1, max: 5, default: 4 },
+    // The group's rating and note, added once they have stayed there. Empty
+    // until then: a stay is usually added before anyone has seen it.
+    stars: { type: Number, min: 1, max: 5, default: null },
+    review: { type: String, trim: true, maxlength: 500, default: '' },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'cancelled'],

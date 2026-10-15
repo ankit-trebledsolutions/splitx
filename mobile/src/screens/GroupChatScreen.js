@@ -15,6 +15,7 @@ import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
 import ReminderSheet from '../components/ReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
+import ReviewStaySheet from '../components/ReviewStaySheet';
 import ChatTab, { COMPOSER_HEIGHT, composerBottomPadding } from './group/ChatTab';
 import ExpensesTab from './group/ExpensesTab';
 import TasksTab from './group/TasksTab';
@@ -34,7 +35,7 @@ import { fetchGroup, fetchExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage, sendAttachment, deleteMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
 import { fetchReminders } from '../api/reminders.api';
-import { fetchItinerary, createItineraryDay } from '../api/itinerary.api';
+import { fetchItinerary, createItineraryDay, updateItineraryActivity } from '../api/itinerary.api';
 import { fetchPhotos, deletePhotos } from '../api/gallery.api';
 import {
   fetchAttractions,
@@ -153,6 +154,8 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [daySheetOpen, setDaySheetOpen] = useState(false);
   const [attractionSheetOpen, setAttractionSheetOpen] = useState(false);
   const [staySheetOpen, setStaySheetOpen] = useState(false);
+  // The stay whose rating sheet is open.
+  const [reviewingStay, setReviewingStay] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
   const [sheetSeed, setSheetSeed] = useState(null);
   const [savedTask, setSavedTask] = useState(null);
@@ -741,6 +744,31 @@ const GroupChatScreen = ({ route, navigation }) => {
     navigation.navigate('EditItineraryDay', { day, groupName: group?.name, adminId });
   };
 
+  // A tap on a stop of the itinerary: tick it off, or take the tick back
+  // (`done` true, false or null; see utils/itineraryProgress.js). Shown at
+  // once, then the server's copy of the day replaces the guess; a refusal
+  // puts the old mark back. 404/409 mean the itinerary moved under us (a
+  // deleted stop, an AI replan), and a refetch says more than an alert would.
+  const toggleActivityDone = async (dayId, activityId, done) => {
+    if (blockedByAi()) return;
+    const before = itineraryDays;
+    setItineraryDays((prev) =>
+      prev.map((d) =>
+        d._id !== dayId
+          ? d
+          : { ...d, activities: d.activities.map((a) => (a._id === activityId ? { ...a, done } : a)) }
+      )
+    );
+    try {
+      const { day } = await updateItineraryActivity(dayId, activityId, { done });
+      setItineraryDays((prev) => prev.map((d) => (d._id === day._id ? day : d)));
+    } catch (err) {
+      setItineraryDays(before);
+      if (err.status === 404 || err.status === 409) refreshItinerary();
+      else AppAlert.alert('Could not update the stop', err.message);
+    }
+  };
+
   // "Plan with AI" / "Replan with AI" in the + menu, the nudge's chip, and the
   // failed banner's "Try again": whether this replaces days is worked out
   // afresh each time, from the days on screen now.
@@ -939,6 +967,16 @@ const GroupChatScreen = ({ route, navigation }) => {
       await refreshMessages();
     } catch (err) {
       AppAlert.alert('Could not update stay', err.message);
+    }
+  };
+
+  const handleReviewStay = async (payload) => {
+    try {
+      const updated = await updateStay(reviewingStay._id, payload);
+      setReviewingStay(null);
+      setStays((prev) => prev.map((s) => (s._id === updated._id ? updated : s)));
+    } catch (err) {
+      AppAlert.alert('Could not save review', err.message);
     }
   };
 
@@ -1301,6 +1339,7 @@ const GroupChatScreen = ({ route, navigation }) => {
               loading={loading}
               onAddDay={openDaySheet}
               onEditDay={openEditDay}
+              onToggleDone={toggleActivityDone}
             />
           )}
         </View>
@@ -1337,6 +1376,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           organiserId={group?.admin ?? group?.createdBy?._id ?? group?.createdBy}
           onToggleStatus={handleToggleStayStatus}
           onDelete={handleDeleteStay}
+          onReview={setReviewingStay}
           focusId={focusIdFor('stays')}
           onFocusDone={clearFocus}
         />
@@ -1427,6 +1467,12 @@ const GroupChatScreen = ({ route, navigation }) => {
         visible={staySheetOpen}
         onClose={() => setStaySheetOpen(false)}
         onSubmit={handleAddStay}
+      />
+      <ReviewStaySheet
+        visible={Boolean(reviewingStay)}
+        stay={reviewingStay}
+        onClose={() => setReviewingStay(null)}
+        onSubmit={handleReviewStay}
       />
     </DarkScreen>
   );

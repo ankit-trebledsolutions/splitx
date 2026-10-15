@@ -5,7 +5,10 @@ const messageService = require('./message.service');
 const notificationService = require('./notification.service');
 
 const USER_FIELDS = 'name email';
-const POPULATE = [{ path: 'bookedBy', select: USER_FIELDS }];
+const POPULATE = [
+  { path: 'bookedBy', select: USER_FIELDS },
+  { path: 'reviewedBy', select: USER_FIELDS },
+];
 
 const assertDates = (checkIn, checkOut) => {
   if (new Date(checkOut) <= new Date(checkIn)) {
@@ -73,6 +76,7 @@ const updateStay = async (stayId, userId, payload) => {
   const fields = [
     'name',
     'stars',
+    'review',
     'status',
     'checkIn',
     'checkOut',
@@ -86,9 +90,11 @@ const updateStay = async (stayId, userId, payload) => {
     if (payload[field] !== undefined) stay[field] = payload[field];
   }
   assertDates(stay.checkIn, stay.checkOut);
+  if (payload.stars !== undefined || payload.review !== undefined) stay.reviewedBy = userId;
 
   const statusChanged = payload.status !== undefined;
   await stay.save();
+  await stay.populate(POPULATE);
 
   if (statusChanged) {
     await messageService.postSystem(stay.group, `${stay.name} is now ${stay.status}`);

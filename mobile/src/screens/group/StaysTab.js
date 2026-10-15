@@ -44,7 +44,18 @@ const nightsBetween = (checkIn, checkOut) =>
 // Booking cards with status gradients, per the Stays mockup. `focusId` is a
 // stay a chat card asked to show: the list scrolls to it and marks it, then
 // `onFocusDone` lets the parent forget the request.
-const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete, focusId, onFocusDone }) => {
+// `onReview` opens the rating sheet: stays are added unrated, and stars and a
+// review are given here afterwards.
+const StaysTab = ({
+  stays,
+  loading,
+  organiserId,
+  onToggleStatus,
+  onDelete,
+  onReview,
+  focusId,
+  onFocusDone,
+}) => {
   const { highlightId, listProps } = useListFocus({
     // Waits for the list itself: nothing to scroll while it is loading.
     items: loading ? [] : stays,
@@ -82,7 +93,6 @@ const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete, focus
               <Text style={styles.name} numberOfLines={2}>
                 {item.name}
               </Text>
-              <Text style={styles.stars}>{'★'.repeat(item.stars ?? 4)}</Text>
             </View>
             <TouchableOpacity
               style={[styles.statusChip, { backgroundColor: status.chipBg }]}
@@ -142,6 +152,41 @@ const StaysTab = ({ stays, loading, organiserId, onToggleStatus, onDelete, focus
               </View>
             )}
           </View>
+
+          {item.stars ? (
+            <TouchableOpacity
+              style={styles.reviewBox}
+              activeOpacity={0.8}
+              onPress={() => onReview?.(item)}
+            >
+              <View style={styles.reviewHead}>
+                <Text style={styles.stars}>
+                  {'★'.repeat(item.stars)}
+                  <Text style={styles.starsOff}>{'★'.repeat(5 - item.stars)}</Text>
+                </Text>
+                {item.reviewedBy?.name ? (
+                  <Text style={styles.reviewBy} numberOfLines={1}>
+                    {item.reviewedBy.name}
+                  </Text>
+                ) : null}
+                <Ionicons name="pencil" size={12} color={dark.textMuted} />
+              </View>
+              {item.review ? (
+                <Text style={styles.reviewText} numberOfLines={4}>
+                  {item.review}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.rateButton}
+              activeOpacity={0.8}
+              onPress={() => onReview?.(item)}
+            >
+              <Ionicons name="star-outline" size={14} color="#F5B342" />
+              <Text style={styles.rateText}>Rate & review</Text>
+            </TouchableOpacity>
+          )}
 
           {item.address ? (
             <View style={styles.addressRow}>
@@ -207,7 +252,6 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 21 },
   titleWrap: { flex: 1, marginRight: spacing.sm },
   name: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  stars: { color: '#F5B342', fontSize: 11, marginTop: 2, letterSpacing: 1.5 },
   statusChip: { borderRadius: 12, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 },
   statusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
 
@@ -261,6 +305,30 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   organiserText: { color: dark.textMuted, fontSize: 9, fontWeight: '700' },
+
+  reviewBox: {
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+  },
+  reviewHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stars: { color: '#F5B342', fontSize: 13, letterSpacing: 1.5 },
+  starsOff: { color: 'rgba(255,255,255,0.18)' },
+  reviewBy: { flex: 1, color: dark.textMuted, fontSize: 11 },
+  reviewText: { color: dark.text, fontSize: 12, lineHeight: 18, marginTop: spacing.xs },
+  rateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245,179,66,0.35)',
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+  },
+  rateText: { color: '#F5B342', fontSize: 12, fontWeight: '700' },
 
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
   addressText: { color: dark.textMuted, fontSize: 11, flex: 1 },

@@ -656,7 +656,9 @@ An Android app that knows about calls rings like a phone call from it; an iPhone
 
 An itinerary is a list of **days**, each holding an ordered list of **activities**. A day's `dayNumber` is its position in the trip calendar (day N falls on `startDate + N - 1`), so deleting a day leaves a free number that a later create can fill. Activities are kept sorted by `time`; an activity with an empty or unreadable time sorts last.
 
-Day object: `{ _id, group, dayNumber, title, date, activities: [{ _id, time, endTime, title, location, icon, note }], createdBy: { _id, name, email }, createdAt, updatedAt }`. Days planned by AI are ordinary days created by the member who asked for the plan; nothing marks them as AI.
+Day object: `{ _id, group, dayNumber, title, date, activities: [{ _id, time, endTime, title, location, icon, note, done }], createdBy: { _id, name, email }, createdAt, updatedAt }`. Days planned by AI are ordinary days created by the member who asked for the plan; nothing marks them as AI.
+
+**Progress.** An activity's `done` is its progress mark on the trip roadmap: `null` (the default) means the app follows the clock and shows the activity as done once its time has passed on the day's date; `true` means a member ticked it off; `false` means a member said it did not happen even though its time has passed. The server only stores the mark; what counts as "done" or "current" is worked out in the app, from the day's `date` and the activity's `time`/`endTime`.
 
 Every write below (create, update, delete, the activity endpoints, and an AI plan being saved or rolled back) emits the realtime event `itinerary:updated` to the group. While AI is planning a group's itinerary, every write answers `409` with code `AI_GENERATING` ("AI is planning this itinerary. Try again in a moment.").
 
@@ -690,13 +692,13 @@ Create-day body:
 | `dayNumber` | int | optional, 1–365. Omitted: one more than the highest existing number. Given: that exact number, which is how the app fills the gap a deleted day left. `409` "Day N already exists" when it is taken |
 | `activities` | Activity[] | optional |
 
-Activity object: `{ time?, endTime?, title (required, ≤200), location?, icon?, note? }`
+Activity object: `{ time?, endTime?, title (required, ≤200), location?, icon?, note?, done? (boolean | null) }`
 
 Creating a day also posts "X added Day N · Title to the itinerary" in the group chat and notifies the other members ("Itinerary Updated", push `data: { type: "itinerary", groupId }`).
 
 ### `PATCH /itinerary-days/:dayId`
 
-Update `title`, `date`, and/or replace `activities`. Each activity may carry its `_id`: an `_id` that belongs to this day is kept across the save, any other `_id` is ignored and the activity gets a new one. `dayNumber` cannot be changed.
+Update `title`, `date`, and/or replace `activities`. Each activity may carry its `_id`: an `_id` that belongs to this day is kept across the save, any other `_id` is ignored and the activity gets a new one. A kept activity also keeps its `done` mark unless the payload sets one. `dayNumber` cannot be changed.
 
 ### `DELETE /itinerary-days/:dayId`
 
@@ -717,6 +719,7 @@ Edits one activity in place, and optionally moves it to another day. Any group m
 | `location` | string | optional, ≤200. An empty string clears it |
 | `icon` | string | optional Ionicons name, ≤40 |
 | `note` | string | optional, ≤300. An empty string clears it |
+| `done` | boolean \| null | optional. `true` ticks the activity off, `false` marks it as not done although its time has passed, `null` hands it back to the clock (see Progress above) |
 | `targetDayId` | ObjectId | optional. A day of the same group to move the activity to; it keeps its `_id` |
 
 At least one field is required (`400` "Nothing to update"). Both days are re-sorted by time.

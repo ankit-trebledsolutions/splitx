@@ -21,6 +21,10 @@ const itineraryDaySchema = new mongoose.Schema(
         // Ionicons name for the activity row glyph.
         icon: { type: String, trim: true, maxlength: 40, default: 'location-outline' },
         note: { type: String, trim: true, maxlength: 300, default: '' },
+        // Progress mark. null = follow the clock (done once its time has
+        // passed), true = ticked off by a member, false = a member said it
+        // did not happen even though its time has passed.
+        done: { type: Boolean, default: null },
       },
     ],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

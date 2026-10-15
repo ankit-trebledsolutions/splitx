@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import TextField from './TextField';
 import GradientButton from './GradientButton';
 import Avatar from './Avatar';
+import CalendarPanel from './CalendarPanel';
 import useSheetBottom from '../hooks/useSheetBottom';
 import { dark, radius, spacing } from '../theme';
 import { formatTime } from '../utils/format';
@@ -45,6 +46,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
   const [priority, setPriority] = useState('high');
   const [assignees, setAssignees] = useState([]);
   const [dueAt, setDueAt] = useState(defaultDueAt);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const sheetBottom = useSheetBottom(spacing.lg);
@@ -56,6 +58,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
     setPriority('high');
     setAssignees([]);
     setDueAt(defaultDueAt());
+    setCalendarOpen(false);
     setError('');
     setSaving(false);
   }, [visible, suggestion]);
@@ -213,10 +216,19 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
                     <TouchableOpacity onPress={() => shiftDate(-1)} style={styles.stepButton}>
                       <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
                     </TouchableOpacity>
-                    <View style={styles.stepValue}>
+                    <TouchableOpacity
+                      style={styles.stepValue}
+                      onPress={() => setCalendarOpen((open) => !open)}
+                      activeOpacity={0.7}
+                    >
                       <Ionicons name="calendar-outline" size={14} color={dark.accentGreen} />
                       <Text style={styles.stepText}>{dateLabel(dueAt)}</Text>
-                    </View>
+                      <Ionicons
+                        name={calendarOpen ? 'chevron-up' : 'chevron-down'}
+                        size={12}
+                        color={dark.textMuted}
+                      />
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => shiftDate(1)} style={styles.stepButton}>
                       <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
                     </TouchableOpacity>
@@ -239,6 +251,14 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
                   </View>
                 </View>
               </View>
+
+              {calendarOpen ? (
+                <CalendarPanel
+                  value={dueAt}
+                  onChange={setDueAt}
+                  onDone={() => setCalendarOpen(false)}
+                />
+              ) : null}
             </ScrollView>
 
             <GradientButton

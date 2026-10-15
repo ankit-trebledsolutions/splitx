@@ -1,6 +1,7 @@
 const ItineraryDay = require('../models/ItineraryDay');
 const ApiError = require('../utils/ApiError');
 const { sortByTime } = require('../utils/itineraryTime');
+const { reconcileActivities } = require('../utils/itineraryActivities');
 // Called as realtime.emitToGroup(...), never destructured, so tests can swap the function.
 const realtime = require('../realtime/socket');
 const groupService = require('./group.service');
@@ -91,18 +92,9 @@ const updateDay = async (dayId, userId, payload) => {
     if (payload[field] !== undefined) day[field] = payload[field];
   }
   if (payload.activities !== undefined) {
-    // An activity keeps its _id across a save only when that id really is one
-    // of this day's (and is sent once). Anything else gets a fresh id, so a
-    // client can never plant an id of its choosing.
-    const kept = new Set();
-    day.activities = sortByTime(
-      payload.activities.map(({ _id, ...activity }) => {
-        const id = _id?.toLowerCase();
-        if (!id || kept.has(id) || !day.activities.id(id)) return activity;
-        kept.add(id);
-        return { _id: id, ...activity };
-      })
-    );
+    // Which rows stay the same activity (and keep their done mark) is the
+    // helper's rule; see utils/itineraryActivities.js.
+    day.activities = sortByTime(reconcileActivities(day.activities, payload.activities));
   }
   await day.save();
   announceChange(day.group);

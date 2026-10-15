@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Text } from 'react-native';
 import FormSheet, { sheetStyles } from './FormSheet';
 import TextField from './TextField';
-import { dark } from '../theme';
+import DateChip from './DateChip';
+import CalendarPanel from './CalendarPanel';
 
 const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -23,6 +23,7 @@ const atNoon = (value) => {
 const NewItineraryDaySheet = ({ visible, nextDayNumber = 1, defaultDate, onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(() => atNoon(defaultDate));
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -33,17 +34,10 @@ const NewItineraryDaySheet = ({ visible, nextDayNumber = 1, defaultDate, onClose
     if (!visible) return;
     setTitle('');
     setDate(atNoon(defaultDate));
+    setCalendarOpen(false);
     setError('');
     setSaving(false);
   }, [visible]);
-
-  const shiftDate = (days) => {
-    setDate((prev) => {
-      const next = new Date(prev);
-      next.setDate(next.getDate() + days);
-      return next;
-    });
-  };
 
   const submit = async () => {
     if (title.trim().length < 2) {
@@ -80,18 +74,21 @@ const NewItineraryDaySheet = ({ visible, nextDayNumber = 1, defaultDate, onClose
       />
 
       <Text style={sheetStyles.label}>Date</Text>
-      <View style={sheetStyles.stepper}>
-        <TouchableOpacity onPress={() => shiftDate(-1)} style={sheetStyles.stepButton}>
-          <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
-        </TouchableOpacity>
-        <View style={sheetStyles.stepValue}>
-          <Ionicons name="calendar-outline" size={14} color={dark.accentGreen} />
-          <Text style={sheetStyles.stepText}>{dateLabel(date)}</Text>
-        </View>
-        <TouchableOpacity onPress={() => shiftDate(1)} style={sheetStyles.stepButton}>
-          <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
-        </TouchableOpacity>
-      </View>
+      <DateChip
+        value={date}
+        onChange={setDate}
+        open={calendarOpen}
+        onToggle={() => setCalendarOpen((open) => !open)}
+        label={dateLabel}
+      />
+      {calendarOpen ? (
+        <CalendarPanel
+          value={date}
+          onChange={setDate}
+          onDone={() => setCalendarOpen(false)}
+          allowPast
+        />
+      ) : null}
     </FormSheet>
   );
 };
