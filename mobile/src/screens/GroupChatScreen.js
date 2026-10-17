@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
@@ -48,6 +48,9 @@ import { detectTask } from '../utils/taskDetect';
 import { AI_ALERTS, replaceConfirmMessage } from '../constants/aiItineraryOptions';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+import { useTour } from '../tour/TourProvider';
+import useTourTarget, { measureView } from '../tour/useTourTarget';
+import { CHAPTERS, extraTabsFor } from '../tour/steps';
 
 const TABS = [
   { key: 'chat', label: 'Chat', icon: 'chatbubble-outline' },
@@ -125,6 +128,17 @@ const GroupChatScreen = ({ route, navigation }) => {
 
   const [tab, setTab] = useState(initialTab ?? 'chat');
   const [group, setGroup] = useState(null);
+
+  // Guided tour: whether this screen is the one on top, the + button, and the
+  // pieces of the tab strip it points at (see the tour effects further down).
+  const isFocused = useIsFocused();
+  const tour = useTour();
+  const fabRef = useTourTarget('group-fab', { enabled: isFocused });
+  const stripFrameRef = useRef(null);
+  const stripRef = useRef(null);
+  const stripViewport = useRef(0);
+  const chipRefs = useRef({});
+  const chipLayouts = useRef({});
   const [messages, setMessages] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -1098,6 +1112,71 @@ const GroupChatScreen = ({ route, navigation }) => {
   const tripTabsHidden = Boolean(groupType) && groupType !== 'trip';
   const tabs = tripTabsHidden ? TABS_WITHOUT_TRIP : TABS;
 
+  // --- Guided tour -------------------------------------------------------
+  // The tabs chapter runs the first time a group is opened: once the group is
+  // known (so the right tabs are up) and its data has landed.
+  const { ready: tourReady, isDone: tourDone, start: startTour, registerTarget } = tour;
+  useEffect(() => {
+    if (loading || !group || !isFocused || !tourReady || tourDone(CHAPTERS.GROUP)) {
+      return undefined;
+    }
+    const timer = setTimeout(
+      () => startTour(CHAPTERS.GROUP, { isTrip: !tripTabsHidden }),
+      500
+    );
+    return () => clearTimeout(timer);
+  }, [loading, group, isFocused, tourReady, tourDone, startTour, tripTabsHidden]);
+
+  // While the tour describes a tab, that tab is the one showing.
+  const tourTab = tour.active?.chapter === CHAPTERS.GROUP ? tour.active.step.tab : null;
+  useEffect(() => {
+    if (tourTab) setTab(tourTab);
+  }, [tourTab]);
+
+  // What the tour can point at here: each tab, the run of extra tabs described
+  // together, and the + button (fabRef). A tab is scrolled into view before it
+  // is measured. Only while this screen is the one on top.
+  const tabKeys = useMemo(() => tabs.map((item) => item.key), [tabs]);
+  useEffect(() => {
+    if (!isFocused) return undefined;
+    const showChip = (key) => {
+      const layout = chipLayouts.current[key];
+      if (!layout) return;
+      // Its right edge in view, with a little room; the first tabs land at 0.
+      const x = layout.x + layout.width + spacing.sm - stripViewport.current;
+      stripRef.current?.scrollTo({ x: Math.max(0, x), animated: false });
+    };
+    const off = tabKeys.map((key) =>
+      registerTarget(`group-tab-${key}`, {
+        prepare: () => showChip(key),
+        measure: () => measureView(chipRefs.current[key]),
+      })
+    );
+    const extra = extraTabsFor(!tripTabsHidden).filter((key) => tabKeys.includes(key));
+    off.push(
+      registerTarget('group-tabs-more', {
+        prepare: () => stripRef.current?.scrollToEnd({ animated: false }),
+        measure: async () => {
+          const rects = (
+            await Promise.all(extra.map((key) => measureView(chipRefs.current[key])))
+          ).filter(Boolean);
+          const bar = await measureView(stripFrameRef.current);
+          if (!rects.length || !bar) return null;
+          // One box around them all, kept inside the strip's viewport: a tab
+          // still partly scrolled off must not open a hole over the padding.
+          const left = Math.max(Math.min(...rects.map((r) => r.x)), bar.x + spacing.md);
+          const right = Math.min(
+            Math.max(...rects.map((r) => r.x + r.width)),
+            bar.x + bar.width - spacing.md
+          );
+          if (right <= left) return null;
+          return { x: left, y: rects[0].y, width: right - left, height: rects[0].height };
+        },
+      })
+    );
+    return () => off.forEach((unregister) => unregister());
+  }, [isFocused, registerTarget, tabKeys, tripTabsHidden]);
+
   // A notification, a deep link or an older screen can still ask for a tab
   // this group does not have. Chat is where it lands instead.
   useEffect(() => {
@@ -1232,13 +1311,26 @@ const GroupChatScreen = ({ route, navigation }) => {
         onDismiss={ai.dismiss}
       />
 
-      <View style={styles.tabBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View ref={stripFrameRef} style={styles.tabBar}>
+        <ScrollView
+          ref={stripRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          onLayout={(e) => {
+            stripViewport.current = e.nativeEvent.layout.width;
+          }}
+        >
           {tabs.map((item) => {
             const active = tab === item.key;
             return (
               <TouchableOpacity
                 key={item.key}
+                ref={(node) => {
+                  chipRefs.current[item.key] = node;
+                }}
+                onLayout={(e) => {
+                  chipLayouts.current[item.key] = e.nativeEvent.layout;
+                }}
                 style={[styles.tab, active && styles.tabActive]}
                 onPress={() => setTab(item.key)}
                 activeOpacity={0.8}
@@ -1419,7 +1511,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          <TouchableOpacity style={styles.fab} activeOpacity={0.9} onPress={pressFab}>
+          <TouchableOpacity ref={fabRef} style={styles.fab} activeOpacity={0.9} onPress={pressFab}>
             <LinearGradient
               colors={dark.gradient}
               start={{ x: 0, y: 0 }}

@@ -35,6 +35,14 @@ export const accountSettings = [
 
 export const helpSupport = [
   {
+    // Replays the guided tour (handled in ProfileScreen, not a screen of its own).
+    key: 'tour',
+    icon: 'compass',
+    label: 'App tour',
+    value: 'See how Splix works, again',
+    action: 'tour',
+  },
+  {
     key: 'faq',
     icon: 'help-circle',
     label: 'FAQ',

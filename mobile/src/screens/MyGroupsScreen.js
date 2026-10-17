@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import SearchField from '../components/SearchField';
 import AiItineraryModal from '../components/AiItineraryModal';
@@ -18,6 +18,8 @@ import { fetchItineraryGeneration } from '../api/itinerary.api';
 import { initials, usd } from '../utils/format';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+import { useTour } from '../tour/TourProvider';
+import useTourTarget from '../tour/useTourTarget';
 
 // Matches the "You Owe" tile on the Expenses tab.
 const OWE_COLOR = '#F5883C';
@@ -55,6 +57,12 @@ const MyGroupsScreen = ({ navigation, route }) => {
   const [query, setQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [itineraryFor, setItineraryFor] = useState(null);
+
+  // The + button is a stop on the welcome tour, which waits for it while
+  // another screen covers this one.
+  const isFocused = useIsFocused();
+  const { notifyTap } = useTour();
+  const fabRef = useTourTarget('groups-fab', { enabled: isFocused });
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -218,9 +226,13 @@ const MyGroupsScreen = ({ navigation, route }) => {
       </View>
 
       <TouchableOpacity
+        ref={fabRef}
         style={styles.fab}
         activeOpacity={0.9}
-        onPress={() => navigation.navigate('GroupAction')}
+        onPress={() => {
+          notifyTap('groups-fab');
+          navigation.navigate('GroupAction');
+        }}
       >
         <LinearGradient
           colors={dark.gradient}

@@ -25,6 +25,8 @@ import { tripFlag } from '../utils/tripFlag';
 import { categoryIcon } from '../utils/expenseCategory';
 import { dark, radius, spacing } from '../theme';
 import AppAlert from '../components/AppAlert';
+import { useTour } from '../tour/TourProvider';
+import { CHAPTERS } from '../tour/steps';
 
 const EMPTY_HOME = {
   balance: { net: 0, youOwe: 0, owedToYou: 0, groupCount: 0 },
@@ -96,6 +98,7 @@ const HomeScreen = ({ navigation }) => {
   const [home, setHome] = useState(EMPTY_HOME);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const { ready: tourReady, isDone: tourDone, start: startTour } = useTour();
 
   const loadHome = useCallback(async () => {
     try {
@@ -141,6 +144,22 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const { balance, upcomingTrips, tasks, recentExpenses } = home;
+
+  // The welcome tour, once the dashboard has answered (its card tells a first
+  // group from another one). Shown once per account; Profile → App tour brings
+  // it back. The short pause lets the screen settle first.
+  const firstName = user?.name?.split(' ')[0];
+  const hasGroups = balance.groupCount > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (!loaded || !tourReady || tourDone(CHAPTERS.WELCOME)) return undefined;
+      const timer = setTimeout(
+        () => startTour(CHAPTERS.WELCOME, { firstName, hasGroups }),
+        600
+      );
+      return () => clearTimeout(timer);
+    }, [loaded, tourReady, tourDone, startTour, firstName, hasGroups])
+  );
 
   const runQuickAction = (key) => {
     if (key === 'create-group' || key === 'create-trip') navigation.navigate('CreateGroup');

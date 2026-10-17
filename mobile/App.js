@@ -6,6 +6,8 @@ import { AuthProvider } from './src/context/AuthContext';
 import { SocketProvider } from './src/context/SocketProvider';
 import { StreamVideoProvider } from './src/context/StreamVideoProvider';
 import { ActiveCallProvider } from './src/context/ActiveCallProvider';
+import { TourProvider } from './src/tour/TourProvider';
+import TourOverlay from './src/tour/TourOverlay';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AppAlertHost } from './src/components/AppAlert';
 import { AlarmPermissionHost } from './src/components/AlarmPermissionSheet';
@@ -14,16 +16,22 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <SocketProvider>
-          <StreamVideoProvider>
-            <ActiveCallProvider>
-              <NavigationContainer>
-                <StatusBar style="dark" />
-                <RootNavigator />
-              </NavigationContainer>
-            </ActiveCallProvider>
-          </StreamVideoProvider>
-        </SocketProvider>
+        <TourProvider>
+          <SocketProvider>
+            <StreamVideoProvider>
+              <ActiveCallProvider>
+                <NavigationContainer>
+                  <StatusBar style="dark" />
+                  <RootNavigator />
+                </NavigationContainer>
+              </ActiveCallProvider>
+            </StreamVideoProvider>
+          </SocketProvider>
+          {/* After the navigator, so the guided tour's spotlight draws over
+              every screen and the tab bar. Alerts and sheets below are Modals
+              and stay above it. */}
+          <TourOverlay />
+        </TourProvider>
       </AuthProvider>
       <AlarmPermissionHost />
       <AppAlertHost />

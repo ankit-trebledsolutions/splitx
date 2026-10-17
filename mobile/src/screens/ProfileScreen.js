@@ -5,10 +5,19 @@ import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { profileDefaults, accountSettings, helpSupport } from '../data/profile';
+import { useTour } from '../tour/TourProvider';
 import { dark, radius, spacing } from '../theme';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { reset: resetTour } = useTour();
+
+  // App tour: forget both chapters and go to Home, where the welcome starts
+  // again. The tabs chapter follows on the next group opened.
+  const replayTour = () => {
+    resetTour();
+    navigation.navigate('Home');
+  };
   // Real account fields win; the rest fall back to the design's placeholder data.
   const profile = { ...profileDefaults, ...(user ?? {}) };
 
@@ -73,7 +82,7 @@ const ProfileScreen = ({ navigation }) => {
               key={item.key}
               style={[styles.settingRow, index > 0 && styles.settingDivider]}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate(item.screen)}
+              onPress={() => (item.action === 'tour' ? replayTour() : navigation.navigate(item.screen))}
             >
               <View style={styles.settingIcon}>
                 <Ionicons name={item.icon} size={18} color={dark.button} />
