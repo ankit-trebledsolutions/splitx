@@ -26,6 +26,9 @@ const groupSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// "Which groups am I in" runs on nearly every screen and every live connection.
+groupSchema.index({ members: 1 });
+
 groupSchema.virtual('adminId').get(function adminId() {
   return this.admin ?? this.createdBy;
 });

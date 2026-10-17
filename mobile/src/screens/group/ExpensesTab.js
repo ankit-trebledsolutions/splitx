@@ -22,8 +22,21 @@ const CATEGORY_LABEL = {
   other: 'Other',
 };
 
-const ExpensesTab = ({ expenses, loading, currentUserId, onOpenExpense }) => {
+// `totals` are the server's sums over the whole group, since `expenses` may be
+// only the pages loaded so far. A server from before paging sends none, and
+// the whole list instead, so they are added up here.
+const ExpensesTab = ({
+  expenses,
+  totals: serverTotals,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  loading,
+  currentUserId,
+  onOpenExpense,
+}) => {
   const totals = useMemo(() => {
+    if (serverTotals) return serverTotals;
     let spent = 0;
     let youOwe = 0;
     let owedYou = 0;
@@ -42,7 +55,7 @@ const ExpensesTab = ({ expenses, loading, currentUserId, onOpenExpense }) => {
     }
 
     return { spent, youOwe, owedYou };
-  }, [expenses, currentUserId]);
+  }, [serverTotals, expenses, currentUserId]);
 
   const renderExpense = ({ item }) => {
     const payer = item.paidBy;
@@ -133,6 +146,11 @@ const ExpensesTab = ({ expenses, loading, currentUserId, onOpenExpense }) => {
       renderItem={renderExpense}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
+      onEndReached={hasMore ? onLoadMore : undefined}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={
+        loadingMore ? <ActivityIndicator color={dark.accentGreen} style={styles.more} /> : null
+      }
       ListHeaderComponent={
         <View>
           <View style={styles.statRow}>
@@ -153,6 +171,7 @@ const ExpensesTab = ({ expenses, loading, currentUserId, onOpenExpense }) => {
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingBottom: 100 },
+  more: { marginVertical: spacing.md },
   statRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   sectionLabel: {
     color: dark.textMuted,

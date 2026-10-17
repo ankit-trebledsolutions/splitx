@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import MemberAvatars from '../components/MemberAvatars';
-import { fetchGroup, fetchExpenses, fetchContributions } from '../api/groups.api';
+import { fetchGroup, fetchExpensePage, appendExpenses, fetchContributions } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
 import { dark, radius, spacing } from '../theme';
 import { usd } from '../utils/format';
@@ -94,7 +94,10 @@ const ContributionsScreen = ({ route, navigation }) => {
   );
   const [group, setGroup] = useState(null);
   const [data, setData] = useState(null);
+  // The ledger is read a page at a time.
   const [expenses, setExpenses] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -105,12 +108,13 @@ const ContributionsScreen = ({ route, navigation }) => {
           const [groupData, contributions, expenseData] = await Promise.all([
             fetchGroup(groupId),
             fetchContributions(groupId),
-            fetchExpenses(groupId),
+            fetchExpensePage(groupId),
           ]);
           if (!active) return;
           setGroup(groupData);
           setData(contributions);
-          setExpenses(expenseData);
+          setExpenses(expenseData.expenses);
+          setHasMore(expenseData.hasMore);
         } catch (err) {
           AppAlert.alert('Could not load contributions', err.message);
         } finally {
@@ -227,6 +231,19 @@ const ContributionsScreen = ({ route, navigation }) => {
     </>
   );
 
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const page = await fetchExpensePage(groupId, { offset: expenses.length });
+      setExpenses((list) => appendExpenses(list, page.expenses));
+      setHasMore(page.hasMore);
+    } catch (err) {
+      AppAlert.alert('Could not load more expenses', err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const renderExpenses = () => (
     <>
       {data.me && (
@@ -304,6 +321,16 @@ const ContributionsScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         );
       })}
+
+      {hasMore && (
+        <TouchableOpacity style={styles.more} activeOpacity={0.8} onPress={loadMore} disabled={loadingMore}>
+          {loadingMore ? (
+            <ActivityIndicator color={dark.accentGreen} />
+          ) : (
+            <Text style={styles.moreText}>Show more</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       {!expenses.length && (
         <Text style={styles.empty}>No expenses in this group yet.</Text>
@@ -595,6 +622,8 @@ const styles = StyleSheet.create({
   },
   taskBody: { flex: 1 },
 
+  more: { alignItems: 'center', paddingVertical: spacing.md },
+  moreText: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
   empty: {
     color: dark.textMuted,
     fontSize: 13,

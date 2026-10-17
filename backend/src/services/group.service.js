@@ -1,6 +1,7 @@
 const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const Task = require('../models/Task');
+const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const notificationService = require('./notification.service');
 const reminderSync = require('./reminderSync.service');
@@ -238,29 +239,49 @@ const setMuted = async (groupId, userId, muted) => {
 };
 
 /**
+ * The people behind some user ids, as MEMBER_FIELDS documents: the group's
+ * members as already loaded, plus one lookup for anyone who has since left.
+ */
+const peopleIn = async (group, userIds) => {
+  const people = new Map(group.members.map((m) => [m._id.toString(), m]));
+  const missing = userIds.filter((id) => !people.has(id));
+  if (missing.length) {
+    const former = await User.find({ _id: { $in: missing } }).select(MEMBER_FIELDS);
+    for (const person of former) people.set(person._id.toString(), person);
+  }
+  return people;
+};
+
+/**
  * Net balance per member: positive = the group owes them, negative = they owe.
  * Also returns a minimal list of settlement transfers (greedy matching).
  */
-const computeBalances = async (groupId) => {
-  const expenses = await Expense.find({ group: groupId })
-    .populate('paidBy', MEMBER_FIELDS)
-    .populate('splits.user', MEMBER_FIELDS);
+const computeBalances = async (group) => {
+  // Plain ids and amounts only, rather than every expense with its payer and
+  // shares populated: that took seconds for a big group, on the one thread
+  // every other request needs.
+  const expenses = await Expense.find({ group: group._id })
+    .select('paidBy amount splits.user splits.amount')
+    .lean();
 
-  const net = new Map(); // userId -> { user, net }
-  const touch = (user) => {
-    const key = user._id.toString();
-    if (!net.has(key)) net.set(key, { user, net: 0 });
-    return net.get(key);
+  const net = new Map(); // userId -> net, in order of first appearance
+  const add = (userId, amount) => {
+    const key = userId.toString();
+    net.set(key, (net.get(key) ?? 0) + amount);
   };
 
   for (const expense of expenses) {
-    touch(expense.paidBy).net += expense.amount;
-    for (const split of expense.splits) {
-      touch(split.user).net -= split.amount;
+    add(expense.paidBy, expense.amount);
+    for (const split of expense.splits ?? []) {
+      add(split.user, -split.amount);
     }
   }
 
-  const balances = [...net.values()].map((b) => ({ ...b, net: Math.round(b.net * 100) / 100 }));
+  const people = await peopleIn(group, [...net.keys()]);
+  const balances = [...net.entries()]
+    // Someone whose account is gone has nobody to show.
+    .filter(([userId]) => people.has(userId))
+    .map(([userId, amount]) => ({ user: people.get(userId), net: Math.round(amount * 100) / 100 }));
 
   // Greedy settlement: repeatedly match the largest debtor with the largest creditor.
   const debtors = balances.filter((b) => b.net < -0.005).map((b) => ({ ...b }));
@@ -288,8 +309,8 @@ const computeBalances = async (groupId) => {
 };
 
 const getBalances = async (groupId, userId) => {
-  await getGroupForMember(groupId, userId);
-  const balances = await computeBalances(groupId);
+  const group = await getGroupForMember(groupId, userId);
+  const balances = await computeBalances(group);
   return { balances: [...balances], settlements: balances.settlements };
 };
 
@@ -302,9 +323,10 @@ const MONEY_EPSILON = 5;
  */
 const getContributions = async (groupId, userId) => {
   const group = await getGroupForMember(groupId, userId);
+  // Just the fields counted below, as plain objects.
   const [expenses, tasks] = await Promise.all([
-    Expense.find({ group: groupId }),
-    Task.find({ group: groupId }),
+    Expense.find({ group: groupId }).select('amount paidBy splits.user splits.amount').lean(),
+    Task.find({ group: groupId }).select('assignees createdBy status').lean(),
   ]);
 
   const totalExpenses = round2(expenses.reduce((sum, e) => sum + e.amount, 0));
@@ -326,7 +348,7 @@ const getContributions = async (groupId, userId) => {
   for (const expense of expenses) {
     const payer = stats.get(expense.paidBy.toString());
     if (payer) payer.paid += expense.amount;
-    for (const split of expense.splits) {
+    for (const split of expense.splits ?? []) {
       const owner = stats.get(split.user.toString());
       if (owner) owner.fairShare += split.amount;
     }
@@ -334,7 +356,7 @@ const getContributions = async (groupId, userId) => {
 
   for (const task of tasks) {
     // Unassigned tasks count toward whoever created them.
-    const owners = task.assignees.length ? task.assignees : [task.createdBy];
+    const owners = task.assignees?.length ? task.assignees : [task.createdBy];
     for (const ownerId of owners) {
       const owner = stats.get(ownerId.toString());
       if (!owner) continue;

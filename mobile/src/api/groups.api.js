@@ -51,9 +51,23 @@ export const fetchContributions = async (groupId) => {
   return data.data;
 };
 
-export const fetchExpenses = async (groupId) => {
-  const { data } = await client.get(`/groups/${groupId}/expenses`);
-  return data.data.expenses;
+export const EXPENSE_PAGE = 50;
+
+// One page of a group's expenses, newest first. The first page (offset 0) also
+// carries `totals`, the group-wide sums the Expenses tab shows. A server from
+// before paging ignores the parameters and sends the whole list, with no
+// `hasMore` (nothing more to load) and no `totals` (the tab adds them up).
+export const fetchExpensePage = async (groupId, { offset = 0, limit = EXPENSE_PAGE } = {}) => {
+  const { data } = await client.get(`/groups/${groupId}/expenses`, { params: { limit, offset } });
+  const { expenses, hasMore = false, totals = null } = data.data;
+  return { expenses, hasMore, totals };
+};
+
+// Adds a later page to what is shown. An expense added meanwhile pushes the
+// list down a place, so the next page can repeat one already on screen.
+export const appendExpenses = (list, more) => {
+  const seen = new Set(list.map((e) => e._id));
+  return [...list, ...more.filter((e) => !seen.has(e._id))];
 };
 
 export const createExpense = async (groupId, payload) => {

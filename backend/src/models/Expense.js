@@ -55,4 +55,7 @@ const expenseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// A group's list, newest first, read a page at a time.
+expenseSchema.index({ group: 1, date: -1, createdAt: -1, _id: -1 });
+
 module.exports = mongoose.model('Expense', expenseSchema);

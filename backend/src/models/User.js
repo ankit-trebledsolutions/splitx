@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+// Native bcrypt: hashing runs on libuv's thread pool, so a sign-in does not
+// hold up every other request while it works. Reads the $2a$ hashes the old
+// pure-JS bcryptjs wrote, so existing passwords keep working.
+const bcrypt = require('bcrypt');
 const { ROLES, ROLE_LIST, ACCESS_LEVEL_LIST } = require('../config/permissions');
 
 const otpSchema = new mongoose.Schema(

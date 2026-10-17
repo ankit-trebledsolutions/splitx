@@ -31,7 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import useAiItinerary from '../hooks/useAiItinerary';
 import useReminderActions from '../hooks/useReminderActions';
-import { fetchGroup, fetchExpenses } from '../api/groups.api';
+import { fetchGroup, fetchExpensePage, appendExpenses } from '../api/groups.api';
 import { fetchMessages, sendMessage, sendAttachment, deleteMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
 import { fetchReminders } from '../api/reminders.api';
@@ -140,7 +140,13 @@ const GroupChatScreen = ({ route, navigation }) => {
   const chipRefs = useRef({});
   const chipLayouts = useRef({});
   const [messages, setMessages] = useState([]);
+  // The Expenses tab is read a page at a time; the tiles' sums come with the
+  // first page, so they cover every expense, not just those loaded so far.
   const [expenses, setExpenses] = useState([]);
+  const [expenseTotals, setExpenseTotals] = useState(null);
+  const [expensesHasMore, setExpensesHasMore] = useState(false);
+  const [loadingMoreExpenses, setLoadingMoreExpenses] = useState(false);
+  const fetchingMoreExpenses = useRef(false);
   const [tasks, setTasks] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [itineraryDays, setItineraryDays] = useState([]);
@@ -217,6 +223,17 @@ const GroupChatScreen = ({ route, navigation }) => {
     setItineraryDays(days);
   }, []);
 
+  // Ticket per list: only the latest fetch of each is shown (see refreshList).
+  const listFetch = useRef({});
+
+  // A first page replaces the list (and drops any next page still on its way).
+  const showExpensePage = useCallback((page) => {
+    listFetch.current.expenses = (listFetch.current.expenses ?? 0) + 1;
+    setExpenses(page.expenses);
+    setExpenseTotals(page.totals);
+    setExpensesHasMore(page.hasMore);
+  }, []);
+
   const loadAll = useCallback(async () => {
     itineraryFetch.current.started += 1;
     const itineraryTicket = itineraryFetch.current.started;
@@ -239,7 +256,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           setMessagesLoading(false);
           return page;
         }),
-        fetchExpenses(groupId),
+        fetchExpensePage(groupId),
         fetchTasks(groupId),
         fetchReminders(groupId),
         fetchItinerary(groupId),
@@ -248,7 +265,7 @@ const GroupChatScreen = ({ route, navigation }) => {
         fetchStays(groupId),
       ]);
       setGroup(groupData);
-      setExpenses(expenseData);
+      showExpensePage(expenseData);
       setTasks(taskData);
       setReminders(reminderData);
       showItinerary(itineraryTicket, itineraryData);
@@ -261,7 +278,26 @@ const GroupChatScreen = ({ route, navigation }) => {
       setLoading(false);
       setMessagesLoading(false);
     }
-  }, [groupId, showItinerary]);
+  }, [groupId, showItinerary, showExpensePage]);
+
+  // Scrolling to the end of the Expenses tab pulls in the next page.
+  const loadMoreExpenses = useCallback(async () => {
+    if (fetchingMoreExpenses.current || !expensesHasMore) return;
+    fetchingMoreExpenses.current = true;
+    setLoadingMoreExpenses(true);
+    const ticket = listFetch.current.expenses;
+    try {
+      const page = await fetchExpensePage(groupId, { offset: expenses.length });
+      if (!mounted.current || listFetch.current.expenses !== ticket) return;
+      setExpenses((list) => appendExpenses(list, page.expenses));
+      setExpensesHasMore(page.hasMore);
+    } catch {
+      // Scrolling to the end again retries.
+    } finally {
+      fetchingMoreExpenses.current = false;
+      if (mounted.current) setLoadingMoreExpenses(false);
+    }
+  }, [groupId, expenses.length, expensesHasMore]);
 
   // Scrolling up to the oldest loaded message pulls in the page before it.
   const loadOlderMessages = useCallback(async () => {
@@ -304,7 +340,6 @@ const GroupChatScreen = ({ route, navigation }) => {
   // The other tabs' lists change under this screen too: a card arriving in the
   // chat says which one (see the socket effect). Only the latest fetch of each
   // list is shown, so two quick changes can't land in the wrong order.
-  const listFetch = useRef({});
   const refreshList = useCallback(
     async (key, fetcher, setter) => {
       const ticket = (listFetch.current[key] ?? 0) + 1;
@@ -343,7 +378,7 @@ const GroupChatScreen = ({ route, navigation }) => {
     (type) => {
       if (type === 'image' || type === 'gallery') refreshPhotos();
       else if (type === 'task' || type === 'task_done') refreshList('tasks', fetchTasks, setTasks);
-      else if (type === 'expense') refreshList('expenses', fetchExpenses, setExpenses);
+      else if (type === 'expense') refreshList('expenses', fetchExpensePage, showExpensePage);
       else if (type === 'stay') refreshList('stays', fetchStays, setStays);
       else if (type === 'attraction') refreshList('attractions', fetchAttractions, setAttractions);
     },
@@ -1377,6 +1412,10 @@ const GroupChatScreen = ({ route, navigation }) => {
       {tab === 'expenses' && (
         <ExpensesTab
           expenses={expenses}
+          totals={expenseTotals}
+          hasMore={expensesHasMore}
+          loadingMore={loadingMoreExpenses}
+          onLoadMore={loadMoreExpenses}
           loading={loading}
           currentUserId={currentUserId}
           onOpenExpense={openExpense}

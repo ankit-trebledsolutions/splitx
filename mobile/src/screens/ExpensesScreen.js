@@ -12,9 +12,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
-import { fetchGroups, fetchExpenses } from '../api/groups.api';
+import { fetchGroups, fetchExpensePage } from '../api/groups.api';
 import { dark, radius, spacing } from '../theme';
 import { usd, formatDate } from '../utils/format';
+
+// The latest few of each group. Its header shows the group's whole total and
+// opens the group's Expenses tab, which has the rest.
+const PER_GROUP = 20;
 
 // Bottom-tab Expenses: every expense across all your groups. Tapping a group
 // header opens that group's Expenses tab; tapping a row opens the expense.
@@ -33,18 +37,20 @@ const ExpensesScreen = ({ navigation }) => {
           const perGroup = await Promise.all(
             groups.map(async (group) => ({
               group,
-              expenses: await fetchExpenses(group._id).catch(() => []),
+              page: await fetchExpensePage(group._id, { limit: PER_GROUP }).catch(() => null),
             }))
           );
           if (!active) return;
           setSections(
             perGroup
-              .filter(({ expenses }) => expenses.length)
-              .map(({ group, expenses }) => ({
+              .filter(({ page }) => page?.expenses.length)
+              .map(({ group, page }) => ({
                 group,
                 title: group.name,
-                data: expenses,
-                total: expenses.reduce((sum, e) => sum + e.amount, 0),
+                data: page.expenses,
+                hasMore: page.hasMore,
+                // A server from before paging sends the whole list and no totals.
+                total: page.totals?.spent ?? page.expenses.reduce((sum, e) => sum + e.amount, 0),
               }))
           );
         } catch {
@@ -103,6 +109,9 @@ const ExpensesScreen = ({ navigation }) => {
     );
   };
 
+  const openGroupExpenses = (group) =>
+    navigation.navigate('GroupChat', { groupId: group._id, initialTab: 'expenses' });
+
   return (
     <DarkScreen edges={TOP_ONLY}>
       <Text style={styles.title}>Expenses</Text>
@@ -113,16 +122,23 @@ const ExpensesScreen = ({ navigation }) => {
         stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        renderSectionFooter={({ section }) =>
+          section.hasMore ? (
+            <TouchableOpacity
+              style={styles.seeAll}
+              activeOpacity={0.8}
+              onPress={() => openGroupExpenses(section.group)}
+            >
+              <Text style={styles.seeAllText}>See all in {section.title}</Text>
+              <Ionicons name="chevron-forward" size={13} color={dark.accentGreen} />
+            </TouchableOpacity>
+          ) : null
+        }
         renderSectionHeader={({ section }) => (
           <TouchableOpacity
             style={styles.sectionHeader}
             activeOpacity={0.8}
-            onPress={() =>
-              navigation.navigate('GroupChat', {
-                groupId: section.group._id,
-                initialTab: 'expenses',
-              })
-            }
+            onPress={() => openGroupExpenses(section.group)}
           >
             <Avatar name={section.group.name} size={26} />
             <Text style={styles.sectionTitle} numberOfLines={1}>
@@ -170,6 +186,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '700' },
   sectionTotal: { color: dark.accentGreen, fontSize: 13, fontWeight: '800' },
+  seeAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm,
+  },
+  seeAllText: { color: dark.accentGreen, fontSize: 12, fontWeight: '700' },
 
   row: {
     flexDirection: 'row',
