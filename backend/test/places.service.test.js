@@ -54,9 +54,11 @@ test('a typed destination becomes a place with an id and a centre, asked for as 
     formatted: 'Jaipur, Rajasthan, India',
     lat: fakeGeoapify.CITY.lat,
     lon: fakeGeoapify.CITY.lon,
+    bbox: [75.6589817, 26.7554576, 75.9789817, 27.0754576],
   });
   assert.equal(fake.requests.length, 1);
   assert.equal(fake.lastRequest().params.type, 'city');
+  assert.equal(fake.lastRequest().params.lang, 'en');
   assert.equal(fake.lastRequest().params.text, '  Jaipur ');
   // The key travels as a query parameter, the only way Geoapify takes it.
   assert.equal(fake.lastRequest().params.apiKey, 'fake-ok');
@@ -72,15 +74,23 @@ test('a place the geocoder does not know is null, after one try as a city and on
 
 // ---- What is there ------------------------------------------------------------------
 
-const JAIPUR = { placeId: fakeGeoapify.CITY.place_id, lat: fakeGeoapify.CITY.lat, lon: fakeGeoapify.CITY.lon };
+const { bbox: BOX } = fakeGeoapify.CITY;
+const JAIPUR = {
+  placeId: fakeGeoapify.CITY.place_id,
+  lat: fakeGeoapify.CITY.lat,
+  lon: fakeGeoapify.CITY.lon,
+  bbox: [BOX.lon1, BOX.lat1, BOX.lon2, BOX.lat2],
+};
 
 test('stays: hotels first and nearest first, labelled, nameless and duplicates dropped', async () => {
   const items = await places.searchPlaces('stay', JAIPUR);
   assert.equal(fake.requests.length, 1);
   const { params } = fake.lastRequest();
-  assert.equal(params.filter, `place:${JAIPUR.placeId}`);
+  assert.equal(params.filter, `rect:${JAIPUR.bbox.join(',')}`);
   assert.equal(params.bias, `proximity:${JAIPUR.lon},${JAIPUR.lat}`);
   assert.equal(params.conditions, 'named');
+  assert.equal(params.lang, 'en');
+  assert.equal(params.limit, '40');
   assert.ok(params.categories.split(',').every((category) => category.startsWith('accommodation.')));
 
   assert.deepEqual(
@@ -103,7 +113,7 @@ test('stays: hotels first and nearest first, labelled, nameless and duplicates d
 
 test('attractions: the famous ones first, at most twenty, nameless dropped', async () => {
   const items = await places.searchPlaces('attraction', JAIPUR);
-  assert.equal(fake.lastRequest().params.limit, '60');
+  assert.equal(fake.lastRequest().params.limit, '100');
   assert.equal(items.length, 20);
   // UNESCO beats a fort beats a temple beats a museum; a fountain is last of the named kinds.
   assert.deepEqual(
@@ -113,6 +123,8 @@ test('attractions: the famous ones first, at most twenty, nameless dropped', asy
   assert.equal(items.find((item) => item.name === 'Jantar Mantar').category, 'UNESCO World Heritage');
   assert.equal(items.find((item) => item.name === 'Amber Fort').emoji, '🏛️');
   assert.equal(items.find((item) => item.name === 'Govind Dev Ji Temple').category, 'Temple');
+  // The museum is named in Hindi with the English name beside it: the English one shows.
+  assert.equal(items.find((item) => item.name === 'Albert Hall Museum').placeId, 'a4');
   assert.ok(!items.some((item) => item.name === ''));
   // Twenty-five named candidates arrived; the fountain and the statue did not make the cut.
   assert.ok(!items.some((item) => item.name === 'Birla Fountain'));
@@ -146,12 +158,24 @@ test('toItem: no name, no id or no known category means nothing to show', () => 
   assert.equal(places.toItem(null), null);
 });
 
-test('a destination that is a point rather than an area falls back to a circle around it', async () => {
+test('an empty bounding box falls back to a circle around the centre', async () => {
   env.geoapify.apiKey = 'fake-noboundary';
   const items = await places.searchPlaces('stay', JAIPUR);
   assert.equal(items.length, 4);
   assert.equal(fake.requests.length, 2);
-  assert.match(fake.requests[1].params.filter, /^circle:/);
+  assert.match(fake.requests[0].params.filter, /^rect:/);
+  assert.equal(fake.requests[1].params.filter, `circle:${JAIPUR.lon},${JAIPUR.lat},15000`);
+});
+
+test('a destination the geocoder gives no box for is searched as a circle from the start', async () => {
+  env.geoapify.apiKey = 'fake-nobbox';
+  const place = await places.geocodeDestination('Jaipur');
+  assert.equal(place.bbox, null);
+  fake.requests.length = 0;
+  const items = await places.searchPlaces('stay', place);
+  assert.equal(items.length, 4);
+  assert.equal(fake.requests.length, 1);
+  assert.match(fake.lastRequest().params.filter, /^circle:/);
 });
 
 test('no places at all is an empty list, not an error', async () => {

@@ -55,8 +55,9 @@ const TYPES = {
       'accommodation.apartment',
       'accommodation.chalet',
     ],
-    // One provider page: 20 results is one credit.
-    fetch: 20,
+    // Two provider pages (20 results is one credit): room for the duplicates
+    // OpenStreetMap carries and for guest houses behind the hotels.
+    fetch: 40,
     keep: 20,
   },
   attraction: {
@@ -73,8 +74,9 @@ const TYPES = {
       'beach',
     ],
     // Over-fetch, then rank: the provider has no notion of "famous", so the
-    // ranking below picks the forts and temples out of the fountains.
-    fetch: 60,
+    // ranking below picks the forts and temples out of the fountains. Five
+    // credits; Jaipur answers about 60 of these in total.
+    fetch: 100,
     keep: 20,
   },
 };
@@ -97,7 +99,7 @@ const CATEGORY_RULES = [
   ['tourism.sights.place_of_worship', 'Place of worship', '🛐', 55],
   ['tourism.sights.monastery', 'Monastery', '🛐', 72],
   ['tourism.sights.manor', 'Manor', '🏛️', 70],
-  ['entertainment.museum', 'Museum', '🖼️', 68],
+  ['entertainment.museum', 'Museum', '🖼️', 62],
   ['national_park', 'National park', '🏞️', 66],
   ['beach', 'Beach', '🏖️', 58],
   ['entertainment.zoo', 'Zoo', '🦁', 56],
@@ -113,7 +115,9 @@ const CATEGORY_RULES = [
   ['tourism.sights.city_hall', 'City hall', '🏛️', 45],
   ['tourism.sights.ruines', 'Ruins', '🏺', 60],
   ['tourism.sights.windmill', 'Windmill', '🌾', 45],
-  ['tourism.sights.building', 'Historic building', '🏛️', 45],
+  ['tourism.sights.building', 'Historic building', '🏛️', 60],
+  // Tagged on the building itself (Hawa Mahal), not always as a sight.
+  ['building.historic', 'Historic building', '🏛️', 64],
   ['tourism.sights', 'Sight', '📍', 60],
   ['tourism.attraction.viewpoint', 'Viewpoint', '🔭', 50],
   ['tourism.attraction.fountain', 'Fountain', '⛲', 25],
@@ -167,7 +171,9 @@ const round1 = (value) => Math.round(value * 10) / 10;
 // One provider feature as the app sees it. Null when it is not worth showing.
 const toItem = (feature) => {
   const props = feature?.properties ?? {};
-  const name = String(props.name ?? '').trim();
+  // `name` is in the local script where OpenStreetMap has it that way (Hindi
+  // for half of Jaipur's sights); the English name sits beside it when known.
+  const name = String(props.name_international?.en || props.name || '').trim();
   if (!name || !props.place_id) return null;
   const rule = ruleFor(props.categories);
   if (!rule) return null;
@@ -250,20 +256,30 @@ const geocodeDestination = async (text) => {
     const json = await request('/v1/geocode/search', { text, limit: '1', format: 'json', ...extra });
     const hit = Array.isArray(json.results) ? json.results[0] : null;
     if (!hit?.place_id || typeof hit.lat !== 'number' || typeof hit.lon !== 'number') return null;
+    const b = hit.bbox;
+    const bbox =
+      b && [b.lon1, b.lat1, b.lon2, b.lat2].every((value) => typeof value === 'number')
+        ? [b.lon1, b.lat1, b.lon2, b.lat2]
+        : null;
     return {
       placeId: String(hit.place_id),
       name: String(hit.city || hit.name || hit.formatted || text).slice(0, 120),
       formatted: String(hit.formatted || '').slice(0, 200),
       lat: hit.lat,
       lon: hit.lon,
+      bbox,
     };
   };
-  return (await ask({ type: 'city' })) ?? (await ask({}));
+  return (await ask({ type: 'city', lang: 'en' })) ?? (await ask({ lang: 'en' }));
 };
 
-// Inside the destination's own boundary, nearest the centre first. A
-// destination that is a point rather than an area falls back to a circle.
+// Within the destination's bounding box, nearest the centre first. Not its
+// administrative boundary: for Jaipur that is a few kilometres across and
+// leaves Amber Fort and Jal Mahal outside, while the box the geocoder gives
+// reaches them. A destination with no box, or an empty box, gets a circle.
 const FALLBACK_RADIUS_M = 15000;
+const rectOf = (bbox) => `rect:${bbox.join(',')}`;
+const circleOf = (place) => `circle:${place.lon},${place.lat},${FALLBACK_RADIUS_M}`;
 
 const searchPlaces = async (type, place) => {
   const spec = TYPES[type];
@@ -273,23 +289,28 @@ const searchPlaces = async (type, place) => {
     conditions: 'named',
     bias: `proximity:${place.lon},${place.lat}`,
     limit: String(spec.fetch),
+    lang: 'en',
   };
 
-  let json = await request('/v2/places', { ...base, filter: `place:${place.placeId}` });
-  let features = Array.isArray(json.features) ? json.features : [];
+  let features = [];
+  if (place.bbox) {
+    const json = await request('/v2/places', { ...base, filter: rectOf(place.bbox) });
+    features = Array.isArray(json.features) ? json.features : [];
+  }
   if (features.length === 0) {
-    json = await request('/v2/places', { ...base, filter: `circle:${place.lon},${place.lat},${FALLBACK_RADIUS_M}` });
+    const json = await request('/v2/places', { ...base, filter: circleOf(place) });
     features = Array.isArray(json.features) ? json.features : [];
   }
 
   // OpenStreetMap often holds one place twice (a point and a building
-  // outline) under two ids: the same name at the same address is one place.
+  // outline, or two spellings) under two ids: the same name for the same
+  // kind of place in one destination is one place.
   const seen = new Set();
   const items = [];
   for (const feature of features) {
     const item = toItem(feature);
     if (!item) continue;
-    const identity = `${item.name.toLowerCase()}|${item.address.toLowerCase()}`;
+    const identity = `${item.name.toLowerCase()}|${item.categoryKey}`;
     if (seen.has(item.placeId) || seen.has(identity)) continue;
     seen.add(item.placeId);
     seen.add(identity);

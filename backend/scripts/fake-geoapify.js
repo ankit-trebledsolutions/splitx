@@ -15,7 +15,8 @@
  *   fake-ok          a city and a page of hotels / sights for any destination
  *   fake-slow        the same, after --slow-ms (past GEOAPIFY_TIMEOUT_MS it is a timeout)
  *   fake-nocity      the geocoder knows no such place (results: [])
- *   fake-noboundary  nothing inside the boundary, results for the circle fallback
+ *   fake-nobbox      a city without a bounding box (the search uses a circle)
+ *   fake-noboundary  nothing inside the bounding box, results for the circle fallback
  *   fake-empty       a city, but no places at all
  *   fake-401         invalid key
  *   fake-429         daily allowance used up
@@ -40,6 +41,7 @@ const CITY = {
   result_type: 'city',
   lat: 26.9154576,
   lon: 75.8189817,
+  bbox: { lon1: 75.6589817, lat1: 26.7554576, lon2: 75.9789817, lat2: 27.0754576 },
 };
 
 const feature = (id, name, categories, extra = {}) => ({
@@ -78,7 +80,11 @@ const ATTRACTIONS = [
     distance: 600,
     wiki_and_media: { wikipedia: 'en:Hawa Mahal' },
   }),
-  feature('a4', 'Albert Hall Museum', ['entertainment', 'entertainment.museum'], { distance: 1800 }),
+  // Named in Hindi, with the English name beside it, as OpenStreetMap has it.
+  feature('a4', 'एल्बर्ट हॉल', ['entertainment', 'entertainment.museum'], {
+    distance: 1800,
+    name_international: { en: 'Albert Hall Museum', hi: 'एल्बर्ट हॉल' },
+  }),
   feature('a5', 'Govind Dev Ji Temple', ['tourism', 'tourism.sights', 'tourism.sights.place_of_worship', 'tourism.sights.place_of_worship.temple'], { distance: 700 }),
   feature('a6', 'Nahargarh Viewpoint', ['tourism', 'tourism.attraction', 'tourism.attraction.viewpoint'], { distance: 6000 }),
   feature('a7', 'Statue of a Horse', ['tourism', 'tourism.attraction', 'tourism.attraction.artwork', 'tourism.attraction.artwork.statue'], { distance: 1200 }),
@@ -117,13 +123,17 @@ const start = async ({ port = 0, slowMs = DEFAULT_SLOW_MS } = {}) => {
 
     if (url.pathname === '/v1/geocode/search') {
       if (scenario === 'fake-nocity') return send(200, { results: [], query: { text: params.text } });
+      if (scenario === 'fake-nobbox') {
+        const { bbox, ...withoutBox } = CITY;
+        return send(200, { results: [withoutBox], query: { text: params.text } });
+      }
       // Only a city is ever asked for first; the fallback query has no type.
       return send(200, { results: [CITY], query: { text: params.text } });
     }
 
     if (url.pathname === '/v2/places') {
       if (scenario === 'fake-empty') return send(200, { type: 'FeatureCollection', features: [] });
-      if (scenario === 'fake-noboundary' && String(params.filter).startsWith('place:')) {
+      if (scenario === 'fake-noboundary' && String(params.filter).startsWith('rect:')) {
         return send(200, { type: 'FeatureCollection', features: [] });
       }
       const isStay = String(params.categories).startsWith('accommodation');
