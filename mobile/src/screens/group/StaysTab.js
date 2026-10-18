@@ -45,8 +45,10 @@ const nightsBetween = (checkIn, checkOut) =>
 // stay a chat card asked to show: the list scrolls to it and marks it, then
 // `onFocusDone` lets the parent forget the request.
 // `onReview` opens the rating sheet: stays are added unrated, and stars and a
-// review are given here afterwards.
+// review are given here afterwards. `header` is rendered above the list: the
+// suggested hotels for the trip's destination.
 const StaysTab = ({
+  header = null,
   stays,
   loading,
   organiserId,
@@ -210,6 +212,7 @@ const StaysTab = ({
       extraData={highlightId}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
+      ListHeaderComponent={header}
       ListEmptyComponent={
         <Text style={styles.empty}>
           No stays yet — tap + to add where the group is staying.

@@ -1,0 +1,444 @@
+require('../testkit/safeEnv');
+
+/**
+ * End-to-end smoke test of the suggested stays and attractions: the real
+ * Express app over HTTP, a throwaway local database, and the fake Geoapify
+ * server. Nothing real is touched (see testkit/safeEnv.js), and it costs
+ * nothing.
+ *
+ *   npm run smoke:places                          needs a local mongod on 27017
+ *   SMOKE_MONGO_BASE=mongodb://127.0.0.1:27018 npm run smoke:places
+ *   node scripts/smoke-places.js --verbose        also print the server's logs
+ *
+ * The database is named splix_places_smoke_<timestamp> and dropped at the end.
+ * Exits 0 only when every case passes.
+ */
+const assert = require('node:assert/strict');
+const fakeGeoapify = require('./fake-geoapify');
+
+const DB_PREFIX = 'splix_places_smoke_';
+const MONGO_BASE = (process.env.SMOKE_MONGO_BASE || 'mongodb://127.0.0.1:27017').replace(/\/+$/, '');
+const VERBOSE = process.argv.includes('--verbose');
+const MINUTE_MS = 60 * 1000;
+
+const print = console.log.bind(console);
+
+let dropThrowawayDatabase = async () => {};
+
+const main = async () => {
+  const fake = await fakeGeoapify.start({ slowMs: 10000 });
+  process.env.MONGODB_URI = `${MONGO_BASE}/${DB_PREFIX}${Date.now()}`;
+  process.env.GEOAPIFY_BASE_URL = fake.url;
+
+  const env = require('../src/config/env');
+  require('../testkit/safeEnv').assertSafe(env);
+
+  const mongoose = require('mongoose');
+  const jwt = require('jsonwebtoken');
+  const app = require('../src/app');
+  const connectDB = require('../src/config/db');
+  const realtime = require('../src/realtime/socket');
+  const places = require('../src/services/places.service');
+  const User = require('../src/models/User');
+  const Group = require('../src/models/Group');
+  const PlaceCache = require('../src/models/PlaceCache');
+  const PlaceLookup = require('../src/models/PlaceLookup');
+
+  await connectDB();
+  const dbName = mongoose.connection.name;
+  dropThrowawayDatabase = async () => {
+    assert.ok(dbName.startsWith(DB_PREFIX), `refusing to drop "${dbName}"`);
+    await mongoose.connection.dropDatabase();
+  };
+  await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
+
+  const server = await new Promise((resolve) => {
+    const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
+  });
+  const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+
+  // Socket events are not under test here; keep them off the wire.
+  realtime.emitToGroup = () => {};
+  realtime.emitToUser = () => {};
+
+  // ---- Fixtures ------------------------------------------------------------
+
+  const DEFAULT_CAPS = { userDailyCap: env.geoapify.userDailyCap, globalDailyCap: env.geoapify.globalDailyCap };
+
+  let userCount = 0;
+  const makeUser = (name = 'Smoke Tester') => {
+    userCount += 1;
+    return User.create({ name, email: `smoke${userCount}@example.test`, googleId: `smoke-${userCount}` });
+  };
+  const makeGroup = async (admin, fields = {}) =>
+    Group.create({
+      name: 'Smoke Trip',
+      groupType: 'trip',
+      location: 'Jaipur, India',
+      createdBy: admin._id,
+      admin: admin._id,
+      members: [admin._id],
+      ...fields,
+    });
+
+  const call = async (user, method, url, body) => {
+    const res = await fetch(`${base}${url}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${jwt.sign({ sub: String(user._id) }, env.jwtSecret)}`,
+        'Content-Type': 'application/json',
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json() };
+  };
+  const suggest = (user, group, type, query = '') => call(user, 'GET', `/groups/${group._id}/suggestions/${type}${query}`);
+
+  const expectError = (res, status, code) => {
+    assert.equal(res.status, status, `expected HTTP ${status}, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.code, code);
+  };
+  const expectOk = (res) => {
+    assert.equal(res.status, 200, `expected HTTP 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    return res.body.data;
+  };
+  const providerCalls = () => fake.requests.length;
+  const lookups = () => PlaceLookup.countDocuments({});
+
+  // ---- Runner --------------------------------------------------------------
+
+  const results = [];
+  let currentGroup = '';
+  const section = (title) => {
+    currentGroup = title;
+    print(`\n${title}`);
+  };
+  const check = async (name, fn) => {
+    places.resetBreaker();
+    env.geoapify.apiKey = 'fake-ok';
+    Object.assign(env.geoapify, DEFAULT_CAPS);
+    fake.requests.length = 0;
+
+    const logs = [];
+    const real = { error: console.error, warn: console.warn };
+    if (!VERBOSE) {
+      console.error = (...args) => logs.push(args.map(String).join(' '));
+      console.warn = console.error;
+    }
+    try {
+      await fn();
+      results.push({ group: currentGroup, name, ok: true });
+      print(`  ok    ${name}`);
+    } catch (err) {
+      results.push({ group: currentGroup, name, ok: false });
+      print(`  FAIL  ${name}\n        ${err.message.split('\n').join('\n        ')}`);
+      for (const line of logs) print(`        log: ${line}`);
+    } finally {
+      Object.assign(console, real);
+    }
+  };
+
+  const admin = await makeUser('Zaphod Beeblebrox');
+  const member = await makeUser('Trillian Astra');
+  const stranger = await makeUser('Arthur Dent');
+
+  // ---- Cases ---------------------------------------------------------------
+
+  section('Who can ask');
+
+  await check('no key on the server: configured false, nothing else', async () => {
+    const group = await makeGroup(admin);
+    env.geoapify.apiKey = '';
+    const data = expectOk(await suggest(admin, group, 'stay'));
+    assert.equal(data.configured, false);
+    assert.deepEqual(data.items, []);
+    assert.equal(providerCalls(), 0);
+  });
+
+  await check('a home group has no suggestions: TRIP_ONLY', async () => {
+    const group = await makeGroup(admin, { groupType: 'home', location: '' });
+    expectError(await suggest(admin, group, 'stay'), 400, 'TRIP_ONLY');
+  });
+
+  await check('a non-member is refused, an unknown type is a 400', async () => {
+    const group = await makeGroup(admin);
+    assert.equal((await suggest(stranger, group, 'stay')).status, 403);
+    assert.equal((await suggest(admin, group, 'restaurant')).status, 400);
+    assert.equal(providerCalls(), 0);
+  });
+
+  await check('a trip with no destination: NO_DESTINATION, no provider call', async () => {
+    const group = await makeGroup(admin, { location: '' });
+    const data = expectOk(await suggest(admin, group, 'attraction'));
+    assert.equal(data.configured, true);
+    assert.equal(data.reason, 'NO_DESTINATION');
+    assert.equal(data.destination, null);
+    assert.deepEqual(data.items, []);
+    assert.equal(providerCalls(), 0);
+  });
+
+  section('Suggestions and the shared cache');
+
+  const jaipur = await makeGroup(admin, { members: [admin._id, member._id] });
+
+  await check('stays for Jaipur: one geocode, one search, four hotels, the destination as resolved', async () => {
+    const data = expectOk(await suggest(admin, jaipur, 'stay'));
+    assert.equal(data.type, 'stay');
+    assert.deepEqual(data.destination, { text: 'Jaipur, India', resolved: 'Jaipur, Rajasthan, India' });
+    assert.equal(data.reason, null);
+    assert.deepEqual(
+      data.items.map((item) => item.name),
+      ['Hotel Pearl Palace', 'Rambagh Palace', 'Pink City Guest House', 'Zostel Jaipur']
+    );
+    assert.equal(data.items[0].placeId, 'h2');
+    assert.deepEqual(data.addedPlaceIds, []);
+    assert.equal(data.provider.name, 'Geoapify');
+    assert.match(data.provider.attribution, /OpenStreetMap/);
+    assert.equal(providerCalls(), 2);
+    assert.equal(fake.requests[0].path, '/v1/geocode/search');
+    assert.equal(fake.requests[1].path, '/v2/places');
+    assert.equal(await PlaceCache.countDocuments({}), 2);
+    assert.equal(await lookups(), 1);
+  });
+
+  await check('the same tab again, and another member: served from the cache', async () => {
+    expectOk(await suggest(admin, jaipur, 'stay'));
+    const data = expectOk(await suggest(member, jaipur, 'stay'));
+    assert.equal(data.items.length, 4);
+    assert.equal(providerCalls(), 0);
+    assert.equal(await lookups(), 1);
+  });
+
+  await check('another group going to " jaipur,india ": the same cache entry, no provider call', async () => {
+    const other = await makeGroup(member, { location: ' jaipur,india ' });
+    const data = expectOk(await suggest(member, other, 'stay'));
+    assert.equal(data.destination.text, 'jaipur,india');
+    assert.equal(data.items.length, 4);
+    assert.equal(providerCalls(), 0);
+    assert.equal(await lookups(), 1);
+  });
+
+  await check('attractions for Jaipur: the destination is already known, famous places first, twenty at most', async () => {
+    const data = expectOk(await suggest(admin, jaipur, 'attraction'));
+    assert.equal(data.items.length, 20);
+    assert.deepEqual(
+      data.items.slice(0, 3).map((item) => [item.name, item.category]),
+      [
+        ['Jantar Mantar', 'UNESCO World Heritage'],
+        ['Amber Fort', 'UNESCO World Heritage'],
+        ['Hawa Mahal', 'Heritage site'],
+      ]
+    );
+    // No second geocode: the destination was cached by the stays lookup.
+    assert.equal(providerCalls(), 1);
+    assert.equal(fake.requests[0].path, '/v2/places');
+    assert.equal(await lookups(), 2);
+  });
+
+  section('Adding a suggestion');
+
+  await check('a stay added from a suggestion carries its place id and is then marked as added', async () => {
+    const created = await call(admin, 'POST', `/groups/${jaipur._id}/stays`, {
+      name: 'Hotel Pearl Palace',
+      address: 'Jaipur, Rajasthan, India',
+      checkIn: '2026-12-10T06:30:00.000Z',
+      checkOut: '2026-12-12T06:30:00.000Z',
+      pricePerNight: 60,
+      placeId: 'h2',
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.data.stay.placeId, 'h2');
+    const data = expectOk(await suggest(member, jaipur, 'stay'));
+    assert.deepEqual(data.addedPlaceIds, ['h2']);
+
+    const again = await call(member, 'POST', `/groups/${jaipur._id}/stays`, {
+      name: 'Hotel Pearl Palace',
+      checkIn: '2026-12-10T06:30:00.000Z',
+      checkOut: '2026-12-12T06:30:00.000Z',
+      pricePerNight: 60,
+      placeId: 'h2',
+    });
+    expectError(again, 409, 'PLACE_ALREADY_ADDED');
+  });
+
+  await check('the same for an attraction; a hand-typed one has no place id', async () => {
+    const created = await call(member, 'POST', `/groups/${jaipur._id}/attractions`, {
+      name: 'Jantar Mantar',
+      category: 'UNESCO World Heritage',
+      distanceKm: 0.8,
+      emoji: '🏛️',
+      placeId: 'a8',
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const data = expectOk(await suggest(admin, jaipur, 'attraction'));
+    assert.deepEqual(data.addedPlaceIds, ['a8']);
+    expectError(
+      await call(admin, 'POST', `/groups/${jaipur._id}/attractions`, { name: 'Jantar Mantar', placeId: 'a8' }),
+      409,
+      'PLACE_ALREADY_ADDED'
+    );
+    const typed = await call(admin, 'POST', `/groups/${jaipur._id}/attractions`, { name: 'Chai stall' });
+    assert.equal(typed.status, 201);
+    assert.equal(typed.body.data.attraction.placeId, null);
+  });
+
+  section('Refreshing');
+
+  await check('a refresh within ten minutes is the cached copy; after that it asks again', async () => {
+    expectOk(await suggest(admin, jaipur, 'stay', '?refresh=1'));
+    assert.equal(providerCalls(), 0);
+
+    await PlaceCache.updateOne({ key: 'stay|jaipur india' }, { $set: { fetchedAt: new Date(Date.now() - 11 * MINUTE_MS) } });
+    const data = expectOk(await suggest(admin, jaipur, 'stay', '?refresh=1'));
+    assert.equal(data.items.length, 4);
+    assert.equal(providerCalls(), 1);
+    assert.equal(await lookups(), 3);
+  });
+
+  await check('a provider failure during a refresh keeps the cached copy', async () => {
+    await PlaceCache.updateOne({ key: 'stay|jaipur india' }, { $set: { fetchedAt: new Date(Date.now() - 11 * MINUTE_MS) } });
+    env.geoapify.apiKey = 'fake-500';
+    const data = expectOk(await suggest(admin, jaipur, 'stay', '?refresh=1'));
+    assert.equal(data.items.length, 4);
+    assert.equal(providerCalls(), 1);
+  });
+
+  section('Destinations the provider cannot help with');
+
+  await check('an unknown destination: UNKNOWN_DESTINATION, remembered so it is not asked again at once', async () => {
+    const group = await makeGroup(admin, { location: 'Atlantis' });
+    env.geoapify.apiKey = 'fake-nocity';
+    const data = expectOk(await suggest(admin, group, 'stay'));
+    assert.equal(data.reason, 'UNKNOWN_DESTINATION');
+    assert.equal(data.destination.text, 'Atlantis');
+    assert.deepEqual(data.items, []);
+    assert.equal(providerCalls(), 2); // as a city, then as anything
+
+    fake.requests.length = 0;
+    const again = expectOk(await suggest(admin, group, 'stay'));
+    assert.equal(again.reason, 'UNKNOWN_DESTINATION');
+    assert.equal(providerCalls(), 0);
+  });
+
+  await check('no places at all is an empty list, cached like any other answer', async () => {
+    const group = await makeGroup(admin, { location: 'Emptyville' });
+    env.geoapify.apiKey = 'fake-empty';
+    const data = expectOk(await suggest(admin, group, 'attraction'));
+    assert.deepEqual(data.items, []);
+    assert.equal(data.reason, null);
+    fake.requests.length = 0;
+    expectOk(await suggest(admin, group, 'attraction'));
+    assert.equal(providerCalls(), 0);
+  });
+
+  section('Failures and spend control');
+
+  await check('provider down: PLACES_UNAVAILABLE; over its allowance: PLACES_BUSY', async () => {
+    const down = await makeGroup(admin, { location: 'Udaipur' });
+    env.geoapify.apiKey = 'fake-500';
+    expectError(await suggest(admin, down, 'stay'), 503, 'PLACES_UNAVAILABLE');
+    const busy = await makeGroup(admin, { location: 'Jodhpur' });
+    env.geoapify.apiKey = 'fake-429';
+    expectError(await suggest(admin, busy, 'stay'), 503, 'PLACES_BUSY');
+  });
+
+  await check('a refused key opens the breaker: the next destination costs no call', async () => {
+    const first = await makeGroup(admin, { location: 'Agra' });
+    env.geoapify.apiKey = 'fake-401';
+    expectError(await suggest(admin, first, 'stay'), 503, 'PLACES_UNAVAILABLE');
+    assert.equal(places.isBreakerOpen(), true);
+    fake.requests.length = 0;
+    const second = await makeGroup(admin, { location: 'Delhi' });
+    env.geoapify.apiKey = 'fake-ok';
+    expectError(await suggest(admin, second, 'stay'), 503, 'PLACES_UNAVAILABLE');
+    assert.equal(providerCalls(), 0);
+    // Cached destinations keep working meanwhile.
+    expectOk(await suggest(admin, jaipur, 'stay'));
+  });
+
+  await check('the per-person cap counts fresh lookups only, and answers with retryAfter', async () => {
+    const before = await PlaceLookup.countDocuments({ user: admin._id });
+    env.geoapify.userDailyCap = before;
+    const fresh = await makeGroup(admin, { location: 'Mumbai' });
+    const res = await suggest(admin, fresh, 'stay');
+    expectError(res, 429, 'PLACES_LIMIT');
+    assert.ok(res.body.retryAfter > 0 && res.body.retryAfter <= 24 * 60 * 60);
+    assert.equal(providerCalls(), 0);
+    // Cached destinations are free.
+    expectOk(await suggest(admin, jaipur, 'attraction'));
+    // Another person is not affected.
+    await Group.updateOne({ _id: fresh._id }, { $addToSet: { members: member._id } });
+    expectOk(await suggest(member, fresh, 'stay'));
+  });
+
+  await check('the server-wide cap reads as unavailable', async () => {
+    env.geoapify.globalDailyCap = await lookups();
+    const fresh = await makeGroup(stranger, { location: 'Goa' });
+    expectError(await suggest(stranger, fresh, 'stay'), 503, 'PLACES_UNAVAILABLE');
+    assert.equal(providerCalls(), 0);
+  });
+
+  section('Setting the destination');
+
+  await check('the admin fills in a missing destination, and suggestions follow', async () => {
+    const group = await makeGroup(admin, { location: '', members: [admin._id, member._id] });
+    assert.equal(expectOk(await suggest(member, group, 'stay')).reason, 'NO_DESTINATION');
+
+    expectError(
+      await call(member, 'PATCH', `/groups/${group._id}/destination`, { location: 'Jaipur, India' }),
+      403,
+      'DESTINATION_FORBIDDEN'
+    );
+    const tooShort = await call(admin, 'PATCH', `/groups/${group._id}/destination`, { location: 'J' });
+    assert.equal(tooShort.status, 400);
+
+    const set = await call(admin, 'PATCH', `/groups/${group._id}/destination`, { location: '  Jaipur, India ' });
+    assert.equal(set.status, 200, JSON.stringify(set.body));
+    assert.equal(set.body.data.group.location, 'Jaipur, India');
+
+    const data = expectOk(await suggest(member, group, 'stay'));
+    assert.equal(data.items.length, 4);
+    assert.equal(providerCalls(), 0); // Jaipur is cached
+  });
+
+  await check('a home group has no destination to set', async () => {
+    const group = await makeGroup(admin, { groupType: 'home', location: '' });
+    expectError(await call(admin, 'PATCH', `/groups/${group._id}/destination`, { location: 'Jaipur' }), 400, 'TRIP_ONLY');
+  });
+
+  // ---- Teardown ------------------------------------------------------------
+
+  section('Clean-up');
+
+  await new Promise((resolve) => server.close(resolve));
+  await fake.close();
+
+  await check(`throwaway database ${dbName} is dropped`, async () => {
+    await dropThrowawayDatabase();
+    const { databases } = await mongoose.connection.getClient().db('admin').admin().listDatabases();
+    assert.equal(databases.some((db) => db.name === dbName), false);
+  });
+  await mongoose.disconnect();
+
+  // ---- Summary -------------------------------------------------------------
+
+  print('');
+  const groups = [...new Set(results.map((result) => result.group))];
+  for (const group of groups) {
+    const inGroup = results.filter((result) => result.group === group);
+    const passed = inGroup.filter((result) => result.ok).length;
+    print(`${passed === inGroup.length ? 'PASS' : 'FAIL'}  ${group} (${passed}/${inGroup.length})`);
+  }
+  const failed = results.filter((result) => !result.ok).length;
+  print(`\nSMOKE places: ${results.length - failed} passed, ${failed} failed, ${results.length} cases`);
+  return failed;
+};
+
+main()
+  .then((failed) => process.exit(failed ? 1 : 0))
+  .catch(async (err) => {
+    console.error(`Smoke test could not run: ${err.message}`);
+    await dropThrowawayDatabase().catch(() => {});
+    process.exit(1);
+  });

@@ -24,6 +24,9 @@ const listStays = async (groupId, userId) => {
 const createStay = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
   assertDates(payload.checkIn, payload.checkOut);
+  if (payload.placeId && (await Stay.exists({ group: groupId, placeId: payload.placeId }))) {
+    throw new ApiError(409, "That place is already in the group's stays.", { code: 'PLACE_ALREADY_ADDED' });
+  }
 
   const stay = await Stay.create({
     group: groupId,
@@ -37,6 +40,7 @@ const createStay = async (userId, groupId, payload) => {
     amenities: payload.amenities ?? [],
     address: payload.address,
     emoji: payload.emoji,
+    placeId: payload.placeId ?? null,
     bookedBy: userId,
   });
 

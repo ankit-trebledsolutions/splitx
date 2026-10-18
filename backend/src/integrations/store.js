@@ -163,6 +163,10 @@ const r2 = () => {
 
 const stream = () => valuesOf('stream');
 
+// The address, the timeout and the cache length are the server's business and
+// stay in config/env; the key and the caps can come from the panel.
+const geoapify = () => ({ ...env.geoapify, ...valuesOf('geoapify') });
+
 /**
  * Every client ID a Google sign-in may have been issued for.
  *
@@ -186,5 +190,6 @@ module.exports = {
   openai,
   r2,
   stream,
+  geoapify,
   googleClientIds,
 };

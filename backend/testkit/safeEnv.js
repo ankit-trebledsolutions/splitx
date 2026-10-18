@@ -50,6 +50,10 @@ Object.assign(process.env, {
   // Port 9 is "discard": nothing answers there. Tests point this at their own fake server.
   OPENAI_BASE_URL: 'http://127.0.0.1:9/v1',
   OPENAI_TIMEOUT_MS: '1500',
+  // Same idea for the places provider: scripts/fake-geoapify.js plays the scenario named by the "key".
+  GEOAPIFY_API_KEY: 'fake-ok',
+  GEOAPIFY_BASE_URL: 'http://127.0.0.1:9',
+  GEOAPIFY_TIMEOUT_MS: '1500',
 });
 
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
@@ -72,6 +76,9 @@ const assertSafe = (env) => {
   }
   if (!isLocal(env.openai.baseUrl)) {
     throw new Error('safeEnv: OPENAI_BASE_URL does not point at this machine. Refusing to run.');
+  }
+  if (!isLocal(env.geoapify.baseUrl)) {
+    throw new Error('safeEnv: GEOAPIFY_BASE_URL does not point at this machine. Refusing to run.');
   }
 };
 

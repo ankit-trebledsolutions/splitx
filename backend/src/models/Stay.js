@@ -27,6 +27,9 @@ const staySchema = new mongoose.Schema(
     amenities: [{ type: String, trim: true, maxlength: 40 }],
     address: { type: String, trim: true, maxlength: 200, default: '' },
     emoji: { type: String, trim: true, maxlength: 8, default: '🏨' },
+    // The places provider's id when this was picked from the suggestions, so
+    // the tab can mark it as added. Null for a stay typed by hand.
+    placeId: { type: String, trim: true, maxlength: 120, default: null },
     bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }

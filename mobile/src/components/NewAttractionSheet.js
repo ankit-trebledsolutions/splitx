@@ -6,7 +6,9 @@ import { dark, radius, spacing } from '../theme';
 
 const EMOJIS = ['📍', '🎨', '🏙️', '⛩️', '🎮', '🐟', '🌸', '🗼', '🍣', '🏯', '🎡', '🌊'];
 
-const NewAttractionSheet = ({ visible, onClose, onSubmit }) => {
+// `initial` is a suggested place ({ name, category, distanceKm, emoji,
+// placeId }); see NewStaySheet.
+const NewAttractionSheet = ({ visible, initial = null, onClose, onSubmit }) => {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [rating, setRating] = useState('');
@@ -17,14 +19,17 @@ const NewAttractionSheet = ({ visible, onClose, onSubmit }) => {
 
   useEffect(() => {
     if (!visible) return;
-    setName('');
-    setCategory('');
+    setName(initial?.name ?? '');
+    setCategory(initial?.category ?? '');
     setRating('');
-    setDistanceKm('');
-    setEmoji(EMOJIS[0]);
+    setDistanceKm(initial?.distanceKm != null ? String(initial.distanceKm) : '');
+    setEmoji(initial?.emoji || EMOJIS[0]);
     setError('');
     setSaving(false);
-  }, [visible]);
+  }, [visible, initial]);
+
+  // A suggestion's own icon joins the choices when it is not one of them.
+  const emojiOptions = initial?.emoji && !EMOJIS.includes(initial.emoji) ? [initial.emoji, ...EMOJIS] : EMOJIS;
 
   const submit = async () => {
     if (name.trim().length < 2) {
@@ -49,6 +54,7 @@ const NewAttractionSheet = ({ visible, onClose, onSubmit }) => {
         rating: parsedRating ?? undefined,
         distanceKm: parsedDistance ?? undefined,
         emoji,
+        placeId: initial?.placeId || undefined,
       });
     } finally {
       setSaving(false);
@@ -59,7 +65,7 @@ const NewAttractionSheet = ({ visible, onClose, onSubmit }) => {
     <FormSheet
       visible={visible}
       title="New Attraction"
-      subtitle="Add a place the group should check out"
+      subtitle={initial ? 'Suggested for this trip. Edit anything before adding.' : 'Add a place the group should check out'}
       submitLabel="Add Attraction"
       saving={saving}
       onClose={onClose}
@@ -104,7 +110,7 @@ const NewAttractionSheet = ({ visible, onClose, onSubmit }) => {
 
       <Text style={sheetStyles.label}>Icon</Text>
       <View style={styles.emojiGrid}>
-        {EMOJIS.map((option) => {
+        {emojiOptions.map((option) => {
           const active = emoji === option;
           return (
             <TouchableOpacity

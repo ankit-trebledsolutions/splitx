@@ -4,6 +4,7 @@ const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
 const { photoUpload, chatUpload, videoUpload } = require('../middleware/upload');
 const aiLimiter = require('../middleware/aiLimiter');
+const placesLimiter = require('../middleware/placesLimiter');
 const { TIME_12H } = require('../utils/itineraryTime');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
@@ -14,6 +15,7 @@ const itineraryController = require('../controllers/itinerary.controller');
 const photoController = require('../controllers/photo.controller');
 const attractionController = require('../controllers/attraction.controller');
 const stayController = require('../controllers/stay.controller');
+const placeController = require('../controllers/place.controller');
 
 const router = Router();
 router.use(protect);
@@ -215,6 +217,9 @@ const createAttractionSchema = {
     rating: z.number().min(0).max(5).optional(),
     distanceKm: z.number().min(0).max(10000).optional(),
     emoji: z.string().max(8).optional(),
+    // Set when it was picked from the suggestions: the provider's id, so the
+    // same place is not offered again. Free text otherwise sends nothing.
+    placeId: z.string().max(120).optional(),
   }),
 };
 
@@ -231,7 +236,22 @@ const createStaySchema = {
     amenities: z.array(z.string().max(40)).max(12).optional(),
     address: z.string().max(200).optional(),
     emoji: z.string().max(8).optional(),
+    placeId: z.string().max(120).optional(),
   }),
+};
+
+// Suggested hotels / sights at the trip's destination (see
+// services/placeSuggestion.service.js). `refresh=1` asks the provider again
+// when the cached copy is older than ten minutes; it counts towards the caps.
+const placeSuggestionsSchema = {
+  params: z.object({ groupId: objectId, type: z.enum(['stay', 'attraction']) }),
+  query: z.object({ refresh: z.enum(['0', '1']).optional() }),
+};
+
+// The trip's destination, when it was left blank at creation. Admin only.
+const destinationSchema = {
+  params: groupParams.params,
+  body: z.object({ location: z.string().trim().min(2, 'Add a destination').max(120) }),
 };
 
 router.post('/', validate(createGroupSchema), groupController.createGroup);
@@ -294,6 +314,9 @@ router.post(
 
 router.get('/:groupId/attractions', validate(groupParams), attractionController.listAttractions);
 router.post('/:groupId/attractions', validate(createAttractionSchema), attractionController.createAttraction);
+
+router.get('/:groupId/suggestions/:type', placesLimiter, validate(placeSuggestionsSchema), placeController.suggestions);
+router.patch('/:groupId/destination', validate(destinationSchema), groupController.setDestination);
 
 router.get('/:groupId/stays', validate(groupParams), stayController.listStays);
 router.post('/:groupId/stays', validate(createStaySchema), stayController.createStay);

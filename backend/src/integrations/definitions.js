@@ -152,6 +152,54 @@ const INTEGRATIONS = [
     ],
   },
   {
+    key: 'geoapify',
+    name: 'Geoapify',
+    purpose:
+      "Suggests hotels and places to visit at a trip's destination, on the Stays and Attractions tabs. Without a key the tabs simply show no suggestions.",
+    steps: [
+      {
+        title: 'Create a Geoapify account',
+        body: 'Sign up with a work email address. The free plan needs no card and allows 3,000 requests a day, which is far more than the app uses: one destination is looked up once a day however many people are going there.',
+        link: { label: 'Open Geoapify', url: 'https://myprojects.geoapify.com/register' },
+      },
+      {
+        title: 'Create a project',
+        body: 'On My Projects choose Add a new project and name it Splix. The project page shows its API key.',
+        link: { label: 'Open My Projects', url: 'https://myprojects.geoapify.com/projects' },
+      },
+      {
+        title: 'Paste the key here and set the limits',
+        body: 'The limits count only fresh lookups, when a destination is not already known from the last 24 hours. They keep one busy day well inside the free plan.',
+      },
+    ],
+    fields: [
+      {
+        key: 'apiKey',
+        label: 'API key',
+        type: 'secret',
+        pattern: /^[A-Za-z0-9]{20,64}$/,
+        patternHint: 'Copy the key exactly as Geoapify shows it (letters and numbers only)',
+        fromEnv: () => env.geoapify.apiKey,
+      },
+      {
+        key: 'userDailyCap',
+        label: 'Fresh lookups per person, per day',
+        type: 'number',
+        min: 0,
+        max: 1000,
+        fromEnv: () => env.geoapify.userDailyCap,
+      },
+      {
+        key: 'globalDailyCap',
+        label: 'Fresh lookups for everyone, per day',
+        type: 'number',
+        min: 0,
+        max: 100000,
+        fromEnv: () => env.geoapify.globalDailyCap,
+      },
+    ],
+  },
+  {
     key: 'r2',
     name: 'Cloudflare R2',
     purpose: 'Stores the photos and files people upload, in the gallery and in chat.',

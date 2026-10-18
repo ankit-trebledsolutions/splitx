@@ -301,6 +301,54 @@ Response: `{ "success": true, "message": "Group deleted" }`. Afterwards every re
 
 Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller only. While muted, the caller gets no device pushes from this group, other members' reminders there do not ring on their phone (their own still do), and the group's calls do not ring; in-app notifications are still recorded. Response: `{ "data": { "muted": true } }`
 
+### `PATCH /groups/:groupId/destination`
+
+Body: `{ "location": "Jaipur, Rajasthan" }` (2–120 characters). Fills in a trip's destination after the fact; the suggestions below and the AI planner plan around it. Admin only (`403 DESTINATION_FORBIDDEN`), trip groups only (`400 TRIP_ONLY`). Response: `{ "data": { "group": Group } }`.
+
+### `GET /groups/:groupId/suggestions/:type`
+
+Suggested places at the trip's destination for the Stays (`type=stay`, hotels and guest houses) and Attractions (`type=attraction`, sights ranked with heritage sites, forts and temples first) tabs. Data comes from a places provider (Geoapify, OpenStreetMap data); the key is set in the admin panel under Third-Party APIs or as `GEOAPIFY_API_KEY`. Members only, trip groups only (`400 TRIP_ONLY`).
+
+One destination is looked up once per `PLACES_CACHE_HOURS` (24) and shared by every group going there, so cost grows with destinations, not with people. `?refresh=1` asks the provider again when the cached copy is older than ten minutes.
+
+```json
+{
+  "data": {
+    "configured": true,
+    "type": "stay",
+    "destination": { "text": "Jaipur", "resolved": "Jaipur, Rajasthan, India" },
+    "reason": null,
+    "fetchedAt": "2026-10-18T09:00:00.000Z",
+    "items": [
+      {
+        "placeId": "51c0f4…",
+        "name": "Hotel Pearl Palace",
+        "category": "Hotel",
+        "categoryKey": "accommodation.hotel",
+        "emoji": "🏨",
+        "address": "Hathroi Fort, Jaipur, Rajasthan, India",
+        "lat": 26.91,
+        "lon": 75.8,
+        "distanceKm": 1.5
+      }
+    ],
+    "addedPlaceIds": ["51c0f4…"],
+    "provider": { "name": "Geoapify", "attribution": "Powered by Geoapify · © OpenStreetMap contributors", "url": "https://www.geoapify.com/" }
+  }
+}
+```
+
+`configured: false` (no key on the server): the app shows no suggestions. `reason` is `NO_DESTINATION` when the group has none and `UNKNOWN_DESTINATION` when the provider could not place it; both come with an empty `items`. `addedPlaceIds` are the suggestions already in the group's list. The provider's attribution must be shown wherever the items are.
+
+| Code | HTTP | When | Extra |
+| --- | --- | --- | --- |
+| `PLACES_RATE_LIMITED` | 429 | More than 60 requests from one account in 15 minutes | |
+| `PLACES_LIMIT` | 429 | The caller caused more fresh lookups today than `PLACES_USER_DAILY_CAP` (30) | `retryAfter` (seconds) |
+| `PLACES_BUSY` | 503 | The provider is over its own allowance | |
+| `PLACES_UNAVAILABLE` | 503 | The provider refused the key, failed or timed out, or the server-wide `PLACES_GLOBAL_DAILY_CAP` (400) is reached | |
+
+Fresh lookups (cache misses and refreshes) are the only thing the caps count; reading a cached destination is free and unlimited.
+
 ### `GET /groups/:groupId/balances`
 
 Net money position per member plus suggested settlements.
@@ -893,6 +941,7 @@ Create body:
 | `rating` | number | optional, 0–5 |
 | `distanceKm` | number | optional, 0–10000 |
 | `emoji` | string | optional, ≤8 |
+| `placeId` | string | optional, ≤120. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
 
 ### `POST /attractions/:attractionId/toggle-save`
 
@@ -926,6 +975,7 @@ Create body:
 | `amenities` | string[] | optional, ≤12 items |
 | `address` | string | optional, ≤200 |
 | `emoji` | string | optional, ≤8 |
+| `placeId` | string | optional, ≤120. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
 
 ### `PATCH /stays/:stayId`
 

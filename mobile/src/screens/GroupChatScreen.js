@@ -15,6 +15,8 @@ import NewItineraryDaySheet from '../components/NewItineraryDaySheet';
 import ReminderSheet from '../components/ReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
+import PlaceSuggestions from '../components/PlaceSuggestions';
+import SetDestinationSheet from '../components/SetDestinationSheet';
 import ReviewStaySheet from '../components/ReviewStaySheet';
 import ChatTab, { COMPOSER_HEIGHT, composerBottomPadding } from './group/ChatTab';
 import ExpensesTab from './group/ExpensesTab';
@@ -31,7 +33,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import useAiItinerary from '../hooks/useAiItinerary';
 import useReminderActions from '../hooks/useReminderActions';
-import { fetchGroup, fetchExpensePage, appendExpenses } from '../api/groups.api';
+import usePlaceSuggestions from '../hooks/usePlaceSuggestions';
+import { fetchGroup, fetchExpensePage, appendExpenses, setGroupDestination } from '../api/groups.api';
 import { fetchMessages, sendMessage, sendAttachment, deleteMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
 import { fetchReminders } from '../api/reminders.api';
@@ -174,6 +177,10 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [daySheetOpen, setDaySheetOpen] = useState(false);
   const [attractionSheetOpen, setAttractionSheetOpen] = useState(false);
   const [staySheetOpen, setStaySheetOpen] = useState(false);
+  // A suggested place the add sheet opens filled in with (null: from scratch).
+  const [stayPrefill, setStayPrefill] = useState(null);
+  const [attractionPrefill, setAttractionPrefill] = useState(null);
+  const [destinationSheetOpen, setDestinationSheetOpen] = useState(false);
   // The stay whose rating sheet is open.
   const [reviewingStay, setReviewingStay] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
@@ -951,6 +958,7 @@ const GroupChatScreen = ({ route, navigation }) => {
     try {
       const attraction = await createAttraction(groupId, payload);
       setAttractionSheetOpen(false);
+      setAttractionPrefill(null);
       setAttractions((prev) => [...prev, attraction]);
       await refreshMessages();
     } catch (err) {
@@ -999,12 +1007,34 @@ const GroupChatScreen = ({ route, navigation }) => {
     try {
       const stay = await createStay(groupId, payload);
       setStaySheetOpen(false);
+      setStayPrefill(null);
       setStays((prev) =>
         [...prev, stay].sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn))
       );
       await refreshMessages();
     } catch (err) {
       AppAlert.alert('Could not add stay', err.message);
+    }
+  };
+
+  // A suggested place opens the ordinary add sheet, filled in: the member
+  // sees and can change everything before it is saved.
+  const openSuggestedStay = (item) => {
+    setStayPrefill(item);
+    setStaySheetOpen(true);
+  };
+  const openSuggestedAttraction = (item) => {
+    setAttractionPrefill(item);
+    setAttractionSheetOpen(true);
+  };
+
+  const handleSetDestination = async (location) => {
+    try {
+      const updated = await setGroupDestination(groupId, location);
+      setGroup((prev) => ({ ...prev, ...updated }));
+      setDestinationSheetOpen(false);
+    } catch (err) {
+      AppAlert.alert('Could not save the destination', err.message);
     }
   };
 
@@ -1217,6 +1247,31 @@ const GroupChatScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (tripTabsHidden && TRIP_ONLY_TABS.has(tab)) setTab('chat');
   }, [tripTabsHidden, tab]);
+
+  // Suggested places for the Stays and Attractions tabs: asked for when each
+  // tab is first opened, kept for the rest of the visit, asked again when the
+  // destination changes. Only a loaded trip has a destination to ask about.
+  const isTrip = group?.groupType === 'trip';
+  const destination = group?.location ?? '';
+  const staySuggestions = usePlaceSuggestions({
+    groupId,
+    type: 'stay',
+    enabled: isTrip && tab === 'stays',
+    destination,
+  });
+  const attractionSuggestions = usePlaceSuggestions({
+    groupId,
+    type: 'attraction',
+    enabled: isTrip && tab === 'attractions',
+    destination,
+  });
+  const isAdmin = Boolean(adminId) && String(adminId) === String(currentUserId);
+  // What the group already added from the suggestions, so the cards say so.
+  const stayPlaceIds = useMemo(() => stays.map((stay) => stay.placeId).filter(Boolean), [stays]);
+  const attractionPlaceIds = useMemo(
+    () => attractions.map((attraction) => attraction.placeId).filter(Boolean),
+    [attractions]
+  );
 
   const fabActions = (
     {
@@ -1490,6 +1545,16 @@ const GroupChatScreen = ({ route, navigation }) => {
 
       {tab === 'attractions' && !tripTabsHidden && (
         <AttractionsTab
+          header={
+            <PlaceSuggestions
+              type="attraction"
+              suggestions={attractionSuggestions}
+              addedPlaceIds={attractionPlaceIds}
+              isAdmin={isAdmin}
+              onAdd={openSuggestedAttraction}
+              onSetDestination={() => setDestinationSheetOpen(true)}
+            />
+          }
           attractions={attractions}
           loading={loading}
           currentUserId={currentUserId}
@@ -1502,6 +1567,18 @@ const GroupChatScreen = ({ route, navigation }) => {
 
       {tab === 'stays' && (
         <StaysTab
+          header={
+            isTrip ? (
+              <PlaceSuggestions
+                type="stay"
+                suggestions={staySuggestions}
+                addedPlaceIds={stayPlaceIds}
+                isAdmin={isAdmin}
+                onAdd={openSuggestedStay}
+                onSetDestination={() => setDestinationSheetOpen(true)}
+              />
+            ) : null
+          }
           stays={stays}
           loading={loading}
           organiserId={group?.admin ?? group?.createdBy?._id ?? group?.createdBy}
@@ -1590,14 +1667,28 @@ const GroupChatScreen = ({ route, navigation }) => {
 
       <NewAttractionSheet
         visible={attractionSheetOpen}
-        onClose={() => setAttractionSheetOpen(false)}
+        initial={attractionPrefill}
+        onClose={() => {
+          setAttractionSheetOpen(false);
+          setAttractionPrefill(null);
+        }}
         onSubmit={handleAddAttraction}
       />
 
       <NewStaySheet
         visible={staySheetOpen}
-        onClose={() => setStaySheetOpen(false)}
+        initial={stayPrefill}
+        onClose={() => {
+          setStaySheetOpen(false);
+          setStayPrefill(null);
+        }}
         onSubmit={handleAddStay}
+      />
+      <SetDestinationSheet
+        visible={destinationSheetOpen}
+        current={destination}
+        onClose={() => setDestinationSheetOpen(false)}
+        onSubmit={handleSetDestination}
       />
       <ReviewStaySheet
         visible={Boolean(reviewingStay)}

@@ -239,6 +239,26 @@ const setMuted = async (groupId, userId, muted) => {
 };
 
 /**
+ * Fills in a trip's destination after the fact, for a group created without
+ * one. Admin only, like the other things that change a group for everyone;
+ * trips only, because nothing else reads it. The AI planner writes the same
+ * field on a successful plan (see savePlan in aiItinerary.service).
+ */
+const setDestination = async (groupId, userId, location) => {
+  const group = await getGroupForMember(groupId, userId);
+  assertTripGroup(group, 'Only trip groups have a destination.');
+  if (!sameId(group.adminId, userId)) {
+    throw new ApiError(403, 'Only the group admin can change the destination.', {
+      code: 'DESTINATION_FORBIDDEN',
+    });
+  }
+  group.location = location;
+  // Not activity in the group: it must not jump to the top of the list.
+  await group.save({ timestamps: false });
+  return group;
+};
+
+/**
  * The people behind some user ids, as MEMBER_FIELDS documents: the group's
  * members as already loaded, plus one lookup for anyone who has since left.
  */
@@ -422,6 +442,7 @@ module.exports = {
   leaveGroup,
   removeMember,
   setMuted,
+  setDestination,
   getBalances,
   getContributions,
   outstandingShares,

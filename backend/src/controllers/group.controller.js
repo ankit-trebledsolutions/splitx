@@ -43,6 +43,11 @@ const setMuted = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
+const setDestination = asyncHandler(async (req, res) => {
+  const group = await groupService.setDestination(req.params.groupId, req.user._id, req.body.location);
+  res.json({ success: true, data: { group } });
+});
+
 const getBalances = asyncHandler(async (req, res) => {
   const data = await groupService.getBalances(req.params.groupId, req.user._id);
   res.json({ success: true, data });
@@ -62,6 +67,7 @@ module.exports = {
   deleteGroup,
   removeMember,
   setMuted,
+  setDestination,
   getBalances,
   getContributions,
 };

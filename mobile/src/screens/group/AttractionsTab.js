@@ -14,7 +14,9 @@ import useListFocus from '../../hooks/useListFocus';
 
 // "Nearby attractions" list with per-user bookmark toggles, per the mockup.
 // `focusId` is an attraction a chat card asked to show (see StaysTab).
+// `header` goes above the list: the suggested places for the destination.
 const AttractionsTab = ({
+  header = null,
   attractions,
   loading,
   currentUserId,
@@ -96,8 +98,10 @@ const AttractionsTab = ({
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>NEARBY ATTRACTIONS</Text>
+        <>
+          {header}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>NEARBY ATTRACTIONS</Text>
           <TouchableOpacity
             style={styles.mapLink}
             activeOpacity={0.8}
@@ -106,7 +110,8 @@ const AttractionsTab = ({
             <Ionicons name="map-outline" size={13} color={dark.accentGreen} />
             <Text style={styles.mapLinkText}>Map View</Text>
           </TouchableOpacity>
-        </View>
+          </View>
+        </>
       }
       ListEmptyComponent={
         <Text style={styles.empty}>

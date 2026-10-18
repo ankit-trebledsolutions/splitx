@@ -75,6 +75,29 @@ if (!openai.apiKey && isProduction) {
   console.warn('[ai] OPENAI_API_KEY is not set: AI itinerary planning answers "not configured"');
 }
 
+// Hotel and attraction suggestions at a trip's destination (Geoapify Places,
+// OpenStreetMap data). Optional like the planner: without a key the app shows
+// no suggestions and everything else works. The provider is behind one file
+// (services/places.service.js), so these names are the only Geoapify-specific
+// thing outside it.
+const GEOAPIFY_OFFICIAL = 'https://api.geoapify.com';
+const geoapify = {
+  apiKey: process.env.GEOAPIFY_API_KEY || '',
+  // Per request. A suggestion load is two or three of these at most.
+  timeoutMs: intEnv('GEOAPIFY_TIMEOUT_MS', 8000),
+  // Tests and the local fake only. Ignored in production, like OPENAI_BASE_URL.
+  baseUrl: isProduction ? GEOAPIFY_OFFICIAL : process.env.GEOAPIFY_BASE_URL || GEOAPIFY_OFFICIAL,
+  // How long one destination's suggestions are kept before Geoapify is asked
+  // again. Everybody heading to the same place shares one copy.
+  cacheHours: intEnv('PLACES_CACHE_HOURS', 24),
+  // Spend control, counted only when Geoapify is actually called (a cache miss).
+  userDailyCap: intEnv('PLACES_USER_DAILY_CAP', 30),
+  globalDailyCap: intEnv('PLACES_GLOBAL_DAILY_CAP', 400),
+};
+if (!geoapify.apiKey && isProduction) {
+  console.warn('[places] GEOAPIFY_API_KEY is not set: stay and attraction suggestions are off');
+}
+
 // Admin panel > Third-Party APIs. Keys saved there are encrypted with this
 // before they reach the database, so the database on its own gives nothing
 // away. It is the one secret that can never be moved into the panel: stored
@@ -118,6 +141,7 @@ module.exports = {
   mediaBaseUrl,
   email,
   openai,
+  geoapify,
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),

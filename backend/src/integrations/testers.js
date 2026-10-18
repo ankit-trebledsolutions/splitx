@@ -205,6 +205,30 @@ const stream = async ({ apiKey, apiSecret }) => {
   return ok('Stream accepted the key and the secret.');
 };
 
+// One cheap geocoding request. Geoapify answers a wrong key with 401, and a
+// key over its daily allowance with 429: both must not be saved.
+const geoapify = async ({ apiKey, baseUrl = env.geoapify.baseUrl }) => {
+  if (!apiKey) return failed('Enter the API key.');
+
+  let res;
+  try {
+    const url = new URL('/v1/geocode/search', baseUrl);
+    url.search = new URLSearchParams({ text: 'Paris', type: 'city', limit: '1', format: 'json', apiKey });
+    res = await outside.fetch(url.toString());
+  } catch {
+    return unreachable('Geoapify');
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return failed('Geoapify did not accept this key. Copy it again from the project page on My Projects.');
+  }
+  if (res.status === 429) {
+    return failed('Geoapify accepted the key, but this project has used up its allowance for today. Try again tomorrow, or raise the plan.');
+  }
+  if (!res.ok) return failed(`Geoapify answered with an error (${res.status}). Try again in a moment.`);
+  return ok('Geoapify accepted the key.');
+};
+
 // Google has nothing to ask: a client ID is only proven when a phone signs in
 // with it. What can be checked is that each one has the shape of a client ID,
 // which definitions.js already does.
@@ -217,4 +241,4 @@ const google = async (values) => {
   );
 };
 
-module.exports = { outside, resend, openai, r2, stream, google };
+module.exports = { outside, resend, openai, r2, stream, geoapify, google };

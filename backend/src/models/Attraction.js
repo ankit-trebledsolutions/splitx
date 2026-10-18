@@ -14,6 +14,8 @@ const attractionSchema = new mongoose.Schema(
     rating: { type: Number, min: 0, max: 5, default: null },
     distanceKm: { type: Number, min: 0, max: 10000, default: null },
     emoji: { type: String, trim: true, maxlength: 8, default: '📍' },
+    // See Stay.placeId.
+    placeId: { type: String, trim: true, maxlength: 120, default: null },
     // Members who bookmarked it; the card shows the filled bookmark when the
     // current user is in here.
     savedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

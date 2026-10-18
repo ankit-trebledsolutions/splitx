@@ -17,7 +17,10 @@ const defaultCheckIn = () => {
   return date;
 };
 
-const NewStaySheet = ({ visible, onClose, onSubmit }) => {
+// `initial` is a suggested place ({ name, address, placeId }): the sheet opens
+// with it filled in and sends the provider's id along, so the tab can mark it
+// as added. Null for a stay typed from scratch.
+const NewStaySheet = ({ visible, initial = null, onClose, onSubmit }) => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [checkIn, setCheckIn] = useState(defaultCheckIn);
@@ -31,8 +34,8 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
 
   useEffect(() => {
     if (!visible) return;
-    setName('');
-    setAddress('');
+    setName(initial?.name ?? '');
+    setAddress(initial?.address ?? '');
     setCheckIn(defaultCheckIn());
     setNights(2);
     setGuests(2);
@@ -41,7 +44,7 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
     setCalendarOpen(false);
     setError('');
     setSaving(false);
-  }, [visible]);
+  }, [visible, initial]);
 
   const checkOut = new Date(checkIn);
   checkOut.setDate(checkOut.getDate() + nights);
@@ -70,6 +73,7 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
           .map((a) => a.trim())
           .filter(Boolean)
           .slice(0, 12),
+        placeId: initial?.placeId || undefined,
       });
     } finally {
       setSaving(false);
@@ -80,7 +84,7 @@ const NewStaySheet = ({ visible, onClose, onSubmit }) => {
     <FormSheet
       visible={visible}
       title="New Stay"
-      subtitle="Add where the group is staying"
+      subtitle={initial ? 'Suggested for this trip. Check the dates and the price.' : 'Add where the group is staying'}
       submitLabel="Add Stay"
       saving={saving}
       onClose={onClose}

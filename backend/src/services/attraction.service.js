@@ -15,6 +15,11 @@ const listAttractions = async (groupId, userId) => {
 const createAttraction = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
   groupService.assertTripGroup(group, 'Only trip groups have attractions.');
+  if (payload.placeId && (await Attraction.exists({ group: groupId, placeId: payload.placeId }))) {
+    throw new ApiError(409, "That place is already in the group's attractions.", {
+      code: 'PLACE_ALREADY_ADDED',
+    });
+  }
 
   const attraction = await Attraction.create({
     group: groupId,
@@ -23,6 +28,7 @@ const createAttraction = async (userId, groupId, payload) => {
     rating: payload.rating ?? null,
     distanceKm: payload.distanceKm ?? null,
     emoji: payload.emoji,
+    placeId: payload.placeId ?? null,
     addedBy: userId,
   });
 

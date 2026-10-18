@@ -47,10 +47,12 @@ test('assertSafe refuses anything that is not this machine', () => {
     nodeEnv: 'test',
     mongoUri: 'mongodb://127.0.0.1:27017/splix_test',
     openai: { baseUrl: 'http://localhost:4010/v1' },
+    geoapify: { baseUrl: 'http://127.0.0.1:4011' },
   };
   assert.doesNotThrow(() => assertSafe(local));
   assert.throws(() => assertSafe({ ...local, nodeEnv: 'development' }), /NODE_ENV/);
   assert.throws(() => assertSafe({ ...local, mongoUri: 'mongodb+srv://cluster0.example.mongodb.net/splix' }), /MONGODB_URI/);
   assert.throws(() => assertSafe({ ...local, mongoUri: 'mongodb://127.0.0.1:27017,db.example.com:27017/splix' }), /MONGODB_URI/);
   assert.throws(() => assertSafe({ ...local, openai: { baseUrl: 'https://api.openai.com/v1' } }), /OPENAI_BASE_URL/);
+  assert.throws(() => assertSafe({ ...local, geoapify: { baseUrl: 'https://api.geoapify.com' } }), /GEOAPIFY_BASE_URL/);
 });

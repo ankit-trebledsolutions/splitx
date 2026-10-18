@@ -67,7 +67,7 @@ const world = (t, { existing = [], accepts = { ok: true, message: 'Accepted.' } 
   const log = t.mock.method(IntegrationChange, 'create', async (entry) => entry);
 
   const asked = {};
-  for (const name of ['resend', 'openai', 'r2', 'stream', 'google']) {
+  for (const name of ['resend', 'openai', 'geoapify', 'r2', 'stream', 'google']) {
     asked[name] = t.mock.method(testers, name, async () => accepts);
   }
   t.after(() => store.apply([]));
@@ -108,7 +108,7 @@ test('the panel is told where each value comes from, and is never sent a secret'
 
   const { integrations, canSaveSecrets } = await service.list();
   assert.equal(canSaveSecrets, true);
-  assert.deepEqual(integrations.map((entry) => entry.key), ['resend', 'openai', 'r2', 'stream', 'google']);
+  assert.deepEqual(integrations.map((entry) => entry.key), ['resend', 'openai', 'geoapify', 'r2', 'stream', 'google']);
 
   const field = (service_, key) => integrations.find((entry) => entry.key === service_).fields.find((f) => f.key === key);
 
