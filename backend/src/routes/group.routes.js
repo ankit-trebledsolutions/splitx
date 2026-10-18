@@ -219,7 +219,7 @@ const createAttractionSchema = {
     emoji: z.string().max(8).optional(),
     // Set when it was picked from the suggestions: the provider's id, so the
     // same place is not offered again. Free text otherwise sends nothing.
-    placeId: z.string().max(120).optional(),
+    placeId: z.string().max(255).optional(),
   }),
 };
 
@@ -236,7 +236,7 @@ const createStaySchema = {
     amenities: z.array(z.string().max(40)).max(12).optional(),
     address: z.string().max(200).optional(),
     emoji: z.string().max(8).optional(),
-    placeId: z.string().max(120).optional(),
+    placeId: z.string().max(255).optional(),
   }),
 };
 

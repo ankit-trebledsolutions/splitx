@@ -72,7 +72,8 @@ const STAYS = [
 // Deliberately in a poor order, with more than the page the app keeps.
 const ATTRACTIONS = [
   feature('a1', 'Birla Fountain', ['tourism', 'tourism.attraction', 'tourism.attraction.fountain'], { distance: 2500 }),
-  feature('a2', 'Amber Fort', ['tourism', 'tourism.sights', 'tourism.sights.fort', 'heritage', 'heritage.unesco'], {
+  // Real Geoapify ids are 86 to 152 characters long; this one is 150.
+  feature(`a2${'f'.repeat(148)}`, 'Amber Fort', ['tourism', 'tourism.sights', 'tourism.sights.fort', 'heritage', 'heritage.unesco'], {
     distance: 9800,
     wiki_and_media: { wikipedia: 'en:Amer Fort', wikidata: 'Q2468236' },
   }),

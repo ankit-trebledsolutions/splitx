@@ -941,7 +941,7 @@ Create body:
 | `rating` | number | optional, 0–5 |
 | `distanceKm` | number | optional, 0–10000 |
 | `emoji` | string | optional, ≤8 |
-| `placeId` | string | optional, ≤120. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
+| `placeId` | string | optional, ≤255. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
 
 ### `POST /attractions/:attractionId/toggle-save`
 
@@ -975,7 +975,7 @@ Create body:
 | `amenities` | string[] | optional, ≤12 items |
 | `address` | string | optional, ≤200 |
 | `emoji` | string | optional, ≤8 |
-| `placeId` | string | optional, ≤120. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
+| `placeId` | string | optional, ≤255. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
 
 ### `PATCH /stays/:stayId`
 

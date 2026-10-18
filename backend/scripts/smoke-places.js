@@ -283,6 +283,21 @@ const main = async () => {
     assert.equal(typed.body.data.attraction.placeId, null);
   });
 
+  await check('a provider id as long as the real ones (150 characters) is accepted', async () => {
+    const suggestions = expectOk(await suggest(admin, jaipur, 'attraction'));
+    const amber = suggestions.items.find((item) => item.name === 'Amber Fort');
+    assert.equal(amber.placeId.length, 150);
+    const created = await call(admin, 'POST', `/groups/${jaipur._id}/attractions`, {
+      name: amber.name,
+      category: amber.category,
+      emoji: amber.emoji,
+      placeId: amber.placeId,
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.data.attraction.placeId, amber.placeId);
+    assert.ok(expectOk(await suggest(member, jaipur, 'attraction')).addedPlaceIds.includes(amber.placeId));
+  });
+
   section('Refreshing');
 
   await check('a refresh within ten minutes is the cached copy; after that it asks again', async () => {
