@@ -21,6 +21,11 @@ const COPY = {
 };
 
 const CARD_WIDTH = 236;
+// Every card is the same size whatever its text, so the row lines up and the
+// Add button sits in the same place on each: the name gets exactly two lines,
+// the meta and the address exactly one, and the button is pinned to the bottom.
+const NAME_LINE_HEIGHT = 17;
+const CARD_HEIGHT = 158;
 
 /**
  * "Suggested in Jaipur": a row of hotels or sights at the trip's destination,
@@ -30,8 +35,17 @@ const CARD_WIDTH = 236;
  *
  *   suggestions: what usePlaceSuggestions returns
  *   addedPlaceIds: provider ids already in the group's list (marked "Added")
+ *   onOpen: a tap on the card itself, which shows everything about the place
  */
-const PlaceSuggestions = ({ type, suggestions, addedPlaceIds = [], isAdmin, onAdd, onSetDestination }) => {
+const PlaceSuggestions = ({
+  type,
+  suggestions,
+  addedPlaceIds = [],
+  isAdmin,
+  onAdd,
+  onOpen,
+  onSetDestination,
+}) => {
   const { status, data, error, refreshing, refresh, retry } = suggestions;
   const copy = COPY[type] ?? COPY.attraction;
 
@@ -115,7 +129,7 @@ const PlaceSuggestions = ({ type, suggestions, addedPlaceIds = [], isAdmin, onAd
             .filter(Boolean)
             .join(' · ');
           return (
-            <View style={styles.card}>
+            <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => onOpen?.(item)}>
               <View style={styles.cardTop}>
                 <View style={styles.emojiTile}>
                   <Text style={styles.emoji}>{item.emoji || '📍'}</Text>
@@ -124,32 +138,34 @@ const PlaceSuggestions = ({ type, suggestions, addedPlaceIds = [], isAdmin, onAd
                   <Text style={styles.name} numberOfLines={2}>
                     {item.name}
                   </Text>
-                  {meta ? (
-                    <Text style={styles.meta} numberOfLines={1}>
-                      {meta}
-                    </Text>
-                  ) : null}
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {meta || ' '}
+                  </Text>
                 </View>
               </View>
-              {item.address ? (
-                <Text style={styles.address} numberOfLines={1}>
-                  {item.address}
-                </Text>
-              ) : null}
-              <TouchableOpacity
-                style={[styles.addButton, isAdded && styles.addedButton]}
-                activeOpacity={0.8}
-                disabled={isAdded}
-                onPress={() => onAdd?.(item)}
-              >
-                <Ionicons
-                  name={isAdded ? 'checkmark' : 'add'}
-                  size={14}
-                  color={isAdded ? dark.textMuted : '#04121C'}
-                />
-                <Text style={[styles.addText, isAdded && styles.addedText]}>{isAdded ? 'Added' : 'Add'}</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.address} numberOfLines={1}>
+                {item.address || ' '}
+              </Text>
+              <View style={styles.cardBottom}>
+                <TouchableOpacity
+                  style={[styles.addButton, isAdded && styles.addedButton]}
+                  activeOpacity={0.8}
+                  disabled={isAdded}
+                  onPress={() => onAdd?.(item)}
+                >
+                  <Ionicons
+                    name={isAdded ? 'checkmark' : 'add'}
+                    size={14}
+                    color={isAdded ? dark.textMuted : '#04121C'}
+                  />
+                  <Text style={[styles.addText, isAdded && styles.addedText]}>{isAdded ? 'Added' : 'Add'}</Text>
+                </TouchableOpacity>
+                <View style={styles.detailsHint}>
+                  <Text style={styles.detailsText}>Details</Text>
+                  <Ionicons name="chevron-forward" size={12} color={dark.textMuted} />
+                </View>
+              </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -243,6 +259,7 @@ const styles = StyleSheet.create({
   gap: { width: spacing.sm },
   card: {
     width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     backgroundColor: dark.card2,
     borderWidth: 1,
     borderColor: dark.border,
@@ -250,6 +267,15 @@ const styles = StyleSheet.create({
     padding: spacing.sm + 4,
   },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start' },
+  // Pinned to the bottom of the card whatever the text above it took.
+  cardBottom: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  detailsHint: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  detailsText: { color: dark.textMuted, fontSize: 11, fontWeight: '600' },
   emojiTile: {
     width: 36,
     height: 36,
@@ -261,20 +287,25 @@ const styles = StyleSheet.create({
   },
   emoji: { fontSize: 18 },
   cardText: { flex: 1 },
-  name: { color: dark.text, fontSize: 13, fontWeight: '700', lineHeight: 17 },
-  meta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
-  address: { color: dark.textMuted, fontSize: 11, marginTop: spacing.sm },
+  // Always two lines tall, so a one-line name does not pull the rest up.
+  name: {
+    color: dark.text,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: NAME_LINE_HEIGHT,
+    height: NAME_LINE_HEIGHT * 2,
+  },
+  meta: { color: dark.textMuted, fontSize: 11, lineHeight: 15, marginTop: 2 },
+  address: { color: dark.textMuted, fontSize: 11, lineHeight: 15, marginTop: spacing.sm },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    alignSelf: 'flex-start',
     backgroundColor: dark.accentGreen,
     borderRadius: 10,
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 6,
-    marginTop: spacing.sm + 2,
   },
   addedButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: dark.border },
   addText: { color: '#04121C', fontSize: 11, fontWeight: '800' },

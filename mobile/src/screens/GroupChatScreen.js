@@ -17,6 +17,7 @@ import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
 import PlaceSuggestions from '../components/PlaceSuggestions';
 import SetDestinationSheet from '../components/SetDestinationSheet';
+import PlaceDetailSheet from '../components/PlaceDetailSheet';
 import ReviewStaySheet from '../components/ReviewStaySheet';
 import ChatTab, { COMPOSER_HEIGHT, composerBottomPadding } from './group/ChatTab';
 import ExpensesTab from './group/ExpensesTab';
@@ -181,6 +182,8 @@ const GroupChatScreen = ({ route, navigation }) => {
   const [stayPrefill, setStayPrefill] = useState(null);
   const [attractionPrefill, setAttractionPrefill] = useState(null);
   const [destinationSheetOpen, setDestinationSheetOpen] = useState(false);
+  // The suggestion whose details are open: { type: 'stay' | 'attraction', item }.
+  const [placeDetail, setPlaceDetail] = useState(null);
   // The stay whose rating sheet is open.
   const [reviewingStay, setReviewingStay] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
@@ -1552,6 +1555,7 @@ const GroupChatScreen = ({ route, navigation }) => {
               addedPlaceIds={attractionPlaceIds}
               isAdmin={isAdmin}
               onAdd={openSuggestedAttraction}
+              onOpen={(item) => setPlaceDetail({ type: 'attraction', item })}
               onSetDestination={() => setDestinationSheetOpen(true)}
             />
           }
@@ -1575,6 +1579,7 @@ const GroupChatScreen = ({ route, navigation }) => {
                 addedPlaceIds={stayPlaceIds}
                 isAdmin={isAdmin}
                 onAdd={openSuggestedStay}
+                onOpen={(item) => setPlaceDetail({ type: 'stay', item })}
                 onSetDestination={() => setDestinationSheetOpen(true)}
               />
             ) : null
@@ -1689,6 +1694,30 @@ const GroupChatScreen = ({ route, navigation }) => {
         current={destination}
         onClose={() => setDestinationSheetOpen(false)}
         onSubmit={handleSetDestination}
+      />
+      <PlaceDetailSheet
+        visible={Boolean(placeDetail)}
+        type={placeDetail?.type}
+        item={placeDetail?.item}
+        destination={destination}
+        added={
+          placeDetail
+            ? (placeDetail.type === 'stay' ? stayPlaceIds : attractionPlaceIds).includes(placeDetail.item.placeId) ||
+              ((placeDetail.type === 'stay' ? staySuggestions : attractionSuggestions).data?.addedPlaceIds ?? []).includes(
+                placeDetail.item.placeId
+              )
+            : false
+        }
+        attribution={(placeDetail?.type === 'stay' ? staySuggestions : attractionSuggestions).data?.provider?.attribution}
+        onClose={() => setPlaceDetail(null)}
+        onAdd={(item) => {
+          // The detail sheet hands over to the add sheet. Android drops a
+          // Modal opened while another is still closing, so the second one
+          // waits for the slide-out.
+          const type = placeDetail?.type;
+          setPlaceDetail(null);
+          setTimeout(() => (type === 'stay' ? openSuggestedStay(item) : openSuggestedAttraction(item)), 350);
+        }}
       />
       <ReviewStaySheet
         visible={Boolean(reviewingStay)}
