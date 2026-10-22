@@ -27,7 +27,8 @@ const retryAfterSeconds = (user) => {
 };
 
 /**
- * Creates a fresh code for the user, stores its hash and emails it.
+ * Creates a fresh code for the user, stores its hash and emails it (in test
+ * mode a sign-up code is handed back for the app to show instead).
  * Expects `user` loaded with `+otp`. Throws 429 inside the cooldown or once the
  * hourly cap is hit, so nobody can use Splix to flood someone's inbox.
  */
@@ -62,15 +63,26 @@ const issueOtp = async (user, purpose) => {
   };
   await user.save({ validateBeforeSave: false });
 
+  const result = { sent: true, retryAfter: OTP_RESEND_COOLDOWN_MS / 1000 };
+
+  // Test mode, until a domain is set up: the test sender can't reach people,
+  // so a sign-up code goes back to the app, which shows it on the code screen.
+  // Never a reset code: shown on screen, it would let anyone set a new
+  // password on any account just by typing its email.
+  if (purpose === PURPOSE.VERIFY && emailService.usesTestSender()) {
+    console.warn('[email] test mode: the sender is on resend.dev, so a sign-up code was shown in the app instead of emailed');
+    return { ...result, devOtp: code };
+  }
+
   try {
     if (purpose === PURPOSE.VERIFY) await emailService.sendVerificationCode(user, code, OTP_TTL_MINUTES);
     else await emailService.sendPasswordResetCode(user, code, OTP_TTL_MINUTES);
   } catch (err) {
-    // The mail provider refused (with Resend's onboarding@resend.dev sender it
-    // only delivers to the Resend account owner). Nothing reached an inbox, so
-    // this attempt must not count: no cooldown, no place in the hourly cap, and
-    // any earlier code keeps working. The reason goes to the log, and the
-    // person gets a message instead of a bare "Internal server error".
+    // The mail provider refused or could not be reached (in test mode, every
+    // reset code to anyone but the Resend account owner). Nothing reached an
+    // inbox, so this attempt must not count: no cooldown, no place in the
+    // hourly cap, and any earlier code keeps working. The reason goes to the
+    // log, and the person gets a message instead of "Internal server error".
     console.error(`[email] could not send the ${purpose} code:`, err.message);
     user.otp = previous;
     await user.save({ validateBeforeSave: false });
@@ -79,7 +91,6 @@ const issueOtp = async (user, purpose) => {
     });
   }
 
-  const result = { sent: true, retryAfter: OTP_RESEND_COOLDOWN_MS / 1000 };
   // With no mail provider configured nothing reaches an inbox, so development
   // builds get the code back to show on screen. Never in production.
   if (!emailService.isConfigured() && env.nodeEnv !== 'production') result.devOtp = code;

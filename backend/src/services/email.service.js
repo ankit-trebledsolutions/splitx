@@ -20,6 +20,19 @@ const RESEND_URL = 'https://api.resend.com/emails';
 // A function, not a constant: the answer changes when a key is saved in the panel.
 const isConfigured = () => Boolean(integrations.resend().apiKey);
 
+// Resend's shared test sender (onboarding@resend.dev) only delivers to the
+// Resend account owner's own inbox. While it is the sender, sign-up codes are
+// shown in the app instead (auth.service.js). Asked each time a code goes out,
+// so saving a sender on a verified domain in the panel switches codes back to
+// email with no restart.
+const TEST_SENDER_DOMAIN = 'resend.dev';
+const usesTestSender = () => {
+  const { from = '' } = integrations.resend();
+  // "Splix <x@y>" or a bare "x@y".
+  const address = (from.match(/<([^>]*)>/)?.[1] ?? from).trim().toLowerCase();
+  return address.endsWith(`@${TEST_SENDER_DOMAIN}`);
+};
+
 const deliver = async ({ to, subject, html, text }) => {
   const { apiKey, from } = integrations.resend();
   if (!apiKey) {
@@ -65,6 +78,7 @@ const sendQuietly = (to, key, vars) => {
 
 module.exports = {
   isConfigured,
+  usesTestSender,
   sendVerificationCode: (user, code, minutes) =>
     send(user.email, 'verify_email', { name: user.name, code, minutes }),
   sendPasswordResetCode: (user, code, minutes) =>
