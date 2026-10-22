@@ -12,6 +12,8 @@ const Attraction = require('../models/Attraction');
 const Stay = require('../models/Stay');
 const ItineraryDay = require('../models/ItineraryDay');
 const ItineraryJob = require('../models/ItineraryJob');
+const Wallet = require('../models/Wallet');
+const CreditTransaction = require('../models/CreditTransaction');
 const storage = require('../storage');
 const ApiError = require('../utils/ApiError');
 const groupDeletion = require('./groupDeletion.service');
@@ -215,6 +217,10 @@ const deleteUser = async (userId) => {
     // so they go through storage as the photos above did.
     Notification.deleteMany({ user: userId }),
     supportService.removeForUser(userId),
+    // Credits go with the account. Straight to the models rather than through
+    // wallet.service, which requires admin.service, which requires this file.
+    Wallet.deleteOne({ user: userId }),
+    CreditTransaction.deleteMany({ user: userId }),
   ]);
 
   await User.deleteOne({ _id: userId });

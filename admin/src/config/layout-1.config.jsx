@@ -1,4 +1,4 @@
-import { Layout, LayoutGrid, LifeBuoy, Settings, Shield } from 'lucide-react';
+import { Layout, LayoutGrid, LifeBuoy, Settings, Shield, Wallet } from 'lucide-react';
 import { PERMISSIONS, ROLES } from '@/lib/permissions';
 import { SupportMenuBadge } from '@/components/layouts/layout-1/components/support-menu-badge';
 
@@ -51,6 +51,12 @@ export const MENU_SIDEBAR = [
     // signed-in admin can use are rendered, so the count is only ever asked
     // for by someone the server would answer.
     badge: SupportMenuBadge,
+  },
+  {
+    title: 'Wallet',
+    icon: Wallet,
+    path: '/wallet',
+    permission: PERMISSIONS.WALLET,
   },
   {
     title: 'General Settings',

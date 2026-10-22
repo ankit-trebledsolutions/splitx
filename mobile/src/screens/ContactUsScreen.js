@@ -51,10 +51,12 @@ const CHANNELS = [
  * Contact Us: a plain message to the team. It lands in the same place as a
  * report, so the reply comes back in the app under My Reports. The account is
  * the sender; there is nothing to type in about who you are.
+ *
+ * Route params (optional): { subject }, to start the message ("More credits" from the wallet).
  */
-const ContactUsScreen = ({ navigation }) => {
+const ContactUsScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(route.params?.subject ?? '');
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);

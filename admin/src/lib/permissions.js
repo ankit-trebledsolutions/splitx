@@ -24,6 +24,10 @@ export const PERMISSIONS = {
   EMAIL_TEMPLATE: 'email_template',
   // Reports people send from the app (Profile > Help & Support).
   SUPPORT: 'support',
+  // People's credits: reading balances and history, and (with read_write)
+  // granting or deducting. Prices and allowances are owners only, whatever
+  // this says.
+  WALLET: 'wallet',
 };
 
 const ACCESS_WEIGHT = {

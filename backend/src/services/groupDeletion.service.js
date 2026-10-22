@@ -13,6 +13,7 @@ const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const notificationService = require('./notification.service');
 const reminderSync = require('./reminderSync.service');
+const walletService = require('./wallet.service');
 const storage = require('../storage');
 const realtime = require('../realtime/socket');
 
@@ -68,10 +69,17 @@ const deleteGroup = async (groupId, userId) => {
   const admin = group.members.find((m) => m._id.equals(userId));
   const others = group.members.filter((m) => !m._id.equals(userId));
   const files = await storedFilesOf(groupId);
+  // A plan still being made dies with the group, so whoever asked for it is
+  // refunded: once its row is deleted the job can no longer fail and refund.
+  const planning = await ItineraryJob.find({ group: groupId, status: 'running' }).select('_id').lean();
 
   // The group first: from this moment every request for it answers 404, so
   // nothing new can be added to it while its contents are being removed.
   await group.deleteOne();
+  for (const job of planning) {
+    // eslint-disable-next-line no-await-in-loop
+    await walletService.refundQuietly(`ai:${job._id}`);
+  }
   await Promise.all(CHILD_MODELS.map((Model) => Model.deleteMany({ group: groupId })));
 
   realtime.closeGroup(groupId, { name: group.name, deletedBy: userId });

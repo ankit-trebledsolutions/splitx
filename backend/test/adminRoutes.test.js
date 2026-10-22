@@ -94,6 +94,12 @@ test('every admin endpoint refuses an anonymous caller', async () => {
       ['POST', '/api/v1/admin/integrations/resend/test'],
       ['PUT', '/api/v1/admin/integrations/resend'],
       ['POST', '/api/v1/admin/integrations/resend/reset'],
+      ['GET', '/api/v1/admin/wallet/summary'],
+      ['GET', '/api/v1/admin/wallet/settings'],
+      ['PUT', '/api/v1/admin/wallet/settings'],
+      ['GET', '/api/v1/admin/wallet/transactions'],
+      ['GET', '/api/v1/admin/wallet/users/65a000000000000000000001'],
+      ['POST', '/api/v1/admin/wallet/users/65a000000000000000000001/adjust'],
     ];
 
     for (const [method, path] of attempts) {

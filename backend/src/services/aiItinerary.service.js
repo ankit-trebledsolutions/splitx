@@ -15,6 +15,7 @@ const ai = require('./ai.service');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
 const notificationService = require('./notification.service');
+const walletService = require('./wallet.service');
 const { buildFacts, MAX_DAYS } = require('./aiItinerary.prompt');
 const { sanitizeItinerary } = require('./aiItinerary.sanitizer');
 
@@ -235,6 +236,10 @@ const assertWithinCaps = async (userId, groupId) => {
 // True when every write the driver refused was refused for a duplicate key.
 const isDuplicateOnly = (err) => (err.writeErrors ?? [err]).every((writeError) => writeError.code === 11000);
 
+// The credits for one run are charged under this key, and refunded under it
+// whenever the run does not end in a saved plan.
+const chargeKeyOf = (jobId) => `ai:${jobId}`;
+
 /**
  * Puts back the days a replace deleted, if this job got that far. Safe to call
  * more than once and from any instance: it only inserts what is missing.
@@ -295,6 +300,8 @@ const fail = async (jobId, errorCode, billing = {}) => {
   ).lean();
   if (!failed) return;
 
+  // Every failure is refunded, cancellations included: the person got no plan.
+  await walletService.refundQuietly(chargeKeyOf(jobId));
   announce(failed, await toClient(failed));
   // Cancelled means the requester was removed or the group is gone. They have
   // already been told that, and a push would deep-link into a group they lost.
@@ -332,7 +339,7 @@ const reapStale = async (extraFilter = {}) => {
       continue;
     }
     // eslint-disable-next-line no-await-in-loop
-    await ItineraryJob.updateOne(
+    const closed = await ItineraryJob.updateOne(
       { _id: job._id, status: 'running' },
       {
         $set: {
@@ -346,6 +353,9 @@ const reapStale = async (extraFilter = {}) => {
         $unset: { backupDays: '', newDayIds: '' },
       }
     );
+    // Whoever closed it refunds it; the person got no plan either way.
+    // eslint-disable-next-line no-await-in-loop
+    if (closed.modifiedCount === 1) await walletService.refundQuietly(chargeKeyOf(job._id));
   }
 };
 
@@ -459,6 +469,21 @@ const start = async (userId, groupId, body) => {
     if (err.code !== 11000) throw err;
     // Two requests passed the checks together; the unique index let one through.
     throw alreadyRunning(await toClient(await latestJobOf(groupId)));
+  }
+
+  // Charged only once the lock is held, so the request that lost the race above
+  // pays nothing. Free while the price is 0.
+  try {
+    await walletService.charge(userId, {
+      feature: 'ai_itinerary',
+      key: chargeKeyOf(job._id),
+      ref: String(job._id),
+    });
+  } catch (err) {
+    // Not enough credits (or the wallet was busy). Nothing has run: the row only
+    // held the lock, and nobody has been told about it yet.
+    await ItineraryJob.deleteOne({ _id: job._id, status: 'running' });
+    throw err;
   }
 
   try {

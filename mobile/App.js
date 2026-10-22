@@ -11,6 +11,7 @@ import TourOverlay from './src/tour/TourOverlay';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AppAlertHost } from './src/components/AppAlert';
 import { AlarmPermissionHost } from './src/components/AlarmPermissionSheet';
+import { NoCreditsHost } from './src/components/NoCreditsSheet';
 
 export default function App() {
   return (
@@ -23,6 +24,8 @@ export default function App() {
                 <NavigationContainer>
                   <StatusBar style="dark" />
                   <RootNavigator />
+                  {/* In here, not with the hosts below: its button opens Contact Us. */}
+                  <NoCreditsHost />
                 </NavigationContainer>
               </ActiveCallProvider>
             </StreamVideoProvider>

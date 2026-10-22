@@ -31,6 +31,14 @@ export const accountSettings = [
     value: 'Push, Email & SMS',
     screen: 'Notifications',
   },
+  {
+    // The value is the balance once it has loaded (ProfileScreen).
+    key: 'wallet',
+    icon: 'wallet',
+    label: 'Wallet',
+    value: 'Credits and history',
+    screen: 'Wallet',
+  },
 ];
 
 export const helpSupport = [

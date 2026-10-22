@@ -21,6 +21,8 @@ const PERMISSIONS = {
   EMAIL_TEMPLATE: 'email_template',
   // Reports people send from the app (Profile > Help & Support).
   SUPPORT: 'support',
+  // People's credits: read their history, grant and deduct. Prices are owners only.
+  WALLET: 'wallet',
 };
 
 const ACCESS_LEVEL = {

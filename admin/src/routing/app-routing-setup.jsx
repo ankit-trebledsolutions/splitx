@@ -23,6 +23,7 @@ import GeneralSettings from '@/pages/layout-1/general-settings/general-settings'
 import ThirdPartyApis from '@/pages/layout-1/general-settings/third-party-apis/third-party-apis';
 import Support from '@/pages/layout-1/support/support';
 import ReportPage from '@/pages/layout-1/support/report-page';
+import WalletPage from '@/pages/layout-1/wallet/wallet';
 
 // The editing screen brings the whole rich-text editor with it, which is
 // larger than the rest of the panel put together. Loaded when it is opened, so
@@ -173,6 +174,18 @@ export function AppRoutingSetup() {
           <Route index element={<Support />} />
           <Route path=":id" element={<ReportPage />} />
         </Route>
+
+        {/* People's credits. Reading needs the module; the page decides what
+            else to show (prices are owners only), and the server refuses
+            the rest either way. */}
+        <Route
+          path="wallet"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.WALLET}>
+              <WalletPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="general-settings"

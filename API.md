@@ -696,7 +696,21 @@ Body: `{ "groupId": "<groupId>", "event": "started" | "ended", "video"?: true | 
 
 An Android app that knows about calls rings like a phone call from it; an iPhone, or an older Android build, shows `text` as an ordinary notification instead (made by the app's background push task), which opens the group when tapped. A second `started` for the same group within 15 seconds is the same call and rings nobody again.
 
-**`ended` stops the ringing.** Every other member (muted or not) gets a silent push `data: { type: "call", action: "end", groupId, at }` and the realtime event `call:end` with the same `data`. A phone still ringing for that group stops and shows the call as missed; one that has not had the ring yet shows it as missed when it arrives.
+**`ended` stops the ringing.** Every other member (muted or not) gets a silent push `data: { type: "call", action: "end", groupId, at }` and the realtime event `call:end` with the same `data`. A phone still ringing for that group stops and shows the call as missed; one that has not had the ring yet shows it as missed when it arrives. It also stops the call's bill (see below), as a hint the billing sweep checks against Stream.
+
+### `POST /stream/call-start`
+
+Body: `{ "groupId": "<groupId>" }`. Sent by the app just before it starts a call in an empty room (before it joins and before `call-event started`). Members only (`403`).
+
+- While calls are free: `{ "data": { "billed": false } }`.
+- Otherwise the caller pays the first block now: `{ "data": { "billed": true, "price", "blockMinutes" } }`, or `402 NO_CREDITS` (with `needed`, `balance`, `feature: "call"`), in which case the app must not join or ring anyone. `{ "billed": false }` also answers a second member starting at the same moment: they join the first one's call.
+
+**How calls are billed.** Whoever starts a call pays `callBlock` credits for each started block of `callBlockMinutes` (see [Wallet](#wallet)); people who join pay nothing. Once a minute the server asks Stream which calls are live and charges each block as it starts. A live call the app never announced (an older build, or one that skipped `call-start`) is billed to whoever has been in it longest, if they are a member. A paid call Stream never showed within two minutes (the phone paid, then failed to join) has its first block given back.
+
+When the payer cannot pay the next block, the server takes everyone out of the call through Stream (it removes them rather than ending the call: an ended call cannot be joined again, and the group keeps the same call id), posts "Call ended: not enough credits" in the chat and sends the usual `call:end` to the others. Realtime events:
+
+- `wallet:call-low` `{ groupId, endsAt }`, to the payer, about 90 seconds before a block they cannot pay
+- `wallet:call-ended` `{ groupId, reason: "no_credits", payerId }`, to the whole group, so every phone in the call lets go of it
 
 ---
 
@@ -806,7 +820,9 @@ The group's own `location`, `startDate` and `totalDays` always win. `destination
 
 Job object: `{ _id, group, status: "running" | "done" | "failed", replace, requestedBy: { _id, name }, startedAt, finishedAt, dayCount, errorCode, errorMessage }`. `finishedAt`, `errorCode` and `errorMessage` are `null` until they apply.
 
-Errors: `400` (validation), `AI_TRIP_ONLY`, `AI_TRIP_DETAILS_REQUIRED`, `AI_REPLACE_FORBIDDEN`, `ITINERARY_EXISTS`, `AI_ALREADY_RUNNING`, `AI_LIMIT`, `AI_RATE_LIMITED`, `AI_NOT_CONFIGURED`, `AI_UNAVAILABLE` (see the table above). None of them creates a job or costs anything.
+Errors: `400` (validation), `AI_TRIP_ONLY`, `AI_TRIP_DETAILS_REQUIRED`, `AI_REPLACE_FORBIDDEN`, `ITINERARY_EXISTS`, `AI_ALREADY_RUNNING`, `AI_LIMIT`, `AI_RATE_LIMITED`, `AI_NOT_CONFIGURED`, `AI_UNAVAILABLE` (see the table above), and `402 NO_CREDITS` when the plan has a price (see [Wallet](#wallet)) the caller cannot pay. None of them creates a job or costs anything.
+
+When the plan has a price, it is charged once the job is created and refunded automatically if the job ends in anything but a saved plan (any `errorCode`, a server dying mid-run, the group being deleted).
 
 A finished plan posts one chat line ("X planned a N-day itinerary with AI", or "X replanned the itinerary with AI (N days)"), notifies the other members ("Itinerary Ready") and notifies the requester ("Your itinerary is ready"). A failed one notifies only the requester ("Could not create itinerary", with the job's `errorMessage`); `AI_CANCELLED` and `AI_STALE` notify nobody. All of these pushes carry `data: { type: "itinerary", groupId }`. Text written by AI only ever appears in itinerary days, never in chat lines or notifications.
 
@@ -1071,6 +1087,51 @@ The queue lives under `/admin/support`, behind the panel's cookie session and th
 | `PATCH /admin/support/reports/:id/status` | `{ "status" }`; tells the reporter |
 | `PATCH /admin/support/reports/:id/priority` | `{ "priority": "low" / "normal" / "high" }`; tells nobody |
 | `POST /admin/support/reports/:id/replies` | `{ "body", "internal" }`; a reply tells the reporter and moves an `open` report to `in_progress`; an internal note is seen by admins only |
+
+---
+
+## Wallet
+
+Credits that paid features use up. A person's credits sit in two pots, shown as one `balance`:
+
+- `free`: this month's free credits. Spent first; topped up to `monthlyFree` at the start of each month (UTC), and unused ones do not carry over.
+- `paid`: everything else (the one-time signup bonus, credits added by an admin, later purchases). Never expires.
+
+A wallet appears the first time anything touches it, existing accounts included, with the signup bonus and this month's free credits. Nothing the app sends can add credits: these routes only read.
+
+Paid features and their prices (credits, `0` = free; both start at `0`, so charging is off until an owner sets a price in the admin panel):
+
+| Feature | Price | Paid by |
+| --- | --- | --- |
+| `ai_itinerary` | `aiItinerary` per plan; refunded when the plan fails | whoever asked for the plan |
+| `call` | `callBlock` per started `callBlockMinutes` | whoever started the call |
+
+When someone cannot pay, the request is `402` with `code: "NO_CREDITS"`, `needed`, `balance` and `feature`, and nothing is charged. Every change to a balance sends the owner the realtime event `wallet:updated` `{ balance, free, paid }`.
+
+### `GET /wallet`
+
+`{ "data": { "wallet": { "balance", "free", "paid", "monthlyFree", "freeRenewsAt", "prices": { "aiItinerary", "callBlock", "callBlockMinutes" } } } }`. `freeRenewsAt` is when this month's free credits are replaced.
+
+### `GET /wallet/transactions`
+
+The caller's history, newest first. Query `page` (default 1) and `limit` (1–50, default 20).
+
+`{ "data": { "items": [{ "id", "type", "amount", "feature", "balanceAfter", "freeAfter", "createdAt" }], "total", "page", "pages" } }`
+
+`type` is one of `bonus` (signup), `monthly` (free credits topped up; `amount` is the change, `freeAfter` what the pot now holds), `spend`, `refund`, `grant` and `deduct` (by an admin). `amount` is signed. An admin's reason, and who they are, never reach the app.
+
+### Admin panel
+
+Under `/admin/wallet`, behind the panel's session and the `wallet` permission module: read access to see balances and history, read-write to grant and deduct. Prices and allowances are owners only. Co-admins can grant or deduct at most `coAdminGrantCap` credits at once, never on their own account, and owners' wallets are "not found" to them.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/wallet/summary` | the settings, credits held (`free`, `paid`, `wallets`), the last 30 days by type and feature, and `check`: balances whose history does not add up (should be empty) |
+| `GET /admin/wallet/settings` | `{ "settings": { "prices": { "aiItinerary", "callBlock" }, "callBlockMinutes", "signupBonus", "monthlyFree", "coAdminGrantCap", "updatedAt" } }` |
+| `PUT /admin/wallet/settings` | owners only; the same fields, whole numbers. Applies to the next request |
+| `GET /admin/wallet/transactions` | every change, newest first, with the person, the admin and their reason: `page`, `limit`, `type`, `feature` |
+| `GET /admin/wallet/users/:id` | one person's `wallet` and paged `transactions` |
+| `POST /admin/wallet/users/:id/adjust` | `{ "type": "grant" \| "deduct", "amount", "reason" (3–300), "requestId" (a UUID per press) }`. The same `requestId` is applied once. A deduction cannot take a balance below zero |
 
 ---
 

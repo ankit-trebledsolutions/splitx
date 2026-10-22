@@ -11,6 +11,8 @@ import { integrationsApi } from '@/features/integrations/integrationsApi';
 import { dashboardApi } from '@/features/dashboard/dashboardApi';
 import { supportApi } from '@/features/support/supportApi';
 import supportReducer from '@/features/support/supportSlice';
+import { walletApi } from '@/features/wallet/walletApi';
+import walletReducer from '@/features/wallet/walletSlice';
 
 // Only the modules that are wired to the ported API are registered. The slices
 // for the not-yet-ported modules (category, carousels, the rest of general
@@ -24,6 +26,7 @@ export const store = configureStore({
     admins: adminsReducer,
     emailTemplate: emailTemplateReducer,
     support: supportReducer,
+    wallet: walletReducer,
     [authApi.reducerPath]: authApi.reducer,
     [usersApi.reducerPath]: usersApi.reducer,
     [coAdminsApi.reducerPath]: coAdminsApi.reducer,
@@ -31,6 +34,7 @@ export const store = configureStore({
     [integrationsApi.reducerPath]: integrationsApi.reducer,
     [dashboardApi.reducerPath]: dashboardApi.reducer,
     [supportApi.reducerPath]: supportApi.reducer,
+    [walletApi.reducerPath]: walletApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -41,5 +45,6 @@ export const store = configureStore({
       integrationsApi.middleware,
       dashboardApi.middleware,
       supportApi.middleware,
+      walletApi.middleware,
     ),
 });

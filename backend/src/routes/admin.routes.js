@@ -6,6 +6,8 @@ const dashboard = require('../controllers/adminDashboard.controller');
 const emailTemplates = require('../controllers/emailTemplate.controller');
 const integrations = require('../controllers/integration.controller');
 const support = require('../controllers/adminSupport.controller');
+const wallet = require('../controllers/adminWallet.controller');
+const { TYPES: TRANSACTION_TYPES, FEATURES: PAID_FEATURES } = require('../models/CreditTransaction');
 const { INTEGRATION_KEYS } = require('../integrations/definitions');
 const { TEMPLATE_KEYS } = require('../emails/defaults');
 const { CATEGORIES, STATUSES, PRIORITIES } = require('../models/SupportReport');
@@ -32,6 +34,8 @@ const canReadEmails = requirePermission(PERMISSIONS.EMAIL_TEMPLATE, ACCESS_LEVEL
 const canWriteEmails = requirePermission(PERMISSIONS.EMAIL_TEMPLATE, ACCESS_LEVEL.READ_WRITE);
 const canReadSupport = requirePermission(PERMISSIONS.SUPPORT, ACCESS_LEVEL.READ);
 const canWriteSupport = requirePermission(PERMISSIONS.SUPPORT, ACCESS_LEVEL.READ_WRITE);
+const canReadWallet = requirePermission(PERMISSIONS.WALLET, ACCESS_LEVEL.READ);
+const canWriteWallet = requirePermission(PERMISSIONS.WALLET, ACCESS_LEVEL.READ_WRITE);
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -70,6 +74,11 @@ const createUserSchema = {
   }),
 };
 
+// No `permissions` here, on purpose: this route only needs user-management
+// write access, so accepting them let a co-admin grant themselves any module.
+// They change through PUT /users/:id/permissions, which is owners only. An
+// unknown key is stripped by zod, so a request that still sends one changes
+// nothing.
 const updateUserSchema = {
   params: z.object({ id: objectId }),
   body: z
@@ -78,7 +87,6 @@ const updateUserSchema = {
       email: z.string().email('A valid email is required').optional(),
       password: z.string().min(8, 'Password must be at least 8 characters').optional(),
       role: z.enum(Object.values(ROLES)).optional(),
-      permissions: permissionMapSchema.optional(),
     })
     .refine((body) => Object.keys(body).length > 0, 'Nothing to update'),
 };
@@ -142,6 +150,40 @@ const supportQueueSchema = paginationSchema.omit({ role: true }).extend({
 });
 
 const reportParams = z.object({ id: objectId });
+
+// Whole credits only. The ceilings are sanity limits, not business rules: the
+// co-admin cap in the settings is the real brake on grants.
+const credits = (max) => z.number({ invalid_type_error: 'Enter a whole number' }).int('Enter a whole number').min(0).max(max);
+
+const walletSettingsSchema = z.object({
+  prices: z.object({
+    aiItinerary: credits(10000),
+    callBlock: credits(10000),
+  }),
+  callBlockMinutes: z.number().int().min(1, 'A call block is at least 1 minute').max(60, 'A call block is at most 60 minutes'),
+  signupBonus: credits(100000),
+  monthlyFree: credits(100000),
+  coAdminGrantCap: credits(1000000),
+});
+
+const walletPagingSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+const walletHistorySchema = walletPagingSchema.extend({
+  type: z.enum(TRANSACTION_TYPES, { message: 'Unknown type' }).optional(),
+  feature: z.enum(PAID_FEATURES, { message: 'Unknown feature' }).optional(),
+});
+
+// `requestId` is made by the panel for each press of the button, so a double
+// click or a retry is applied once (see wallet.service, adjust).
+const walletAdjustSchema = z.object({
+  type: z.enum(['grant', 'deduct']),
+  amount: z.number({ invalid_type_error: 'Enter a whole number' }).int('Enter a whole number').min(1, 'Enter at least 1 credit').max(1000000),
+  reason: z.string().trim().min(3, 'Say why, in a few words').max(300),
+  requestId: z.string().uuid('Invalid request id'),
+});
 
 // `internal` makes it a note between admins; the reporter is told nothing.
 const replySchema = z.object({
@@ -404,6 +446,45 @@ router.post(
   canWriteSupport,
   validate({ params: reportParams, body: replySchema }),
   support.reply
+);
+
+// --- Wallet -----------------------------------------------------------------
+// Reading and adjusting people's credits is the `wallet` module. Prices and
+// allowances are owners only: they change what everyone pays.
+router.get('/wallet/summary', adminReadLimiter, canReadWallet, wallet.summary);
+
+router.get('/wallet/settings', adminReadLimiter, canReadWallet, wallet.getSettings);
+
+router.put(
+  '/wallet/settings',
+  adminWriteLimiter,
+  requireSuperAdmin,
+  validate({ body: walletSettingsSchema }),
+  wallet.updateSettings
+);
+
+router.get(
+  '/wallet/transactions',
+  adminReadLimiter,
+  canReadWallet,
+  validate({ query: walletHistorySchema }),
+  wallet.listTransactions
+);
+
+router.get(
+  '/wallet/users/:id',
+  adminReadLimiter,
+  canReadWallet,
+  validate({ params: z.object({ id: objectId }), query: walletPagingSchema }),
+  wallet.getUserWallet
+);
+
+router.post(
+  '/wallet/users/:id/adjust',
+  adminWriteLimiter,
+  canWriteWallet,
+  validate({ params: z.object({ id: objectId }), body: walletAdjustSchema }),
+  wallet.adjust
 );
 
 module.exports = router;

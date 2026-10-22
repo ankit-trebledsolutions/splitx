@@ -20,8 +20,10 @@ import StepperField from '../components/StepperField';
 import ChoiceChips from '../components/ChoiceChips';
 import TimeStepper from '../components/TimeStepper';
 import AppAlert from '../components/AppAlert';
+import { isNoCredits, showNoCredits } from '../components/NoCreditsSheet';
 import useKeyboardLift from '../hooks/useKeyboardLift';
 import useKeyboardVisible from '../hooks/useKeyboardVisible';
+import useWallet from '../hooks/useWallet';
 import { fetchGroup } from '../api/groups.api';
 import { fetchStays } from '../api/stays.api';
 import { fetchAttractions } from '../api/attractions.api';
@@ -45,6 +47,7 @@ import {
 } from '../constants/aiItineraryOptions';
 import { labelToMinutes, minutesToLabel } from '../utils/time';
 import { formatDate } from '../utils/format';
+import { creditsLabel, isPaid } from '../data/wallet';
 import { dark, radius, spacing } from '../theme';
 
 // iOS keeps KeyboardAvoidingView; Android lifts the screen itself (see useKeyboardLift).
@@ -98,6 +101,9 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
   const keyboardVisible = useKeyboardVisible();
   const { lift, ref: liftRef } = useKeyboardLift();
   const scrollRef = useRef(null);
+  // For what a plan costs, when it costs anything. A server without wallets
+  // leaves it null and the screen as it was.
+  const { wallet, refresh: refreshWallet } = useWallet();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -222,6 +228,10 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
 
   const goBackOneStep = () => (step === 2 ? setStep(1) : navigation.goBack());
 
+  // Only while a plan costs credits: a price of 0 means it is free.
+  const aiPrice = wallet?.prices?.aiItinerary;
+  const showCost = Boolean(wallet) && isPaid(aiPrice);
+
   const buildBody = (withReplace) => ({
     // Trip facts go out only where this screen showed an input for them.
     ...(destinationEditable ? { destination: destination.trim() } : {}),
@@ -243,6 +253,11 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
   });
 
   const showStartError = (err) => {
+    if (isNoCredits(err)) {
+      showNoCredits(err);
+      refreshWallet();
+      return;
+    }
     if (err.code === 'ITINERARY_EXISTS') {
       AppAlert.alert('Replace itinerary?', replaceConfirmMessage(err.details?.dayCount), [
         { text: 'Cancel', style: 'cancel' },
@@ -533,6 +548,11 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
                 { paddingBottom: keyboardVisible ? spacing.sm + 2 : Math.max(insets.bottom, spacing.lg) },
               ]}
             >
+              {showCost ? (
+                <Text style={[styles.cost, wallet.balance < aiPrice && styles.costShort]}>
+                  Uses {creditsLabel(aiPrice)} · You have {Number(wallet.balance).toLocaleString()}
+                </Text>
+              ) : null}
               <GradientButton
                 title="Create itinerary"
                 onPress={() => start(replace)}
@@ -642,6 +662,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: dark.border,
   },
+  cost: {
+    color: dark.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  costShort: { color: '#F5B342' },
   moreLink: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -18,6 +18,7 @@ const realtime = require('../src/realtime/socket');
 const groupService = require('../src/services/group.service');
 const messageService = require('../src/services/message.service');
 const callRing = require('../src/services/callRing.service');
+const callBilling = require('../src/services/callBilling.service');
 const controller = require('../src/controllers/stream.controller');
 
 const ASHA = 'aaaaaaaaaaaaaaaaaaaaaaaa';
@@ -166,6 +167,11 @@ const stubCallEvent = (t, group) => {
   t.mock.method(callRing, 'end', async (args) => {
     calls.ends.push(args);
   });
+  // "ended" also closes the call's bill; that has its own smoke test.
+  calls.billingEnded = [];
+  t.mock.method(callBilling, 'ended', async (groupId) => {
+    calls.billingEnded.push(groupId);
+  });
   return calls;
 };
 
@@ -194,6 +200,7 @@ test('"ended" posts the chat card and stops the ringing', async (t) => {
   assert.deepEqual(calls.rings, []);
   assert.equal(calls.ends.length, 1);
   assert.equal(String(calls.ends[0].by._id), ASHA);
+  assert.deepEqual(calls.billingEnded, [String(group._id)]);
 });
 
 test('someone who is not in the group rings nobody', async (t) => {

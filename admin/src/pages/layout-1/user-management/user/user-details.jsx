@@ -11,12 +11,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { cn } from '@/lib/utils';
+import { selectCurrentUser } from '@/features/auth/authSelectors';
 import { useSetUserActiveMutation } from '@/features/users/usersApi';
 import {
   selectSelectedUser,
   selectUserDialogType,
 } from '@/features/users/usersSelectors';
 import { closeUserDialog } from '@/features/users/usersSlice';
+import UserCredits from './user-credits';
 
 const getStatusBadge = (status, isBlocked) => {
   if (isBlocked) return 'destructive';
@@ -50,6 +54,10 @@ const UserDetails = () => {
   const dispatch = useAppDispatch();
   const selectedUser = useAppSelector(selectSelectedUser);
   const dialogType = useAppSelector(selectUserDialogType);
+  const currentUser = useAppSelector(selectCurrentUser);
+  // The Credits card needs the wallet module as well as this one, and makes
+  // the dialog wide enough for its history.
+  const canSeeCredits = hasPermission(currentUser, PERMISSIONS.WALLET);
   const [setUserActive] = useSetUserActiveMutation();
 
   const handleToggleBlock = async () => {
@@ -76,7 +84,12 @@ const UserDetails = () => {
         if (!open) dispatch(closeUserDialog());
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className={cn(
+          'max-h-[90vh] overflow-y-auto',
+          canSeeCredits ? 'max-w-2xl' : 'max-w-md',
+        )}
+      >
         <DialogHeader>
           <DialogTitle>User Details</DialogTitle>
           <DialogDescription>
@@ -135,6 +148,10 @@ const UserDetails = () => {
                 {!selectedUser.isActive ? 'Blocked' : selectedUser.status}
               </Badge>
             </div>
+
+            {canSeeCredits && (
+              <UserCredits key={selectedUser.id} user={selectedUser} />
+            )}
 
             <div className="flex gap-2 pt-4">
               <Button

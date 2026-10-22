@@ -185,10 +185,27 @@ const assertNotLastSuperAdmin = async (target) => {
   if (remaining === 0) throw ApiError.badRequest('This is the last active super admin');
 };
 
+/**
+ * Another admin's sign-in details are an owner's to change. Without this a
+ * co-admin with write access could reset a peer's password or email and sign
+ * in as them. Changing your own, and an app user's, stays open to anyone with
+ * write access: that is ordinary support work.
+ */
+const assertMayChangeSignIn = (target, actor, data) => {
+  const changesEmail =
+    data.email !== undefined && data.email.toLowerCase().trim() !== target.email;
+  if (!data.password && !changesEmail) return;
+  if (!STAFF_ROLES.includes(target.role)) return;
+  if (actor.role === ROLES.SUPER_ADMIN) return;
+  if (actor._id.toString() === target._id.toString()) return;
+  throw ApiError.forbidden("Only a super admin can change another admin's email or password");
+};
+
 const updateUser = async (id, data, actor) => {
   const user = await User.findById(id).select('+password');
   if (!user) throw ApiError.notFound('User not found');
   assertVisible(user, actor);
+  assertMayChangeSignIn(user, actor, data);
 
   if (data.role !== undefined && data.role !== user.role) {
     // Promoting through an edit has to be as restricted as creating a staff
@@ -220,13 +237,8 @@ const updateUser = async (id, data, actor) => {
   // Plain text again: the pre('save') hook does the hashing.
   if (data.password) user.password = data.password;
 
-  if (data.permissions !== undefined) {
-    const effectiveRole = data.role || user.role;
-    if (effectiveRole !== ROLES.ADMIN) {
-      throw ApiError.badRequest('Only admin accounts carry module permissions');
-    }
-    user.permissions = cleanPermissions(data.permissions);
-  }
+  // Permissions are not edited here: see setPermissions, which only an owner
+  // can reach.
 
   await user.save();
   return user;
@@ -280,6 +292,7 @@ const deleteUser = async (id, actor) => {
 module.exports = {
   buildListQuery,
   assertVisible,
+  assertMayChangeSignIn,
   login,
   listUsers,
   getUser,

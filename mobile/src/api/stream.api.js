@@ -14,3 +14,13 @@ export const postCallEvent = async (groupId, event, { video } = {}) => {
   const { data } = await client.post('/stream/call-event', { groupId, event, video });
   return data.data;
 };
+
+// Asked just before starting a call in an empty room. While calls cost
+// credits the server charges the caller's first block here, so someone who
+// cannot pay is stopped before anyone's phone rings. Resolves to
+// { billed: false } or { billed: true, price, blockMinutes }; rejects with
+// code 'NO_CREDITS' (402) when they cannot pay.
+export const startCall = async (groupId) => {
+  const { data } = await client.post('/stream/call-start', { groupId });
+  return data.data;
+};

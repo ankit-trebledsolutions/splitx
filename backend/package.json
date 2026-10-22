@@ -12,6 +12,7 @@
     "smoke:reminders": "node scripts/smoke-reminders.js",
     "smoke:cards": "node scripts/smoke-chat-cards.js",
     "smoke:places": "node scripts/smoke-places.js",
+    "smoke:wallet": "node scripts/smoke-wallet.js",
     "seed:admin": "node scripts/seed-super-admin.js",
     "dev:local": "node scripts/dev-local.js"
   },

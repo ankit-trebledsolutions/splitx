@@ -4,6 +4,7 @@ const env = require('./config/env');
 const realtime = require('./realtime/socket');
 const aiItineraryService = require('./services/aiItinerary.service');
 const reminderSweep = require('./services/reminderSweep.service');
+const walletSweep = require('./services/walletSweep.service');
 const integrations = require('./integrations/store');
 
 // How long a shutdown waits for AI jobs to be closed before carrying on regardless.
@@ -35,10 +36,13 @@ const start = async () => {
     // Reminder-time bookkeeping and the backup push (see reminderSweep.service).
     if (env.reminderSweep) reminderSweep.start();
     console.log(`[reminders] backup sweep is ${env.reminderSweep ? 'on' : 'off'}`);
+    // Wallet repair and call billing (see walletSweep.service). Always on.
+    walletSweep.start();
 
     const shutdown = async (signal) => {
       console.log(`${signal} received, shutting down`);
       reminderSweep.stop();
+      walletSweep.stop();
       // Before the sockets close, so requesters still get the "failed" event
       // instead of watching the planning animation until it times out.
       await Promise.race([

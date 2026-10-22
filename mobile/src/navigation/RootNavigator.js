@@ -37,6 +37,7 @@ import ContactUsScreen from '../screens/ContactUsScreen';
 import ReportProblemScreen from '../screens/ReportProblemScreen';
 import MyReportsScreen from '../screens/MyReportsScreen';
 import ReportDetailScreen from '../screens/ReportDetailScreen';
+import WalletScreen from '../screens/WalletScreen';
 import CallScreen from '../screens/CallScreen';
 import FaqScreen from '../screens/FaqScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -210,6 +211,7 @@ const RootNavigator = () => {
             component={ReportDetailScreen}
             options={{ headerShown: false }}
           />
+          <Stack.Screen name="Wallet" component={WalletScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Faq" component={FaqScreen} options={{ headerShown: false }} />
           <Stack.Screen
             name="PrivacyPolicy"

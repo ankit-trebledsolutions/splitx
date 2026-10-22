@@ -5,12 +5,15 @@ import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { profileDefaults, accountSettings, helpSupport } from '../data/profile';
+import { creditsLabel } from '../data/wallet';
+import useWallet from '../hooks/useWallet';
 import { useTour } from '../tour/TourProvider';
 import { dark, radius, spacing } from '../theme';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { reset: resetTour } = useTour();
+  const { wallet } = useWallet();
 
   // App tour: forget both chapters and go to Home, where the welcome starts
   // again. The tabs chapter follows on the next group opened.
@@ -20,6 +23,13 @@ const ProfileScreen = ({ navigation }) => {
   };
   // Real account fields win; the rest fall back to the design's placeholder data.
   const profile = { ...profileDefaults, ...(user ?? {}) };
+
+  // The Wallet row shows the balance; until it loads (or on a server without
+  // wallets) it keeps its plain description.
+  const settingValue = (item) => {
+    if (item.key === 'wallet' && wallet) return creditsLabel(wallet.balance);
+    return item.value ?? profile[item.valueFrom];
+  };
 
   return (
     <DarkScreen edges={TOP_ONLY}>
@@ -66,7 +76,7 @@ const ProfileScreen = ({ navigation }) => {
               <View style={styles.settingBody}>
                 <Text style={styles.settingLabel}>{item.label}</Text>
                 <Text style={styles.settingValue} numberOfLines={1}>
-                  {item.value ?? profile[item.valueFrom]}
+                  {settingValue(item)}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />

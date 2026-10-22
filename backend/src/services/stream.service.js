@@ -42,4 +42,65 @@ const issueToken = async (user) => {
   };
 };
 
-module.exports = { issueToken };
+// The server's own Stream client, or null while no keys are set.
+const serverClient = () => {
+  const keys = integrations.stream();
+  return keys.apiKey && keys.apiSecret ? clientFor(keys) : null;
+};
+
+/**
+ * Every call Stream says is happening now. Each group has one call, whose id is
+ * the group's id (see the app's ActiveCallProvider). Resolves to
+ *   [{ groupId, startedAt, firstUserId }]
+ * where firstUserId is whoever has been in the call longest.
+ */
+const ongoingCalls = async () => {
+  const client = serverClient();
+  if (!client) return [];
+  const found = [];
+  let next;
+  // A few pages at most: far more live calls than this app will ever have.
+  for (let page = 0; page < 10; page += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const response = await client.video.queryCalls({
+      filter_conditions: { ongoing: true },
+      limit: 100,
+      ...(next ? { next } : {}),
+    });
+    for (const { call } of response.calls ?? []) {
+      if (call?.type !== 'default') continue;
+      const participants = [...(call.session?.participants ?? [])].sort(
+        (a, b) => new Date(a.joined_at) - new Date(b.joined_at)
+      );
+      found.push({
+        groupId: call.id,
+        startedAt: call.session?.started_at ? new Date(call.session.started_at) : null,
+        firstUserId: participants[0]?.user?.id ?? null,
+      });
+    }
+    next = response.next;
+    if (!next) break;
+  }
+  return found;
+};
+
+/**
+ * Takes everyone out of a group's call, leaving the call itself open for the
+ * next one. Not end(): an ended call can only be joined again with Stream's
+ * JOIN_ENDED_CALL permission, and every group reuses one call id for good, so
+ * ending it would stop that group calling at all. Resolves to the ids removed.
+ */
+const removeEveryone = async (groupId) => {
+  const client = serverClient();
+  if (!client) return [];
+  const call = client.video.call('default', String(groupId));
+  const { call: current } = await call.get();
+  const userIds = [
+    ...new Set((current?.session?.participants ?? []).map((p) => p.user?.id).filter(Boolean)),
+  ];
+  // Not blocked: they may call again as soon as they have credits.
+  await Promise.allSettled(userIds.map((userId) => call.kickUser({ user_id: userId })));
+  return userIds;
+};
+
+module.exports = { issueToken, ongoingCalls, removeEveryone, isConfigured: () => serverClient() !== null };

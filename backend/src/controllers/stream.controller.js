@@ -3,6 +3,7 @@ const streamService = require('../services/stream.service');
 const messageService = require('../services/message.service');
 const groupService = require('../services/group.service');
 const callRing = require('../services/callRing.service');
+const callBilling = require('../services/callBilling.service');
 
 const getToken = asyncHandler(async (req, res) => {
   const data = await streamService.issueToken(req.user);
@@ -23,9 +24,21 @@ const callEvent = asyncHandler(async (req, res) => {
 
   // Not awaited: like every push, ringing must not slow the request down.
   if (event === 'started') callRing.ring({ group, caller: req.user, video });
-  else callRing.end({ group, by: req.user });
+  else {
+    callRing.end({ group, by: req.user });
+    // Stops the bill. Only a hint: the billing sweep checks with Stream.
+    await callBilling.ended(groupId);
+  }
 
   res.json({ success: true, data: { message } });
 });
 
-module.exports = { getToken, callEvent };
+// Asked by the app just before it starts a call in an empty room: charges the
+// first block, or answers 402 NO_CREDITS so the phone never joins or rings
+// anyone. Free calls answer { billed: false }.
+const callStart = asyncHandler(async (req, res) => {
+  const data = await callBilling.start(req.user._id, req.body.groupId);
+  res.json({ success: true, data });
+});
+
+module.exports = { getToken, callEvent, callStart };
