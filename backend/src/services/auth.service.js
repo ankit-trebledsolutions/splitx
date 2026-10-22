@@ -49,6 +49,7 @@ const issueOtp = async (user, purpose) => {
     });
   }
 
+  const previous = user.otp?.toObject();
   const code = String(crypto.randomInt(100000, 1000000));
   user.otp = {
     hash: hashOtp(code),
@@ -61,8 +62,22 @@ const issueOtp = async (user, purpose) => {
   };
   await user.save({ validateBeforeSave: false });
 
-  if (purpose === PURPOSE.VERIFY) await emailService.sendVerificationCode(user, code, OTP_TTL_MINUTES);
-  else await emailService.sendPasswordResetCode(user, code, OTP_TTL_MINUTES);
+  try {
+    if (purpose === PURPOSE.VERIFY) await emailService.sendVerificationCode(user, code, OTP_TTL_MINUTES);
+    else await emailService.sendPasswordResetCode(user, code, OTP_TTL_MINUTES);
+  } catch (err) {
+    // The mail provider refused (with Resend's onboarding@resend.dev sender it
+    // only delivers to the Resend account owner). Nothing reached an inbox, so
+    // this attempt must not count: no cooldown, no place in the hourly cap, and
+    // any earlier code keeps working. The reason goes to the log, and the
+    // person gets a message instead of a bare "Internal server error".
+    console.error(`[email] could not send the ${purpose} code:`, err.message);
+    user.otp = previous;
+    await user.save({ validateBeforeSave: false });
+    throw new ApiError(503, "We couldn't send the email with your code. Please try again in a few minutes.", {
+      code: 'EMAIL_NOT_SENT',
+    });
+  }
 
   const result = { sent: true, retryAfter: OTP_RESEND_COOLDOWN_MS / 1000 };
   // With no mail provider configured nothing reaches an inbox, so development
