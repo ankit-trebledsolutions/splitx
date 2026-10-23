@@ -2,10 +2,12 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { dark } from '../theme';
+import { useStyles, useTheme } from '../theme';
 
-// Dark scaffold for the non-auth screens: flat deep background (#05070A) with
-// cards raised on #0E1014, per the dashboard design.
+// Scaffold for the non-auth screens: the theme's flat base (theme.background)
+// with cards raised on theme.card, per the dashboard design. Dark unless the
+// person picked Light (or their phone's setting) under Profile → Appearance;
+// the name is from when the app only had the dark look.
 //
 // The app draws edge-to-edge, so the window runs underneath the system
 // navigation bar (48dp with Android's 3-button navigation). Both edges are
@@ -20,17 +22,21 @@ import { dark } from '../theme';
 export const TOP_ONLY = ['top'];
 const BOTH = ['top', 'bottom'];
 
-const DarkScreen = ({ children, edges = BOTH, style }) => (
-  <View style={styles.screen}>
-    <StatusBar style="light" />
-    <SafeAreaView style={styles.flex} edges={edges}>
-      <View style={[styles.flex, style]}>{children}</View>
-    </SafeAreaView>
-  </View>
-);
+const DarkScreen = ({ children, edges = BOTH, style }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.screen}>
+      <StatusBar style={theme.statusBar} />
+      <SafeAreaView style={styles.flex} edges={edges}>
+        <View style={[styles.flex, style]}>{children}</View>
+      </SafeAreaView>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: dark.background },
+const makeStyles = (theme) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.background },
   flex: { flex: 1 },
 });
 

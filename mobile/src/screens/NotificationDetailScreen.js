@@ -9,9 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { fetchExpense } from '../api/groups.api';
 import { clearNotification, markNotificationRead } from '../api/notifications.api';
 import { usd, timeAgo } from '../utils/format';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
-const EXPENSE_TINT = '#F97362';
 
 const idOf = (value) => value?._id ?? value;
 
@@ -23,6 +22,8 @@ const idOf = (value) => value?._id ?? value;
  * tapped push (which has no _id, so it cannot be dismissed or marked read).
  */
 const NotificationDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { notification } = route.params;
   const { user } = useAuth();
   const me = user?._id;
@@ -105,7 +106,7 @@ const NotificationDetailScreen = ({ route, navigation }) => {
     <DarkScreen>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notification Details</Text>
         <View style={styles.headerSpacer} />
@@ -115,7 +116,7 @@ const NotificationDetailScreen = ({ route, navigation }) => {
         <View style={styles.card}>
           <View style={styles.titleRow}>
             <View style={styles.iconTile}>
-              <Ionicons name="add-circle-outline" size={20} color={EXPENSE_TINT} />
+              <Ionicons name="add-circle-outline" size={20} color={theme.coral} />
             </View>
             <View style={styles.titleBody}>
               <Text style={styles.title}>{notification.title ?? 'Expense Added'}</Text>
@@ -138,10 +139,10 @@ const NotificationDetailScreen = ({ route, navigation }) => {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={dark.accentGreen} style={styles.loading} />
+          <ActivityIndicator color={theme.accentGreen} style={styles.loading} />
         ) : gone ? (
           <View style={[styles.card, styles.goneCard]}>
-            <Ionicons name="information-circle-outline" size={18} color={dark.textMuted} />
+            <Ionicons name="information-circle-outline" size={18} color={theme.textMuted} />
             <Text style={styles.goneText}>
               This expense is no longer available. It may have been deleted, or you have left the group.
             </Text>
@@ -203,7 +204,7 @@ const NotificationDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -215,22 +216,22 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerSpacer: { width: 36 },
-  headerTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
 
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl },
   loading: { paddingVertical: spacing.xl },
 
   card: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 6,
     padding: spacing.md + 2,
     marginBottom: spacing.md,
@@ -240,37 +241,37 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 13,
-    backgroundColor: `${EXPENSE_TINT}1F`,
+    backgroundColor: `${theme.coral}1F`,
     borderWidth: 1,
-    borderColor: `${EXPENSE_TINT}47`,
+    borderColor: `${theme.coral}47`,
     alignItems: 'center',
     justifyContent: 'center',
   },
   titleBody: { flex: 1, marginLeft: spacing.sm + 4 },
-  title: { color: dark.text, fontSize: 16, fontWeight: '800' },
-  time: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  title: { color: theme.text, fontSize: 16, fontWeight: '800' },
+  time: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#17E695' },
-  divider: { height: 1, backgroundColor: dark.border, marginVertical: spacing.md },
+  divider: { height: 1, backgroundColor: theme.border, marginVertical: spacing.md },
 
   amountLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.2,
     textAlign: 'center',
   },
   amount: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 40,
     fontWeight: '800',
     textAlign: 'center',
     marginTop: 4,
   },
-  messageLabel: { color: dark.textMuted, fontSize: 12, fontWeight: '700', marginBottom: 6 },
-  message: { color: dark.text, fontSize: 14, lineHeight: 21 },
+  messageLabel: { color: theme.textMuted, fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  message: { color: theme.text, fontSize: 14, lineHeight: 21 },
 
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
@@ -282,29 +283,29 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 4,
     paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
+    borderBottomColor: theme.border,
   },
   rowLast: { borderBottomWidth: 0, paddingBottom: 0 },
-  rowLabel: { flex: 1, color: dark.text, fontSize: 14 },
-  rowValue: { flexShrink: 1, color: dark.text, fontSize: 14, fontWeight: '800', textAlign: 'right' },
-  rowValueAccent: { color: '#17E695' },
+  rowLabel: { flex: 1, color: theme.text, fontSize: 14 },
+  rowValue: { flexShrink: 1, color: theme.text, fontSize: 14, fontWeight: '800', textAlign: 'right' },
+  rowValueAccent: { color: theme.success },
 
   goneCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  goneText: { flex: 1, color: dark.textMuted, fontSize: 13, lineHeight: 19 },
+  goneText: { flex: 1, color: theme.textMuted, fontSize: 13, lineHeight: 19 },
 
   primary: { marginTop: spacing.xs },
   secondary: {
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
     alignItems: 'center',
     marginTop: spacing.sm + 2,
   },
-  secondaryText: { color: dark.text, fontSize: 15, fontWeight: '700' },
+  secondaryText: { color: theme.text, fontSize: 15, fontWeight: '700' },
   dismiss: { alignSelf: 'center', paddingVertical: spacing.md, marginTop: spacing.sm },
-  dismissText: { color: dark.textMuted, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
+  dismissText: { color: theme.textMuted, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
 });
 
 export default NotificationDetailScreen;

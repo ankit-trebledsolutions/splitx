@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles } from '../theme';
 import AppAlert from '../components/AppAlert';
 
 const OTP_LENGTH = 6;
@@ -23,6 +23,7 @@ const RESEND_SECONDS = 60; // fallback; the server says how long to wait
  *   purpose 'reset-password' forgot password: the right code leads to New Password
  */
 const EnterOtpScreen = ({ route, navigation }) => {
+  const styles = useStyles(makeStyles);
   const { email, purpose = 'reset-password', retryAfter, devOtp } = route.params;
   const isSignup = purpose === 'verify-email';
   const { verifyEmail } = useAuth();
@@ -170,7 +171,7 @@ const EnterOtpScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   // Covers the whole row of boxes. Transparent rather than opacity: 0, which
   // some Android versions treat as not worth focusing.
   overlayInput: {
@@ -189,17 +190,17 @@ const styles = StyleSheet.create({
     flex: 1,
     aspectRatio: 0.82,
     borderRadius: radius.md,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1.5,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxFilled: { borderColor: dark.accentGreen },
-  boxDigit: { color: dark.text, fontSize: 28, fontWeight: '700' },
+  boxFilled: { borderColor: theme.accentGreen },
+  boxDigit: { color: theme.text, fontSize: 28, fontWeight: '700' },
   resendRow: { alignItems: 'center', marginTop: spacing.xl },
-  resendText: { color: dark.textMuted, fontSize: 15 },
-  resendTimer: { color: dark.accentGreen, fontSize: 15, fontWeight: '600' },
+  resendText: { color: theme.textMuted, fontSize: 15 },
+  resendTimer: { color: theme.accentGreen, fontSize: 15, fontWeight: '600' },
   spacer: { flex: 1, minHeight: spacing.xl },
 });
 

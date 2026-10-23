@@ -2,22 +2,26 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from './DarkScreen';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 // Stand-in for the tabs that are not built yet.
-const PlaceholderScreen = ({ title, subtitle, icon = 'construct-outline' }) => (
-  <DarkScreen>
-    <View style={styles.container}>
-      <View style={styles.iconWrap}>
-        <Ionicons name={icon} size={28} color={dark.textMuted} />
+const PlaceholderScreen = ({ title, subtitle, icon = 'construct-outline' }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <DarkScreen>
+      <View style={styles.container}>
+        <View style={styles.iconWrap}>
+          <Ionicons name={icon} size={28} color={theme.textMuted} />
+        </View>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
-    </View>
-  </DarkScreen>
-);
+    </DarkScreen>
+  );
+};
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -29,15 +33,15 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  title: { color: dark.text, fontSize: 22, fontWeight: '700' },
+  title: { color: theme.text, fontSize: 22, fontWeight: '700' },
   subtitle: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',

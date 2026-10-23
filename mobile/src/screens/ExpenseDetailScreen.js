@@ -15,7 +15,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { fetchExpense, settleExpense, deleteExpense } from '../api/groups.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { usd, formatDate, formatTime } from '../utils/format';
 import AppAlert from '../components/AppAlert';
 
@@ -34,6 +34,8 @@ const CATEGORY_LABEL = {
 };
 
 const ExpenseDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { expenseId } = route.params;
   const { user } = useAuth();
   const [expense, setExpense] = useState(null);
@@ -61,7 +63,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
       <DarkScreen>
         <ScreenHeader onBack={navigation.goBack} />
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       </DarkScreen>
     );
@@ -140,7 +142,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
 
           <View style={styles.cardRow}>
             <View style={styles.groupIcon}>
-              <Ionicons name="people-outline" size={17} color={dark.text} />
+              <Ionicons name="people-outline" size={17} color={theme.text} />
             </View>
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>{expense.group?.name ?? 'Group'}</Text>
@@ -194,7 +196,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
 
         <Text style={styles.sectionLabel}>Receipt attachment</Text>
         <View style={styles.receipt}>
-          <Ionicons name="image-outline" size={22} color={dark.textMuted} />
+          <Ionicons name="image-outline" size={22} color={theme.textMuted} />
           <Text style={styles.receiptText}>No receipt attached yet</Text>
         </View>
       </ScrollView>
@@ -212,7 +214,7 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
         >
           <LinearGradient
             colors={
-              canSettleMine ? dark.gradient : ['#1B2429', '#1B2429']
+              canSettleMine ? theme.gradient : [theme.card2, theme.card2]
             }
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
@@ -228,11 +230,11 @@ const ExpenseDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
-  amount: { color: dark.text, fontSize: 40, fontWeight: '800', textAlign: 'center', marginTop: spacing.sm },
+  amount: { color: theme.text, fontSize: 40, fontWeight: '800', textAlign: 'center', marginTop: spacing.sm },
   chipRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -241,17 +243,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   chip: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: theme.overlay,
     borderRadius: 8,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
-  chipText: { color: dark.textMuted, fontSize: 11, fontWeight: '600' },
+  chipText: { color: theme.textMuted, fontSize: 11, fontWeight: '600' },
 
   card: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
   },
@@ -262,15 +264,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   cardBody: { flex: 1 },
-  cardTitle: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  cardMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
-  cardValue: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: dark.border },
+  cardTitle: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  cardMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
+  cardValue: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: theme.border },
   groupIcon: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -280,10 +282,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
   },
-  tripChipText: { color: dark.accentGreen, fontSize: 10, fontWeight: '700' },
+  tripChipText: { color: theme.accentGreen, fontSize: 10, fontWeight: '700' },
 
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -291,25 +293,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  splitName: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '600' },
-  splitAmount: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  paid: { color: dark.accentGreen, fontSize: 11, fontWeight: '600', width: 62, textAlign: 'right' },
-  pending: { color: '#F5B342', fontSize: 11, fontWeight: '600', width: 62, textAlign: 'right' },
-  markPaid: { color: dark.accentBlue, fontSize: 11, fontWeight: '700', width: 62, textAlign: 'right' },
+  splitName: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600' },
+  splitAmount: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  paid: { color: theme.accentGreen, fontSize: 11, fontWeight: '600', width: 62, textAlign: 'right' },
+  pending: { color: theme.warning, fontSize: 11, fontWeight: '600', width: 62, textAlign: 'right' },
+  markPaid: { color: theme.accentBlue, fontSize: 11, fontWeight: '700', width: 62, textAlign: 'right' },
 
   receipt: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.lg,
     justifyContent: 'center',
   },
-  receiptText: { color: dark.textMuted, fontSize: 12 },
+  receiptText: { color: theme.textMuted, fontSize: 12 },
 
   footer: {
     flexDirection: 'row',
@@ -318,22 +320,22 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
+    borderTopColor: theme.border,
   },
   editButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  editText: { color: dark.text, fontSize: 14, fontWeight: '600' },
+  editText: { color: theme.text, fontSize: 14, fontWeight: '600' },
   settleButton: { flex: 1 },
   settleInner: { borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
   settleText: { color: '#04121C', fontSize: 14, fontWeight: '700' },
-  settleTextOff: { color: dark.textMuted },
+  settleTextOff: { color: theme.textMuted },
 });
 
 export default ExpenseDetailScreen;

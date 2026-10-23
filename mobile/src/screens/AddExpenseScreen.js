@@ -17,7 +17,7 @@ import GradientButton from '../components/GradientButton';
 import SelectField from '../components/SelectField';
 import { useAuth } from '../context/AuthContext';
 import { createExpense } from '../api/groups.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { usd } from '../utils/format';
 import AppAlert from '../components/AppAlert';
 
@@ -35,6 +35,8 @@ const CATEGORIES = [
 const round2 = (n) => Math.round(n * 100) / 100;
 
 const AddExpenseScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { groupId, members = [] } = route.params;
   const { user } = useAuth();
 
@@ -144,7 +146,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 value={amountText}
                 onChangeText={setAmountText}
                 placeholder="0.00"
-                placeholderTextColor="rgba(255,255,255,0.25)"
+                placeholderTextColor={theme.placeholder}
                 keyboardType="decimal-pad"
               />
             </View>
@@ -156,7 +158,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
             value={description}
             onChangeText={setDescription}
             placeholder="Shibuya Crossing Coffee"
-            placeholderTextColor={dark.textMuted}
+            placeholderTextColor={theme.textMuted}
           />
 
           <Text style={styles.label}>Category</Text>
@@ -174,7 +176,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               {payer?._id === user?._id ? ' (You)' : ''}
             </Text>
             <Text style={styles.changeLink}>Change</Text>
-            <Ionicons name="chevron-forward" size={14} color={dark.accentBlue} />
+            <Ionicons name="chevron-forward" size={14} color={theme.accentBlue} />
           </TouchableOpacity>
 
           {payerPickerOpen && (
@@ -192,7 +194,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
                   <Avatar name={member.name} size={26} solid />
                   <Text style={styles.payerOptionText}>{member.name}</Text>
                   {member._id === paidBy && (
-                    <Ionicons name="checkmark" size={16} color={dark.accentGreen} />
+                    <Ionicons name="checkmark" size={16} color={theme.accentGreen} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -245,7 +247,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
                       setCustomAmounts((prev) => ({ ...prev, [member._id]: text }))
                     }
                     placeholder="0.00"
-                    placeholderTextColor={dark.textMuted}
+                    placeholderTextColor={theme.textMuted}
                     keyboardType="decimal-pad"
                   />
                 ) : (
@@ -280,29 +282,29 @@ const AddExpenseScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
   amountCard: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',
     marginTop: spacing.sm,
   },
   amountLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.9,
   },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  currency: { color: dark.accentGreen, fontSize: 26, fontWeight: '700' },
+  currency: { color: theme.accentGreen, fontSize: 26, fontWeight: '700' },
   amountInput: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 36,
     fontWeight: '800',
     minWidth: 140,
@@ -311,7 +313,7 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -321,13 +323,13 @@ const styles = StyleSheet.create({
   },
   labelInline: { marginTop: 0, marginBottom: 0 },
   field: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md - 2,
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
   },
 
@@ -335,18 +337,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.sm + 2,
   },
-  payerName: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600' },
-  changeLink: { color: dark.accentBlue, fontSize: 12, fontWeight: '700' },
+  payerName: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600' },
+  changeLink: { color: theme.accentBlue, fontSize: 12, fontWeight: '700' },
   payerPicker: {
-    backgroundColor: '#0F1A20',
+    backgroundColor: theme.raised,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     marginTop: spacing.sm,
     paddingVertical: spacing.xs,
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  payerOptionText: { flex: 1, color: dark.text, fontSize: 13 },
+  payerOptionText: { flex: 1, color: theme.text, fontSize: 13 },
 
   splitHeader: {
     flexDirection: 'row',
@@ -369,24 +371,24 @@ const styles = StyleSheet.create({
   },
   modeToggle: {
     flexDirection: 'row',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.sm,
     padding: 2,
   },
   modeButton: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.sm - 2 },
-  modeButtonActive: { backgroundColor: 'rgba(255,255,255,0.12)' },
-  modeText: { color: dark.textMuted, fontSize: 11, fontWeight: '700' },
-  modeTextActive: { color: dark.text },
+  modeButtonActive: { backgroundColor: theme.overlayStrong },
+  modeText: { color: theme.textMuted, fontSize: 11, fontWeight: '700' },
+  modeTextActive: { color: theme.text },
 
   splitRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: spacing.sm + 2,
@@ -398,27 +400,27 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: dark.textMuted,
+    borderColor: theme.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
-  splitName: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '600' },
-  splitAmount: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  splitAmountOff: { color: dark.textMuted },
+  checkboxOn: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
+  splitName: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600' },
+  splitAmount: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  splitAmountOff: { color: theme.textMuted },
   customInput: {
     minWidth: 76,
     textAlign: 'right',
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     fontWeight: '700',
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
+    borderBottomColor: theme.border,
     paddingVertical: 2,
   },
   customTotal: { fontSize: 12, textAlign: 'right', marginTop: 2 },
-  customOk: { color: dark.accentGreen },
-  customBad: { color: '#F87171' },
+  customOk: { color: theme.accentGreen },
+  customBad: { color: theme.danger },
 
   submit: { marginTop: spacing.lg },
 });

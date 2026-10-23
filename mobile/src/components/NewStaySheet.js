@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
 import DateChip from './DateChip';
 import CalendarPanel from './CalendarPanel';
-import { dark } from '../theme';
+import { useStyles, useTheme } from '../theme';
 
 const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -21,6 +21,8 @@ const defaultCheckIn = () => {
 // with it filled in and sends the provider's id along, so the tab can mark it
 // as added. Null for a stay typed from scratch.
 const NewStaySheet = ({ visible, initial = null, onClose, onSubmit }) => {
+  const theme = useTheme();
+  const sheetStyles = useStyles(makeSheetStyles);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [checkIn, setCheckIn] = useState(defaultCheckIn);
@@ -132,17 +134,17 @@ const NewStaySheet = ({ visible, initial = null, onClose, onSubmit }) => {
               onPress={() => setNights((n) => Math.max(1, n - 1))}
               style={sheetStyles.stepButton}
             >
-              <Ionicons name="remove" size={16} color={dark.textMuted} />
+              <Ionicons name="remove" size={16} color={theme.textMuted} />
             </TouchableOpacity>
             <View style={sheetStyles.stepValue}>
-              <Ionicons name="moon-outline" size={14} color={dark.accentGreen} />
+              <Ionicons name="moon-outline" size={14} color={theme.accentGreen} />
               <Text style={sheetStyles.stepText}>{nights}</Text>
             </View>
             <TouchableOpacity
               onPress={() => setNights((n) => Math.min(60, n + 1))}
               style={sheetStyles.stepButton}
             >
-              <Ionicons name="add" size={16} color={dark.textMuted} />
+              <Ionicons name="add" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -154,17 +156,17 @@ const NewStaySheet = ({ visible, initial = null, onClose, onSubmit }) => {
               onPress={() => setGuests((g) => Math.max(1, g - 1))}
               style={sheetStyles.stepButton}
             >
-              <Ionicons name="remove" size={16} color={dark.textMuted} />
+              <Ionicons name="remove" size={16} color={theme.textMuted} />
             </TouchableOpacity>
             <View style={sheetStyles.stepValue}>
-              <Ionicons name="people-outline" size={14} color={dark.accentGreen} />
+              <Ionicons name="people-outline" size={14} color={theme.accentGreen} />
               <Text style={sheetStyles.stepText}>{guests}</Text>
             </View>
             <TouchableOpacity
               onPress={() => setGuests((g) => Math.min(50, g + 1))}
               style={sheetStyles.stepButton}
             >
-              <Ionicons name="add" size={16} color={dark.textMuted} />
+              <Ionicons name="add" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
         </View>

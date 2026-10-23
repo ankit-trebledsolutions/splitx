@@ -1,19 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
 import Avatar from '../components/Avatar';
+import AppearanceSheet from '../components/AppearanceSheet';
 import { useAuth } from '../context/AuthContext';
 import { profileDefaults, accountSettings, helpSupport } from '../data/profile';
 import { creditsLabel } from '../data/wallet';
 import useWallet from '../hooks/useWallet';
 import { useTour } from '../tour/TourProvider';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme, useThemeMode, THEME_MODES } from '../theme';
 
 const ProfileScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { user, logout } = useAuth();
   const { reset: resetTour } = useTour();
   const { wallet } = useWallet();
+  const { mode } = useThemeMode();
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
 
   // App tour: forget both chapters and go to Home, where the welcome starts
   // again. The tabs chapter follows on the next group opened.
@@ -25,9 +30,13 @@ const ProfileScreen = ({ navigation }) => {
   const profile = { ...profileDefaults, ...(user ?? {}) };
 
   // The Wallet row shows the balance; until it loads (or on a server without
-  // wallets) it keeps its plain description.
+  // wallets) it keeps its plain description. The Appearance row shows the
+  // current choice.
   const settingValue = (item) => {
     if (item.key === 'wallet' && wallet) return creditsLabel(wallet.balance);
+    if (item.key === 'appearance') {
+      return THEME_MODES.find((option) => option.key === mode)?.label ?? item.value;
+    }
     return item.value ?? profile[item.valueFrom];
   };
 
@@ -57,7 +66,7 @@ const ProfileScreen = ({ navigation }) => {
               @{profile.username} · {profile.tagline}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={dark.textMuted} />
+          <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
         </TouchableOpacity>
 
         <Text style={styles.sectionLabel}>Account Settings</Text>
@@ -68,10 +77,14 @@ const ProfileScreen = ({ navigation }) => {
               key={item.key}
               style={[styles.settingRow, index > 0 && styles.settingDivider]}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate(item.screen ?? 'EditProfile')}
+              onPress={() =>
+                item.key === 'appearance'
+                  ? setAppearanceOpen(true)
+                  : navigation.navigate(item.screen ?? 'EditProfile')
+              }
             >
               <View style={styles.settingIcon}>
-                <Ionicons name={item.icon} size={18} color={dark.button} />
+                <Ionicons name={item.icon} size={18} color={theme.accentGreen} />
               </View>
               <View style={styles.settingBody}>
                 <Text style={styles.settingLabel}>{item.label}</Text>
@@ -79,7 +92,7 @@ const ProfileScreen = ({ navigation }) => {
                   {settingValue(item)}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           ))}
         </View>
@@ -95,7 +108,7 @@ const ProfileScreen = ({ navigation }) => {
               onPress={() => (item.action === 'tour' ? replayTour() : navigation.navigate(item.screen))}
             >
               <View style={styles.settingIcon}>
-                <Ionicons name={item.icon} size={18} color={dark.button} />
+                <Ionicons name={item.icon} size={18} color={theme.accentGreen} />
               </View>
               <View style={styles.settingBody}>
                 <Text style={styles.settingLabel}>{item.label}</Text>
@@ -103,7 +116,7 @@ const ProfileScreen = ({ navigation }) => {
                   {item.value}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           ))}
         </View>
@@ -113,11 +126,13 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <AppearanceSheet visible={appearanceOpen} onClose={() => setAppearanceOpen(false)} />
     </DarkScreen>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
   titleRow: {
@@ -126,31 +141,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
   },
-  title: { color: dark.text, fontSize: 24, fontWeight: '800' },
+  title: { color: theme.text, fontSize: 24, fontWeight: '800' },
   editChip: {
     borderWidth: 1,
-    borderColor: dark.accentGreen,
+    borderColor: theme.accentGreen,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
   },
-  editText: { color: dark.accentGreen, fontSize: 12, fontWeight: '700' },
+  editText: { color: theme.accentGreen, fontSize: 12, fontWeight: '700' },
 
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
   },
   profileBody: { flex: 1, marginLeft: spacing.md },
-  profileName: { color: dark.text, fontSize: 18, fontWeight: '700' },
-  profileHandle: { color: dark.textMuted, fontSize: 12, marginTop: 3 },
+  profileName: { color: theme.text, fontSize: 18, fontWeight: '700' },
+  profileHandle: { color: theme.textMuted, fontSize: 12, marginTop: 3 },
 
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -160,9 +175,9 @@ const styles = StyleSheet.create({
   },
 
   settingsCard: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
@@ -172,7 +187,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  settingDivider: { borderTopWidth: 1, borderTopColor: dark.border },
+  settingDivider: { borderTopWidth: 1, borderTopColor: theme.border },
   settingIcon: {
     width: 34,
     height: 34,
@@ -183,8 +198,8 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   settingBody: { flex: 1 },
-  settingLabel: { color: dark.text, fontSize: 14, fontWeight: '600' },
-  settingValue: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  settingLabel: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  settingValue: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
 
   signOut: {
     flexDirection: 'row',
@@ -198,7 +213,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.md,
   },
-  signOutText: { color: '#F87171', fontSize: 15, fontWeight: '700' },
+  signOutText: { color: theme.danger, fontSize: 15, fontWeight: '700' },
 });
 
 export default ProfileScreen;

@@ -8,13 +8,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../../theme';
-import ItineraryProgressStrip, {
-  ROAD_DONE,
-  ROAD_EDGE,
-  ROAD_NOW,
-  ON_ROAD,
-} from '../../components/ItineraryProgressStrip';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
+import ItineraryProgressStrip from '../../components/ItineraryProgressStrip';
 import ItineraryRoadmap from '../../components/ItineraryRoadmap';
 import useMinuteTick from '../../hooks/useMinuteTick';
 import { buildItineraryProgress, nextDoneFor, STOP_STATUS } from '../../utils/itineraryProgress';
@@ -27,11 +22,13 @@ const shortDate = (value) =>
 // The tick circle at the start of an activity row: filled once the stop is
 // done (by a tap or by the clock), amber for the stop the group is at now.
 const StopMark = ({ status }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   switch (status) {
     case STOP_STATUS.done:
       return (
         <View style={[styles.mark, styles.markDone]}>
-          <Ionicons name="checkmark" size={12} color={ON_ROAD} />
+          <Ionicons name="checkmark" size={12} color={theme.road.ink} />
         </View>
       );
     case STOP_STATUS.current:
@@ -39,7 +36,7 @@ const StopMark = ({ status }) => {
     case STOP_STATUS.skipped:
       return (
         <View style={[styles.mark, styles.markSkipped]}>
-          <Ionicons name="close" size={10} color={dark.textMuted} />
+          <Ionicons name="close" size={10} color={theme.textMuted} />
         </View>
       );
     default:
@@ -52,6 +49,8 @@ const StopMark = ({ status }) => {
 // strip's switch swaps the cards for the roadmap: the same days as one
 // winding road, where a tap on a stop ticks it off.
 const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // undefined = nothing chosen yet (the current day opens), null = all closed.
   const [expandedId, setExpandedId] = useState(undefined);
   const [view, setView] = useState('list');
@@ -61,7 +60,7 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
@@ -109,7 +108,7 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
         >
           <View style={[styles.dayBadge, dayNow && styles.dayBadgeNow, dayDone && styles.dayBadgeDone]}>
             {dayDone ? (
-              <Ionicons name="checkmark" size={20} color={ON_ROAD} />
+              <Ionicons name="checkmark" size={20} color={theme.road.ink} />
             ) : (
               <>
                 <Text style={styles.dayBadgeLabel}>DAY</Text>
@@ -128,7 +127,7 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
           <Ionicons
             name={expanded ? 'chevron-up' : 'chevron-down'}
             size={15}
-            color={dark.textMuted}
+            color={theme.textMuted}
             style={styles.chevron}
           />
           <TouchableOpacity
@@ -136,7 +135,7 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
             activeOpacity={0.8}
             onPress={() => onEditDay?.(item)}
           >
-            <Ionicons name="pencil" size={13} color={dark.accentGreen} />
+            <Ionicons name="pencil" size={13} color={theme.accentGreen} />
           </TouchableOpacity>
         </TouchableOpacity>
 
@@ -189,7 +188,7 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
       ListHeaderComponent={header}
       ListFooterComponent={
         <TouchableOpacity style={styles.addDay} activeOpacity={0.8} onPress={onAddDay}>
-          <Ionicons name="add" size={16} color={dark.accentGreen} />
+          <Ionicons name="add" size={16} color={theme.accentGreen} />
           <Text style={styles.addDayText}>Add Day</Text>
         </TouchableOpacity>
       }
@@ -202,11 +201,11 @@ const ItineraryTab = ({ days, loading, onAddDay, onEditDay, onToggleDone }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 100 },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -216,9 +215,9 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     marginBottom: spacing.sm + 2,
   },
@@ -227,33 +226,33 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
-  dayBadgeNow: { backgroundColor: ROAD_NOW },
-  dayBadgeDone: { backgroundColor: ROAD_DONE },
+  dayBadgeNow: { backgroundColor: theme.road.now },
+  dayBadgeDone: { backgroundColor: theme.road.done },
   dayBadgeLabel: { color: '#04241A', fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
   dayBadgeNumber: { color: '#04241A', fontSize: 16, fontWeight: '800', marginTop: -1 },
   cardBody: { flex: 1, marginRight: spacing.sm },
-  title: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  meta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  title: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  meta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   chevron: { marginRight: spacing.sm },
   editButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   activities: {
     borderTopWidth: 1,
-    borderTopColor: dark.border,
+    borderTopColor: theme.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -263,38 +262,38 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: ROAD_EDGE,
+    borderColor: theme.road.edge,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm + 2,
   },
-  markDone: { backgroundColor: ROAD_DONE, borderColor: ROAD_DONE },
-  markNow: { borderColor: ROAD_NOW, borderWidth: 3 },
+  markDone: { backgroundColor: theme.road.done, borderColor: theme.road.done },
+  markNow: { borderColor: theme.road.now, borderWidth: 3 },
   markSkipped: { borderStyle: 'dashed' },
   activityTime: {
     width: 76,
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 12,
     fontWeight: '600',
   },
-  activityTimeNow: { color: ROAD_NOW },
-  activityTitle: { flex: 1, color: dark.text, fontSize: 13 },
+  activityTimeNow: { color: theme.warning },
+  activityTitle: { flex: 1, color: theme.text, fontSize: 13 },
   activityTitleNow: { fontWeight: '700' },
-  muted: { color: dark.textMuted },
-  skipped: { color: dark.textMuted, textDecorationLine: 'line-through' },
+  muted: { color: theme.textMuted },
+  skipped: { color: theme.textMuted, textDecorationLine: 'line-through' },
 
   addDay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
   },
-  addDayText: { color: dark.accentGreen, fontSize: 14, fontWeight: '700' },
+  addDayText: { color: theme.accentGreen, fontSize: 14, fontWeight: '700' },
 });
 
 export default ItineraryTab;

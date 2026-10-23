@@ -17,7 +17,7 @@ import { avatarColor } from '../../components/Avatar';
 import ImageViewer from '../../components/ImageViewer';
 import VideoViewer from '../../components/VideoViewer';
 import { API_ORIGIN } from '../../api/client';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import { initials } from '../../utils/format';
 import { formatDuration } from '../../utils/attachments';
 import { isVideo } from '../../utils/video';
@@ -32,7 +32,6 @@ const NUM_COLUMNS = 3;
 const GRID_GAP = spacing.sm;
 const GRID_PADDING = spacing.md;
 const RECENT_MS = 24 * 60 * 60 * 1000; // green "new" dot for photos < 1 day old
-const DANGER = '#F87171';
 
 const absolute = (url) => (url ? (url.startsWith('http') ? url : `${API_ORIGIN}${url}`) : null);
 
@@ -93,6 +92,8 @@ const GalleryTab = ({
   focusId,
   onFocusDone,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [filter, setFilter] = useState('all');
   const [savedIds, setSavedIds] = useState(() => new Set());
   const [savingIds, setSavingIds] = useState(() => new Set());
@@ -287,7 +288,7 @@ const GalleryTab = ({
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
@@ -358,7 +359,7 @@ const GalleryTab = ({
         {selecting ? (
           <View style={[styles.checkBadge, isSelected && styles.checkBadgeOn]}>
             {isSaving ? (
-              <ActivityIndicator size="small" color={isSelected ? '#04241A' : dark.text} />
+              <ActivityIndicator size="small" color={isSelected ? '#04241A' : theme.text} />
             ) : (
               isSelected && <Ionicons name="checkmark" size={15} color="#04241A" />
             )}
@@ -366,12 +367,12 @@ const GalleryTab = ({
         ) : imageUri && !isMine && !video ? (
           <View style={[styles.downloadBadge, !needsDownload && styles.downloadBadgeDone]}>
             {isSaving ? (
-              <ActivityIndicator size="small" color={dark.text} />
+              <ActivityIndicator size="small" color={theme.text} />
             ) : (
               <Ionicons
                 name={needsDownload ? 'arrow-down' : 'checkmark'}
                 size={14}
-                color={needsDownload ? dark.text : '#04241A'}
+                color={needsDownload ? theme.text : '#04241A'}
               />
             )}
           </View>
@@ -381,7 +382,7 @@ const GalleryTab = ({
 
         {item.taggedMembers?.length ? (
           <View style={styles.peopleBadge}>
-            <Ionicons name="people" size={9} color={dark.text} />
+            <Ionicons name="people" size={9} color={theme.text} />
             <Text style={styles.peopleBadgeText}>{item.taggedMembers.length}</Text>
           </View>
         ) : null}
@@ -417,7 +418,7 @@ const GalleryTab = ({
           disabled={bulkBusy}
           onPress={() => setSelectedIds(null)}
         >
-          <Ionicons name="close" size={18} color={dark.text} />
+          <Ionicons name="close" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.selectCount} numberOfLines={1}>
           {selected.length ? `${selected.length} selected` : 'Select photos'}
@@ -432,9 +433,9 @@ const GalleryTab = ({
           onPress={downloadSelected}
         >
           {bulkBusy ? (
-            <ActivityIndicator size="small" color={dark.text} />
+            <ActivityIndicator size="small" color={theme.text} />
           ) : (
-            <Ionicons name="download-outline" size={18} color={dark.text} />
+            <Ionicons name="download-outline" size={18} color={theme.text} />
           )}
         </TouchableOpacity>
         <TouchableOpacity
@@ -443,7 +444,7 @@ const GalleryTab = ({
           disabled={!selected.length || bulkBusy}
           onPress={deleteSelected}
         >
-          <Ionicons name="trash-outline" size={17} color={DANGER} />
+          <Ionicons name="trash-outline" size={17} color={theme.danger} />
         </TouchableOpacity>
       </View>
     )}
@@ -478,12 +479,12 @@ const GalleryTab = ({
                   activeOpacity={0.8}
                   onPress={() => setSelectedIds(new Set())}
                 >
-                  <Ionicons name="checkmark-circle-outline" size={16} color={dark.text} />
+                  <Ionicons name="checkmark-circle-outline" size={16} color={theme.text} />
                   <Text style={styles.selectButtonText}>Select</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.cameraButton} activeOpacity={0.8} onPress={onAddPhoto}>
-                <Ionicons name="camera-outline" size={17} color={dark.text} />
+                <Ionicons name="camera-outline" size={17} color={theme.text} />
               </TouchableOpacity>
             </View>
           )}
@@ -550,11 +551,11 @@ const GalleryTab = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: GRID_PADDING, paddingBottom: 100 },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -575,26 +576,26 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingVertical: spacing.sm + 3,
   },
-  faceScanText: { color: '#B79CFF', fontSize: 13, fontWeight: '600' },
+  faceScanText: { color: theme.stay, fontSize: 13, fontWeight: '600' },
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     height: 40,
     borderRadius: 20,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.sm + 4,
   },
-  selectButtonText: { color: dark.text, fontSize: 12, fontWeight: '600' },
+  selectButtonText: { color: theme.text, fontSize: 12, fontWeight: '600' },
   cameraButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -606,22 +607,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: GRID_PADDING,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
-    backgroundColor: dark.card,
+    borderBottomColor: theme.border,
+    backgroundColor: theme.card,
   },
   selectBarButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectCount: { flex: 1, color: dark.text, fontSize: 15, fontWeight: '700' },
+  selectCount: { flex: 1, color: theme.text, fontSize: 15, fontWeight: '700' },
   selectAll: {
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 12,
     fontWeight: '700',
     paddingHorizontal: spacing.xs,
@@ -634,16 +635,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 16,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 5,
     marginRight: spacing.sm,
   },
   chipActive: {
-    borderColor: dark.accentGreen,
+    borderColor: theme.accentGreen,
     backgroundColor: 'rgba(0,196,208,0.10)',
   },
   chipAvatar: {
@@ -654,9 +655,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipAvatarText: { color: '#0B1116', fontSize: 7, fontWeight: '800' },
-  chipText: { color: dark.textMuted, fontSize: 11, fontWeight: '600' },
-  chipTextActive: { color: dark.accentGreen },
-  chipCount: { color: dark.textMuted, fontSize: 10, fontWeight: '700' },
+  chipText: { color: theme.textMuted, fontSize: 11, fontWeight: '600' },
+  chipTextActive: { color: theme.accentGreen },
+  chipCount: { color: theme.textMuted, fontSize: 10, fontWeight: '700' },
 
   gridRow: { gap: GRID_GAP, marginBottom: GRID_GAP },
   tile: {
@@ -670,7 +671,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,196,208,0.28)',
     borderWidth: 2,
-    borderColor: dark.accentGreen,
+    borderColor: theme.accentGreen,
     borderRadius: radius.md,
   },
   checkBadge: {
@@ -686,7 +687,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkBadgeOn: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
+  checkBadgeOn: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
   uploaderChip: {
     position: 'absolute',
     top: 6,
@@ -703,7 +704,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
   downloadBadge: {
     position: 'absolute',
@@ -718,7 +719,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  downloadBadgeDone: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
+  downloadBadgeDone: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
 
   // Videos: a play mark in the middle and the length in the bottom-left corner.
   playBadge: {
@@ -757,7 +758,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 1,
   },
-  peopleBadgeText: { color: dark.text, fontSize: 9, fontWeight: '700' },
+  peopleBadgeText: { color: theme.text, fontSize: 9, fontWeight: '700' },
 });
 
 export default GalleryTab;

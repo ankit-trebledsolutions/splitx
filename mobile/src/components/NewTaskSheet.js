@@ -16,13 +16,13 @@ import GradientButton from './GradientButton';
 import Avatar from './Avatar';
 import CalendarPanel from './CalendarPanel';
 import useSheetBottom from '../hooks/useSheetBottom';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { formatTime } from '../utils/format';
 
-const PRIORITIES = [
-  { value: 'high', label: 'High', color: '#F87171' },
-  { value: 'med', label: 'Med', color: '#F5B342' },
-  { value: 'low', label: 'Low', color: '#17E695' },
+const priorities = (theme) => [
+  { value: 'high', label: 'High', color: theme.danger },
+  { value: 'med', label: 'Med', color: theme.warning },
+  { value: 'low', label: 'Low', color: theme.success },
 ];
 
 // Rounds to the next half hour so the default due time is never in the past.
@@ -42,6 +42,8 @@ const dateLabel = (date) =>
  *   suggestion: { title, from: { name }, text, at } | null
  */
 const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState('high');
   const [assignees, setAssignees] = useState([]);
@@ -126,7 +128,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
                 </Text>
               </View>
               <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
-                <Ionicons name="close" size={18} color={dark.text} />
+                <Ionicons name="close" size={18} color={theme.text} />
               </TouchableOpacity>
             </View>
 
@@ -163,7 +165,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
 
               <Text style={styles.label}>Priority</Text>
               <View style={styles.row}>
-                {PRIORITIES.map((option) => {
+                {priorities(theme).map((option) => {
                   const active = priority === option.value;
                   return (
                     <TouchableOpacity
@@ -176,7 +178,7 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
                       onPress={() => setPriority(option.value)}
                     >
                       <View style={[styles.priorityDot, { backgroundColor: option.color }]} />
-                      <Text style={[styles.priorityText, active && { color: dark.text }]}>
+                      <Text style={[styles.priorityText, active && { color: theme.text }]}>
                         {option.label}
                       </Text>
                     </TouchableOpacity>
@@ -214,23 +216,23 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
                   <Text style={styles.label}>Due Date</Text>
                   <View style={styles.stepper}>
                     <TouchableOpacity onPress={() => shiftDate(-1)} style={styles.stepButton}>
-                      <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
+                      <Ionicons name="chevron-back" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.stepValue}
                       onPress={() => setCalendarOpen((open) => !open)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="calendar-outline" size={14} color={dark.accentGreen} />
+                      <Ionicons name="calendar-outline" size={14} color={theme.accentGreen} />
                       <Text style={styles.stepText}>{dateLabel(dueAt)}</Text>
                       <Ionicons
                         name={calendarOpen ? 'chevron-up' : 'chevron-down'}
                         size={12}
-                        color={dark.textMuted}
+                        color={theme.textMuted}
                       />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => shiftDate(1)} style={styles.stepButton}>
-                      <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -239,14 +241,14 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
                   <Text style={styles.label}>Due Time</Text>
                   <View style={styles.stepper}>
                     <TouchableOpacity onPress={() => shiftTime(-30)} style={styles.stepButton}>
-                      <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
+                      <Ionicons name="chevron-back" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
                     <View style={styles.stepValue}>
-                      <Ionicons name="time-outline" size={14} color={dark.accentGreen} />
+                      <Ionicons name="time-outline" size={14} color={theme.accentGreen} />
                       <Text style={styles.stepText}>{formatTime(dueAt)}</Text>
                     </View>
                     <TouchableOpacity onPress={() => shiftTime(30)} style={styles.stepButton}>
-                      <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+                      <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -275,15 +277,15 @@ const NewTaskSheet = ({ visible, members = [], suggestion, onClose, onSubmit }) 
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheetWrap: { maxHeight: '92%' },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
   },
@@ -292,19 +294,19 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: theme.overlayBold,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
   headerText: { flex: 1 },
-  title: { color: dark.text, fontSize: 22, fontWeight: '800' },
-  subtitle: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  title: { color: theme.text, fontSize: 22, fontWeight: '800' },
+  subtitle: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   closeButton: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -313,19 +315,19 @@ const styles = StyleSheet.create({
   quote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     padding: spacing.sm + 2,
     marginBottom: spacing.md,
   },
   quoteBody: { flex: 1, marginLeft: spacing.sm },
-  quoteMeta: { color: dark.textMuted, fontSize: 11 },
-  quoteText: { color: dark.text, fontSize: 12, fontStyle: 'italic', marginTop: 2 },
+  quoteMeta: { color: theme.textMuted, fontSize: 11 },
+  quoteText: { color: theme.text, fontSize: 12, fontStyle: 'italic', marginTop: 2 },
 
   label: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.7,
@@ -341,13 +343,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
   },
   priorityDot: { width: 8, height: 8, borderRadius: 4 },
-  priorityText: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
+  priorityText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
 
   assignee: { position: 'relative' },
   assigneeIdle: { opacity: 0.45 },
@@ -359,7 +361,7 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
 
   dueRow: { flexDirection: 'row', gap: spacing.sm },
@@ -368,9 +370,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: 2,
     paddingVertical: spacing.sm,
@@ -378,7 +380,7 @@ const styles = StyleSheet.create({
   },
   stepButton: { paddingHorizontal: 6, paddingVertical: 2 },
   stepValue: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stepText: { color: dark.text, fontSize: 12, fontWeight: '600' },
+  stepText: { color: theme.text, fontSize: 12, fontWeight: '600' },
 
   save: { marginTop: spacing.sm },
 });

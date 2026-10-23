@@ -21,7 +21,7 @@ import {
   removeItineraryActivity,
 } from '../api/itinerary.api';
 import { useAuth } from '../context/AuthContext';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { isValidTimeText, normalizeTimeText } from '../utils/time';
 
@@ -45,6 +45,8 @@ const previewOf = ({ location, note }) =>
 // Time and title are edited in the rows; a row's edit button opens the full
 // activity form for the rest (end time, location, note, moving to another day).
 const EditItineraryDayScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { day, groupName, adminId } = route.params;
   const { user } = useAuth();
 
@@ -255,7 +257,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
             onPress={navigation.goBack}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-back" size={18} color={dark.text} />
+            <Ionicons name="chevron-back" size={18} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Edit Day Details</Text>
           <TouchableOpacity
@@ -291,9 +293,9 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
                   value={title}
                   onChangeText={editTitle}
                   placeholder="e.g. Arrival Day"
-                  placeholderTextColor={dark.textMuted}
+                  placeholderTextColor={theme.textMuted}
                 />
-                <Ionicons name="pencil" size={13} color={dark.accentBlue} />
+                <Ionicons name="pencil" size={13} color={theme.accentBlue} />
               </View>
             </View>
 
@@ -301,7 +303,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
               <Text style={styles.fieldLabel}>DATE</Text>
               <View style={styles.fieldBox}>
                 <TouchableOpacity onPress={() => shiftDate(-1)} hitSlop={styles.hitSlop}>
-                  <Ionicons name="chevron-back" size={14} color={dark.textMuted} />
+                  <Ionicons name="chevron-back" size={14} color={theme.textMuted} />
                 </TouchableOpacity>
                 {/* The chevrons step a day at a time; tapping the date itself
                     opens the month calendar for a far jump. */}
@@ -323,7 +325,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
                   )}
                 />
                 <TouchableOpacity onPress={() => shiftDate(1)} hitSlop={styles.hitSlop}>
-                  <Ionicons name="chevron-forward" size={14} color={dark.textMuted} />
+                  <Ionicons name="chevron-forward" size={14} color={theme.textMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -345,7 +347,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
                     activeOpacity={0.8}
                     onPress={() => openActivity(activity._id)}
                   >
-                    <Ionicons name="create-outline" size={15} color={dark.accentBlue} />
+                    <Ionicons name="create-outline" size={15} color={theme.accentBlue} />
                   </TouchableOpacity>
 
                   <View
@@ -356,7 +358,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
                       value={activity.time}
                       onChangeText={(text) => setActivity(index, { time: text })}
                       placeholder="10:30 AM"
-                      placeholderTextColor={dark.textMuted}
+                      placeholderTextColor={theme.textMuted}
                     />
                   </View>
 
@@ -366,7 +368,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
                       value={activity.title}
                       onChangeText={(text) => setActivity(index, { title: text })}
                       placeholder="What's happening?"
-                      placeholderTextColor={dark.textMuted}
+                      placeholderTextColor={theme.textMuted}
                     />
                   </View>
 
@@ -399,7 +401,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
             activeOpacity={0.8}
             onPress={() => openActivity()}
           >
-            <Ionicons name="add" size={16} color={dark.accentGreen} />
+            <Ionicons name="add" size={16} color={theme.accentGreen} />
             <Text style={styles.addActivityText}>Add New Activity</Text>
           </TouchableOpacity>
 
@@ -435,7 +437,7 @@ const EditItineraryDayScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
 
@@ -449,21 +451,21 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
-    color: dark.text,
+    color: theme.text,
     fontSize: 18,
     fontWeight: '800',
     marginLeft: spacing.md,
   },
   saveChip: {
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderRadius: 16,
     paddingHorizontal: spacing.md + 2,
     paddingVertical: spacing.sm,
@@ -487,13 +489,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 3,
   },
-  dayChipText: { color: dark.accentGreen, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
-  contextText: { color: dark.textMuted, fontSize: 12, flex: 1 },
+  dayChipText: { color: theme.accentGreen, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  contextText: { color: theme.textMuted, fontSize: 12, flex: 1 },
 
   fieldRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   fieldColumn: { flex: 1 },
   fieldLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -503,21 +505,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 2,
     minHeight: 44,
   },
-  fieldInput: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600', paddingVertical: 8 },
+  fieldInput: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600', paddingVertical: 8 },
   // The date is also the calendar's trigger. It fills the box between the
   // chevrons, so the whole middle is tappable, and keeps the text centred
   // exactly where it was.
   dateTrigger: { flex: 1, alignSelf: 'stretch' },
   dateTap: { flex: 1, justifyContent: 'center' },
-  dateText: { color: dark.text, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  dateText: { color: theme.text, fontSize: 14, fontWeight: '600', textAlign: 'center' },
 
   scheduleHeader: {
     flexDirection: 'row',
@@ -525,7 +527,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  reorderHint: { color: dark.accentBlue, fontSize: 11, fontWeight: '600' },
+  reorderHint: { color: theme.accentBlue, fontSize: 11, fontWeight: '600' },
 
   activityRow: {
     flexDirection: 'row',
@@ -535,16 +537,16 @@ const styles = StyleSheet.create({
   },
   timeBox: {
     width: 92,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
   },
   // Time text the server could not read (see utils/time).
-  boxError: { borderColor: '#F87171' },
+  boxError: { borderColor: theme.danger },
   timeInput: {
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 12,
     fontWeight: '700',
     paddingVertical: 10,
@@ -552,13 +554,13 @@ const styles = StyleSheet.create({
   },
   titleBox: {
     flex: 1,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm + 2,
   },
-  titleInput: { color: dark.text, fontSize: 13, fontWeight: '600', paddingVertical: 10 },
+  titleInput: { color: theme.text, fontSize: 13, fontWeight: '600', paddingVertical: 10 },
   // The two round buttons that bracket a row: edit on the left, in the colours
   // of the boxes beside it, and delete on the right.
   rowButton: {
@@ -569,7 +571,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editButton: { backgroundColor: dark.card, borderColor: dark.border },
+  editButton: { backgroundColor: theme.card, borderColor: theme.border },
   deleteButton: {
     backgroundColor: 'rgba(248,113,113,0.12)',
     borderColor: 'rgba(248,113,113,0.35)',
@@ -582,7 +584,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 34 + spacing.sm,
     paddingVertical: spacing.xs,
   },
-  activityPreviewText: { color: dark.textMuted, fontSize: 11 },
+  activityPreviewText: { color: theme.textMuted, fontSize: 11 },
 
   addActivity: {
     flexDirection: 'row',
@@ -596,7 +598,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     marginTop: spacing.xs,
   },
-  addActivityText: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
+  addActivityText: { color: theme.accentGreen, fontSize: 13, fontWeight: '700' },
 
   deleteDay: {
     flexDirection: 'row',
@@ -606,7 +608,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  deleteDayText: { color: '#F87171', fontSize: 13, fontWeight: '700' },
+  deleteDayText: { color: theme.danger, fontSize: 13, fontWeight: '700' },
 });
 
 export default EditItineraryDayScreen;

@@ -7,11 +7,13 @@ import GradientButton from '../components/GradientButton';
 import TermsCheckbox from '../components/TermsCheckbox';
 import AuthFooter from '../components/AuthFooter';
 import GoogleIcon from '../assets/google.svg';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { phoneError } from '../utils/profileValidation';
 
 const RegisterScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { register, loginWithGoogle } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -141,7 +143,7 @@ const RegisterScreen = ({ navigation }) => {
         activeOpacity={0.8}
       >
         {googleLoading ? (
-          <ActivityIndicator color={dark.text} />
+          <ActivityIndicator color={theme.text} />
         ) : (
           <>
             <GoogleIcon width={20} height={20} />
@@ -159,7 +161,7 @@ const RegisterScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   signUp: { marginTop: spacing.md },
   dividerRow: {
     flexDirection: 'row',
@@ -167,21 +169,21 @@ const styles = StyleSheet.create({
     marginVertical: spacing.lg,
     gap: spacing.md,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: dark.border },
-  dividerText: { color: dark.textMuted, fontSize: 14 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.textMuted, fontSize: 14 },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
   },
   googleDisabled: { opacity: 0.6 },
-  googleText: { color: dark.text, fontSize: 16, fontWeight: '600' },
+  googleText: { color: theme.text, fontSize: 16, fontWeight: '600' },
 });
 
 export default RegisterScreen;

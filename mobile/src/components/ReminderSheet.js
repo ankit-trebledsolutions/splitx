@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
 import CalendarPanel from './CalendarPanel';
 import TimeWheel from './TimeWheel';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { formatTime } from '../utils/format';
 import { alarmsSupported, nextRingAt } from '../utils/reminderAlarms';
 
-const DANGER = '#F97362';
 
 // Tomorrow at 10:00 AM by default.
 const defaultRemindAt = () => {
@@ -30,18 +29,23 @@ const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
 // The middle of the date or time chip. Tapping it drops the picker down.
-const StepValue = ({ icon, text, open, onPress }) => (
-  <TouchableOpacity style={sheetStyles.stepValue} onPress={onPress} activeOpacity={0.7}>
-    <Ionicons name={icon} size={14} color={dark.accentGreen} />
-    <Text style={sheetStyles.stepText}>{text}</Text>
-    <Ionicons
-      name={open ? 'chevron-up' : 'chevron-down'}
-      size={12}
-      color={dark.textMuted}
-      style={styles.stepCaret}
-    />
-  </TouchableOpacity>
-);
+const StepValue = ({ icon, text, open, onPress }) => {
+  const theme = useTheme();
+  const sheetStyles = useStyles(makeSheetStyles);
+  const styles = useStyles(makeStyles);
+  return (
+    <TouchableOpacity style={sheetStyles.stepValue} onPress={onPress} activeOpacity={0.7}>
+      <Ionicons name={icon} size={14} color={theme.accentGreen} />
+      <Text style={sheetStyles.stepText}>{text}</Text>
+      <Ionicons
+        name={open ? 'chevron-up' : 'chevron-down'}
+        size={12}
+        color={theme.textMuted}
+        style={styles.stepCaret}
+      />
+    </TouchableOpacity>
+  );
+};
 
 /**
  * The reminder sheet, per the add-reminder design. It creates a reminder and
@@ -70,6 +74,9 @@ const ReminderSheet = ({
   onSubmit,
   onDelete,
 }) => {
+  const theme = useTheme();
+  const sheetStyles = useStyles(makeSheetStyles);
+  const styles = useStyles(makeStyles);
   const editing = Boolean(reminder);
 
   const [title, setTitle] = useState('');
@@ -190,7 +197,7 @@ const ReminderSheet = ({
           <Ionicons
             name="checkmark-circle-outline"
             size={18}
-            color={dark.accentGreen}
+            color={theme.accentGreen}
             style={styles.titleCheck}
           />
         )}
@@ -203,7 +210,7 @@ const ReminderSheet = ({
             style={[sheetStyles.stepper, styles.stepperTight, picker === 'date' && styles.stepperOpen]}
           >
             <TouchableOpacity onPress={() => shiftDate(-1)} style={sheetStyles.stepButton}>
-              <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
+              <Ionicons name="chevron-back" size={16} color={theme.textMuted} />
             </TouchableOpacity>
             <StepValue
               icon="calendar-outline"
@@ -212,7 +219,7 @@ const ReminderSheet = ({
               onPress={() => toggle('date')}
             />
             <TouchableOpacity onPress={() => shiftDate(1)} style={sheetStyles.stepButton}>
-              <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -223,7 +230,7 @@ const ReminderSheet = ({
             style={[sheetStyles.stepper, styles.stepperTight, picker === 'time' && styles.stepperOpen]}
           >
             <TouchableOpacity onPress={() => shiftTime(-30)} style={sheetStyles.stepButton}>
-              <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
+              <Ionicons name="chevron-back" size={16} color={theme.textMuted} />
             </TouchableOpacity>
             <StepValue
               icon="time-outline"
@@ -232,7 +239,7 @@ const ReminderSheet = ({
               onPress={() => toggle('time')}
             />
             <TouchableOpacity onPress={() => shiftTime(30)} style={sheetStyles.stepButton}>
-              <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -267,7 +274,7 @@ const ReminderSheet = ({
                   <Ionicons
                     name={option.icon}
                     size={14}
-                    color={active ? dark.text : dark.textMuted}
+                    color={active ? theme.text : theme.textMuted}
                   />
                   <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
                     {option.label}
@@ -289,7 +296,7 @@ const ReminderSheet = ({
         <Switch
           value={repeatWeekly}
           onValueChange={setRepeatWeekly}
-          trackColor={{ false: 'rgba(255,255,255,0.14)', true: dark.accentGreen }}
+          trackColor={{ false: theme.overlayStrong, true: theme.accentFill }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="rgba(255,255,255,0.14)"
         />
@@ -309,7 +316,7 @@ const ReminderSheet = ({
 
       {onDelete ? (
         <TouchableOpacity style={styles.delete} onPress={onDelete} activeOpacity={0.8}>
-          <Ionicons name="trash-outline" size={15} color={DANGER} />
+          <Ionicons name="trash-outline" size={15} color={theme.coral} />
           <Text style={styles.deleteText}>Delete reminder</Text>
         </TouchableOpacity>
       ) : null}
@@ -317,7 +324,7 @@ const ReminderSheet = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   titleWrap: { position: 'relative' },
   titleInput: { paddingRight: 44 },
   titleCheck: { position: 'absolute', right: spacing.md, top: 15 },
@@ -326,14 +333,14 @@ const styles = StyleSheet.create({
   stepperOpen: { borderColor: 'rgba(0,196,208,0.55)' },
   stepCaret: { marginLeft: 2 },
   whenRow: { marginBottom: spacing.sm },
-  whenHint: { color: dark.textMuted, fontSize: 11, marginBottom: spacing.md },
-  whenError: { color: DANGER },
+  whenHint: { color: theme.textMuted, fontSize: 11, marginBottom: spacing.md },
+  whenError: { color: theme.coral },
 
   segment: {
     flexDirection: 'row',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md + 2,
     padding: 3,
     marginBottom: spacing.md,
@@ -348,9 +355,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md - 2,
     paddingVertical: spacing.sm + 2,
   },
-  segmentItemActive: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  segmentText: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
-  segmentTextActive: { color: dark.text },
+  segmentItemActive: { backgroundColor: theme.overlay },
+  segmentText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
+  segmentTextActive: { color: theme.text },
 
   repeatRow: {
     flexDirection: 'row',
@@ -358,8 +365,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   repeatBody: { flex: 1 },
-  repeatTitle: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  repeatMeta: { color: dark.textMuted, fontSize: 11, marginTop: 1 },
+  repeatTitle: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  repeatMeta: { color: theme.textMuted, fontSize: 11, marginTop: 1 },
 
   notesInput: { minHeight: 96, paddingTop: spacing.md - 2 },
 
@@ -375,7 +382,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md - 4,
     marginBottom: spacing.sm,
   },
-  deleteText: { color: DANGER, fontSize: 14, fontWeight: '700' },
+  deleteText: { color: theme.coral, fontSize: 14, fontWeight: '700' },
 });
 
 export default ReminderSheet;

@@ -15,18 +15,18 @@ import Avatar from '../components/Avatar';
 import MemberAvatars from '../components/MemberAvatars';
 import { fetchGroup, fetchExpensePage, appendExpenses, fetchContributions } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { usd } from '../utils/format';
 import AppAlert from '../components/AppAlert';
 
 const SEGMENTS = ['Overview', 'Expenses', 'Tasks'];
 
-const BADGES = {
-  'contributed-extra': { label: 'Contributed Extra', color: '#4A7DF7' },
-  balanced: { label: 'Balanced', color: '#C7D1DB' },
-  'owes-effort': { label: 'Owes more effort', color: '#F5B342' },
-  'owes-balance': { label: 'Owes balance', color: '#F97362' },
-};
+const badges = (theme) => ({
+  'contributed-extra': { label: 'Contributed Extra', color: theme.accentBlue },
+  balanced: { label: 'Balanced', color: theme.textSoft },
+  'owes-effort': { label: 'Owes more effort', color: theme.warning },
+  'owes-balance': { label: 'Owes balance', color: theme.coral },
+});
 
 const CATEGORY_ICONS = {
   stay: 'bed-outline',
@@ -47,6 +47,8 @@ const firstName = (name = '') => name.split(' ')[0];
 
 // Score ring for the Group Balance Status card.
 const ScoreRing = ({ score }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const R = 26;
   const C = 2 * Math.PI * R;
   const filled = (C * Math.min(100, Math.max(0, score))) / 100;
@@ -58,7 +60,7 @@ const ScoreRing = ({ score }) => {
           cx={34}
           cy={34}
           r={R}
-          stroke={dark.accentGreen}
+          stroke={theme.accentGreen}
           strokeWidth={6}
           fill="none"
           strokeDasharray={`${filled} ${C}`}
@@ -72,18 +74,23 @@ const ScoreRing = ({ score }) => {
 };
 
 // Thin two-tone progress bar used in the member breakdown.
-const StatBar = ({ ratio, color }) => (
-  <View style={styles.barTrack}>
-    <View
-      style={[
-        styles.barFill,
-        { width: `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%`, backgroundColor: color },
-      ]}
-    />
-  </View>
-);
+const StatBar = ({ ratio, color }) => {
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.barTrack}>
+      <View
+        style={[
+          styles.barFill,
+          { width: `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%`, backgroundColor: color },
+        ]}
+      />
+    </View>
+  );
+};
 
 const ContributionsScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // `segment` lets other screens deep-link to a tab, e.g. Group Info -> Expenses.
   const { groupId, segment: initialSegment } = route.params;
   const { user } = useAuth();
@@ -131,7 +138,7 @@ const ContributionsScreen = ({ route, navigation }) => {
     return (
       <DarkScreen>
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       </DarkScreen>
     );
@@ -191,7 +198,8 @@ const ContributionsScreen = ({ route, navigation }) => {
       <Text style={styles.sectionLabel}>MEMBER CONTRIBUTION BREAKDOWN</Text>
 
       {data.members.map((member) => {
-        const badge = BADGES[member.badge] ?? BADGES.balanced;
+        const badgeSet = badges(theme);
+        const badge = badgeSet[member.badge] ?? badgeSet.balanced;
         return (
           <View key={member.user._id} style={styles.memberCard}>
             <View style={styles.memberTop}>
@@ -210,7 +218,7 @@ const ContributionsScreen = ({ route, navigation }) => {
                   <Text style={styles.memberStatLabel}>Expenses paid</Text>
                   <Text style={styles.memberStatValue}>{usd(member.expensesPaid)}</Text>
                 </View>
-                <StatBar ratio={member.expensesPaid / maxPaid} color={dark.accentGreen} />
+                <StatBar ratio={member.expensesPaid / maxPaid} color={theme.accentGreen} />
               </View>
               <View style={styles.memberStat}>
                 <View style={styles.memberStatHeader}>
@@ -221,7 +229,7 @@ const ContributionsScreen = ({ route, navigation }) => {
                 </View>
                 <StatBar
                   ratio={member.tasksAssigned ? member.tasksDone / member.tasksAssigned : 0}
-                  color={dark.accentBlue}
+                  color={theme.accentBlue}
                 />
               </View>
             </View>
@@ -283,7 +291,7 @@ const ContributionsScreen = ({ route, navigation }) => {
                 <Ionicons
                   name={CATEGORY_ICONS[expense.category] ?? 'receipt-outline'}
                   size={16}
-                  color={dark.accentGreen}
+                  color={theme.accentGreen}
                 />
               </View>
               <View style={styles.ledgerBody}>
@@ -311,7 +319,7 @@ const ContributionsScreen = ({ route, navigation }) => {
                 <Text
                   style={[
                     styles.ledgerChipText,
-                    { color: chip.tone === 'red' ? '#F97362' : dark.accentGreen },
+                    { color: chip.tone === 'red' ? theme.coral : theme.accentGreen },
                   ]}
                 >
                   {chip.label}
@@ -325,7 +333,7 @@ const ContributionsScreen = ({ route, navigation }) => {
       {hasMore && (
         <TouchableOpacity style={styles.more} activeOpacity={0.8} onPress={loadMore} disabled={loadingMore}>
           {loadingMore ? (
-            <ActivityIndicator color={dark.accentGreen} />
+            <ActivityIndicator color={theme.accentGreen} />
           ) : (
             <Text style={styles.moreText}>Show more</Text>
           )}
@@ -363,7 +371,7 @@ const ContributionsScreen = ({ route, navigation }) => {
             </View>
             <StatBar
               ratio={member.tasksAssigned ? member.tasksDone / member.tasksAssigned : 0}
-              color={dark.accentBlue}
+              color={theme.accentBlue}
             />
           </View>
         </View>
@@ -379,7 +387,7 @@ const ContributionsScreen = ({ route, navigation }) => {
           onPress={navigation.goBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>Contributions</Text>
@@ -429,7 +437,7 @@ const ContributionsScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
@@ -442,45 +450,45 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: { flex: 1, marginLeft: spacing.md },
-  headerTitle: { color: dark.text, fontSize: 19, fontWeight: '800' },
-  headerSubtitle: { color: dark.textMuted, fontSize: 11, marginTop: 1 },
+  headerTitle: { color: theme.text, fontSize: 19, fontWeight: '800' },
+  headerSubtitle: { color: theme.textMuted, fontSize: 11, marginTop: 1 },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
   },
   summaryColumn: { flex: 1 },
-  summaryLabel: { color: dark.textMuted, fontSize: 11 },
-  summaryMoney: { color: '#2EE6A8', fontSize: 22, fontWeight: '800', marginTop: 4 },
-  summaryTasks: { color: dark.accentBlue, fontSize: 22, fontWeight: '800', marginTop: 4 },
+  summaryLabel: { color: theme.textMuted, fontSize: 11 },
+  summaryMoney: { color: theme.success, fontSize: 22, fontWeight: '800', marginTop: 4 },
+  summaryTasks: { color: theme.accentBlue, fontSize: 22, fontWeight: '800', marginTop: 4 },
   summaryDivider: {
     width: 1,
     alignSelf: 'stretch',
-    backgroundColor: dark.border,
+    backgroundColor: theme.border,
     marginHorizontal: spacing.md,
   },
 
   segmentRow: {
     flexDirection: 'row',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 20,
     padding: 3,
     marginTop: spacing.md,
@@ -492,38 +500,38 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 1,
     borderRadius: 17,
   },
-  segmentActive: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  segmentText: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
-  segmentTextActive: { color: dark.text, fontWeight: '700' },
+  segmentActive: { backgroundColor: theme.overlay },
+  segmentText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
+  segmentTextActive: { color: theme.text, fontWeight: '700' },
 
   balanceCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     padding: spacing.md,
     marginBottom: spacing.md,
   },
   balanceHeader: { flexDirection: 'row', alignItems: 'flex-start' },
   balanceHeaderText: { flex: 1, marginRight: spacing.sm },
-  balanceTitle: { color: dark.text, fontSize: 15, fontWeight: '800' },
-  balanceMeta: { color: dark.textMuted, fontSize: 10, marginTop: 2 },
+  balanceTitle: { color: theme.text, fontSize: 15, fontWeight: '800' },
+  balanceMeta: { color: theme.textMuted, fontSize: 10, marginTop: 2 },
   fairChip: {
     backgroundColor: 'rgba(0,196,208,0.14)',
     borderRadius: 10,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 3,
   },
-  fairChipText: { color: dark.accentGreen, fontSize: 10, fontWeight: '800' },
+  fairChipText: { color: theme.accentGreen, fontSize: 10, fontWeight: '800' },
   balanceBody: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
   ringWrap: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' },
-  ringText: { position: 'absolute', color: dark.text, fontSize: 14, fontWeight: '800' },
+  ringText: { position: 'absolute', color: theme.text, fontSize: 14, fontWeight: '800' },
   balanceCopy: { flex: 1, marginLeft: spacing.md },
-  balanceHeadline: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  balanceBlurb: { color: dark.textMuted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  balanceHeadline: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  balanceBlurb: { color: theme.textMuted, fontSize: 11, lineHeight: 16, marginTop: 3 },
 
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.9,
@@ -531,15 +539,15 @@ const styles = StyleSheet.create({
   },
 
   memberCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm + 2,
   },
   memberTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  memberName: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '700' },
+  memberName: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '700' },
   badge: { borderRadius: 12, paddingHorizontal: spacing.sm + 2, paddingVertical: 3 },
   badgeText: { fontSize: 10, fontWeight: '800' },
 
@@ -551,12 +559,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 5,
   },
-  memberStatLabel: { color: dark.textMuted, fontSize: 10 },
-  memberStatValue: { color: dark.text, fontSize: 11, fontWeight: '700' },
+  memberStatLabel: { color: theme.textMuted, fontSize: 10 },
+  memberStatValue: { color: theme.text, fontSize: 11, fontWeight: '700' },
   barTrack: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: theme.overlay,
     overflow: 'hidden',
   },
   barFill: { height: 4, borderRadius: 2 },
@@ -570,14 +578,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 3,
     marginBottom: spacing.md,
   },
-  youText: { color: dark.textMuted, fontSize: 12 },
-  youPaid: { color: '#2EE6A8', fontWeight: '800' },
-  youShare: { color: dark.accentBlue, fontWeight: '800' },
+  youText: { color: theme.textMuted, fontSize: 12 },
+  youPaid: { color: theme.success, fontWeight: '800' },
+  youShare: { color: theme.accentBlue, fontWeight: '800' },
 
   ledgerCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm + 2,
@@ -593,9 +601,9 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm + 2,
   },
   ledgerBody: { flex: 1, marginRight: spacing.sm },
-  ledgerTitle: { color: dark.text, fontSize: 13, fontWeight: '700' },
-  ledgerMeta: { color: dark.textMuted, fontSize: 10, marginTop: 2 },
-  ledgerAmount: { color: dark.text, fontSize: 15, fontWeight: '800' },
+  ledgerTitle: { color: theme.text, fontSize: 13, fontWeight: '700' },
+  ledgerMeta: { color: theme.textMuted, fontSize: 10, marginTop: 2 },
+  ledgerAmount: { color: theme.text, fontSize: 15, fontWeight: '800' },
   ledgerFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -603,7 +611,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm + 2,
   },
   splitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  splitLabel: { color: dark.textMuted, fontSize: 10 },
+  splitLabel: { color: theme.textMuted, fontSize: 10 },
   ledgerChip: { borderRadius: 10, paddingHorizontal: spacing.sm + 2, paddingVertical: 3 },
   ledgerChipGreen: { backgroundColor: 'rgba(0,196,208,0.12)' },
   ledgerChipRed: { backgroundColor: 'rgba(249,115,98,0.14)' },
@@ -613,9 +621,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm + 2,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -623,9 +631,9 @@ const styles = StyleSheet.create({
   taskBody: { flex: 1 },
 
   more: { alignItems: 'center', paddingVertical: spacing.md },
-  moreText: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
+  moreText: { color: theme.accentGreen, fontSize: 13, fontWeight: '700' },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     textAlign: 'center',
     marginTop: spacing.lg,

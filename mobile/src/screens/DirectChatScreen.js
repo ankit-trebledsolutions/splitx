@@ -29,7 +29,7 @@ import {
 } from '../api/direct.api';
 import { presenceFrom } from '../utils/presence';
 import { formatTime } from '../utils/format';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 
 const MESSAGE_PAGE = 50;
 // One "typing" event per burst of keystrokes; the other side hides the dots
@@ -57,23 +57,26 @@ const dayLabel = (value) => {
   return `${day}, ${formatTime(date)}`;
 };
 
-const Bubble = React.memo(({ message, mine }) =>
-  mine ? (
-    <LinearGradient
-      colors={dark.gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={[styles.bubble, styles.bubbleMine]}
-    >
-      <Text style={[styles.bubbleText, styles.bubbleTextMine]}>{message.text}</Text>
-      <Text style={[styles.time, styles.timeMine]}>{formatTime(message.createdAt)}</Text>
-    </LinearGradient>
-  ) : (
-    <View style={[styles.bubble, styles.bubbleTheirs]}>
-      <Text style={styles.bubbleText}>{message.text}</Text>
-      <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
-    </View>
-  )
+const Bubble = React.memo(({ message, mine }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return mine ? (
+      <LinearGradient
+        colors={theme.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[styles.bubble, styles.bubbleMine]}
+      >
+        <Text style={[styles.bubbleText, styles.bubbleTextMine]}>{message.text}</Text>
+        <Text style={[styles.time, styles.timeMine]}>{formatTime(message.createdAt)}</Text>
+      </LinearGradient>
+    ) : (
+      <View style={[styles.bubble, styles.bubbleTheirs]}>
+        <Text style={styles.bubbleText}>{message.text}</Text>
+        <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
+      </View>
+    );
+}
 );
 
 const keyOf = (item) => item._id;
@@ -83,6 +86,8 @@ const keyOf = (item) => item._id;
  * notification with only `conversationId`.
  */
 const DirectChatScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { peer: initialPeer, conversationId: initialConversationId } = route.params ?? {};
   const { user } = useAuth();
   const currentUserId = user?._id;
@@ -298,7 +303,7 @@ const DirectChatScreen = ({ route, navigation }) => {
     <DarkScreen edges={TOP_ONLY}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
 
         <View style={styles.headerPeer}>
@@ -326,7 +331,7 @@ const DirectChatScreen = ({ route, navigation }) => {
       >
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator color={dark.accentGreen} />
+            <ActivityIndicator color={theme.accentGreen} />
           </View>
         ) : rows.length === 0 && !peerTyping ? (
           <View style={styles.center}>
@@ -355,7 +360,7 @@ const DirectChatScreen = ({ route, navigation }) => {
             // Inverted: the header is drawn at the bottom, under the newest message.
             ListHeaderComponent={peerTyping ? <TypingDots style={styles.typing} /> : null}
             ListFooterComponent={
-              loadingOlder ? <ActivityIndicator color={dark.accentGreen} style={styles.older} /> : null
+              loadingOlder ? <ActivityIndicator color={theme.accentGreen} style={styles.older} /> : null
             }
           />
         )}
@@ -372,7 +377,7 @@ const DirectChatScreen = ({ route, navigation }) => {
               value={draft}
               onChangeText={onChangeDraft}
               placeholder="Message..."
-              placeholderTextColor={dark.textMuted}
+              placeholderTextColor={theme.textMuted}
               multiline
             />
           </View>
@@ -382,7 +387,7 @@ const DirectChatScreen = ({ route, navigation }) => {
             disabled={!canSend}
             activeOpacity={0.85}
           >
-            <Ionicons name="send" size={17} color={canSend ? '#04241A' : dark.textMuted} />
+            <Ionicons name="send" size={17} color={canSend ? '#04241A' : theme.textMuted} />
           </TouchableOpacity>
         </View>
       </Root>
@@ -390,7 +395,7 @@ const DirectChatScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -400,15 +405,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
+    borderBottomColor: theme.border,
   },
   headerIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -422,9 +427,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   headerText: { flexShrink: 1 },
-  headerName: { color: dark.text, fontSize: 16, fontWeight: '800' },
-  headerStatus: { color: dark.textMuted, fontSize: 12, marginTop: 1 },
-  headerStatusOnline: { color: dark.accentGreen },
+  headerName: { color: theme.text, fontSize: 16, fontWeight: '800' },
+  headerStatus: { color: theme.textMuted, fontSize: 12, marginTop: 1 },
+  headerStatusOnline: { color: theme.accentGreen },
   onlineDot: {
     position: 'absolute',
     right: -1,
@@ -434,7 +439,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#22C55E',
     borderWidth: 2,
-    borderColor: dark.background,
+    borderColor: theme.background,
   },
 
   list: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
@@ -442,13 +447,13 @@ const styles = StyleSheet.create({
   typing: { marginTop: spacing.xs, marginBottom: spacing.xs },
   dayLabel: {
     alignSelf: 'center',
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.8,
     marginVertical: spacing.md,
   },
-  empty: { color: dark.textMuted, fontSize: 13, textAlign: 'center' },
+  empty: { color: theme.textMuted, fontSize: 13, textAlign: 'center' },
 
   bubble: {
     maxWidth: '80%',
@@ -460,14 +465,14 @@ const styles = StyleSheet.create({
   },
   bubbleTheirs: {
     alignSelf: 'flex-start',
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
   },
   bubbleMine: { alignSelf: 'flex-end' },
-  bubbleText: { color: dark.text, fontSize: 14.5, lineHeight: 21 },
+  bubbleText: { color: theme.text, fontSize: 14.5, lineHeight: 21 },
   bubbleTextMine: { color: '#04121C' },
-  time: { color: dark.textMuted, fontSize: 10, marginTop: 4 },
+  time: { color: theme.textMuted, fontSize: 10, marginTop: 4 },
   timeMine: { color: 'rgba(4,18,28,0.6)', alignSelf: 'flex-end' },
 
   composer: {
@@ -477,14 +482,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
-    backgroundColor: '#080D10',
+    borderTopColor: theme.border,
+    backgroundColor: theme.composer,
   },
   inputWrap: {
     flex: 1,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 21,
     minHeight: 42,
     justifyContent: 'center',
@@ -492,7 +497,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   input: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     lineHeight: 20,
     maxHeight: 100,
@@ -505,11 +510,11 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonIdle: { backgroundColor: dark.surface, borderWidth: 1, borderColor: dark.border },
+  sendButtonIdle: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
 });
 
 export default DirectChatScreen;

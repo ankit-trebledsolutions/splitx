@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import useSheetBottom from '../hooks/useSheetBottom';
 
 // Dropdown styled to match TextField's dark variant.
@@ -27,6 +27,8 @@ const SelectField = ({
   style,
   renderTrigger,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [open, setOpen] = useState(false);
   const { height } = useWindowDimensions();
   const selected = options.find((o) => o.value === value);
@@ -54,7 +56,7 @@ const SelectField = ({
             <Text style={[styles.value, !selected && styles.placeholder]}>
               {selected ? selected.label : placeholder}
             </Text>
-            <Ionicons name="chevron-down" size={18} color={dark.textMuted} />
+            <Ionicons name="chevron-down" size={18} color={theme.textMuted} />
           </TouchableOpacity>
         </>
       )}
@@ -89,7 +91,7 @@ const SelectField = ({
                     >
                       {option.label}
                     </Text>
-                    {active && <Ionicons name="checkmark" size={18} color={dark.accentGreen} />}
+                    {active && <Ionicons name="checkmark" size={18} color={theme.accentGreen} />}
                   </TouchableOpacity>
                 );
               })}
@@ -101,10 +103,10 @@ const SelectField = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrapper: { marginBottom: spacing.md },
   label: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     fontWeight: '500',
     marginBottom: spacing.sm,
@@ -113,32 +115,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  value: { color: dark.text, fontSize: 16 },
-  placeholder: { color: dark.textMuted },
+  value: { color: theme.text, fontSize: 16 },
+  placeholder: { color: theme.textMuted },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: radius.lg + 8,
     borderTopRightRadius: radius.lg + 8,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
   sheetTitle: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -151,12 +153,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
+    borderBottomColor: theme.border,
   },
   // Shrinks (and truncates) only when a label is too long for the row, so the
   // check mark stays on screen; short labels lay out as they always have.
-  optionText: { flexShrink: 1, color: dark.text, fontSize: 16 },
-  optionTextActive: { color: dark.accentGreen, fontWeight: '600' },
+  optionText: { flexShrink: 1, color: theme.text, fontSize: 16 },
+  optionTextActive: { color: theme.accentGreen, fontWeight: '600' },
 });
 
 export default SelectField;

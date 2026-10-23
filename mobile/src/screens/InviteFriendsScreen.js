@@ -36,7 +36,7 @@ import {
   inviteViaShareSheet,
 } from '../utils/invite';
 import { copyText } from '../utils/clipboard';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const HERO_LEFT = require('../assets/invite-hero-1.jpg');
 const HERO_RIGHT = require('../assets/invite-hero-2.jpg');
@@ -63,6 +63,8 @@ const CHANNELS = [
  * Either way: copy it, share it through an app, or pick someone from contacts.
  */
 const InviteFriendsScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { group, isNew = false } = route.params ?? {};
   const { user } = useAuth();
   const inviterName = user?.name?.split(' ')[0];
@@ -208,7 +210,7 @@ const InviteFriendsScreen = ({ route, navigation }) => {
     <DarkScreen>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={finish} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Invite Friends</Text>
         <View style={styles.headerSpacer} />
@@ -253,11 +255,11 @@ const InviteFriendsScreen = ({ route, navigation }) => {
                 {code}
               </Text>
             ) : (
-              <ActivityIndicator color={dark.accentGreen} style={styles.codeLoading} />
+              <ActivityIndicator color={theme.accentGreen} style={styles.codeLoading} />
             )}
           </View>
           <TouchableOpacity style={styles.copyButton} activeOpacity={0.8} onPress={handleCopy} disabled={!code}>
-            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color={dark.text} />
+            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color={theme.text} />
             <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy'}</Text>
           </TouchableOpacity>
         </View>
@@ -277,7 +279,7 @@ const InviteFriendsScreen = ({ route, navigation }) => {
                   { backgroundColor: `${channel.tint}1A`, borderColor: `${channel.tint}40` },
                 ]}
               >
-                <Ionicons name={channel.icon} size={20} color={channel.tint} />
+                <Ionicons name={channel.icon} size={20} color={theme.ink(channel.tint)} />
               </View>
               <Text style={styles.channelLabel}>{channel.label}</Text>
             </TouchableOpacity>
@@ -292,24 +294,24 @@ const InviteFriendsScreen = ({ route, navigation }) => {
         </View>
 
         <View style={styles.search}>
-          <Ionicons name="search" size={15} color={dark.textMuted} />
+          <Ionicons name="search" size={15} color={theme.textMuted} />
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
             placeholder="Search name, phone or email..."
-            placeholderTextColor={dark.textMuted}
+            placeholderTextColor={theme.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
           />
         </View>
 
         <View style={styles.listCard}>
-          {contactsStatus === null && <ActivityIndicator color={dark.accentGreen} style={styles.listState} />}
+          {contactsStatus === null && <ActivityIndicator color={theme.accentGreen} style={styles.listState} />}
 
           {needsAccess && (
             <View style={styles.listState}>
-              <Ionicons name="people-outline" size={22} color={dark.accentGreen} />
+              <Ionicons name="people-outline" size={22} color={theme.accentGreen} />
               <Text style={styles.stateTitle}>
                 {contactsStatus === CONTACTS_STATUS.UNAVAILABLE ? 'Update needed' : 'Find your friends'}
               </Text>
@@ -389,7 +391,7 @@ const InviteFriendsScreen = ({ route, navigation }) => {
 
 const PHOTO = 68;
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
   header: {
     flexDirection: 'row',
@@ -402,14 +404,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerSpacer: { width: 36 },
-  headerTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
   // ---- hero
@@ -421,8 +423,8 @@ const styles = StyleSheet.create({
     height: PHOTO,
     borderRadius: PHOTO / 2,
     borderWidth: 3,
-    borderColor: dark.background,
-    backgroundColor: dark.card,
+    borderColor: theme.background,
+    backgroundColor: theme.card,
   },
   heroPhotoLeft: { left: 0 },
   heroPhotoRight: { right: 0 },
@@ -432,9 +434,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderWidth: 3,
-    borderColor: dark.background,
+    borderColor: theme.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -443,18 +445,18 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#161A20',
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroBadgeTrip: { top: -4, left: -8 },
   heroBadgeMoney: { bottom: -2, right: -8 },
 
-  title: { color: dark.text, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  title: { color: theme.text, fontSize: 22, fontWeight: '800', textAlign: 'center' },
   subtitle: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13.5,
     lineHeight: 20,
     textAlign: 'center',
@@ -466,9 +468,9 @@ const styles = StyleSheet.create({
   codeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 2,
     paddingVertical: spacing.md - 2,
     paddingLeft: spacing.md,
@@ -476,25 +478,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   codeBody: { flex: 1, marginRight: spacing.sm },
-  codeLabel: { color: dark.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
-  code: { color: dark.accentGreen, fontSize: 20, fontWeight: '800', letterSpacing: 0.6, marginTop: 3 },
+  codeLabel: { color: theme.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
+  code: { color: theme.accentGreen, fontSize: 20, fontWeight: '800', letterSpacing: 0.6, marginTop: 3 },
   codeLoading: { alignSelf: 'flex-start', marginTop: 6 },
   copyButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md - 2,
     paddingVertical: spacing.sm + 2,
   },
-  copyText: { color: dark.text, fontSize: 13, fontWeight: '700' },
+  copyText: { color: theme.text, fontSize: 13, fontWeight: '700' },
 
   // ---- sections
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.9,
@@ -509,7 +511,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm + 4,
   },
   sectionLabelInline: { marginTop: 0, marginBottom: 0 },
-  sync: { color: dark.accentGreen, fontSize: 12.5, fontWeight: '700' },
+  sync: { color: theme.accentGreen, fontSize: 12.5, fontWeight: '700' },
 
   channelRow: { flexDirection: 'row', justifyContent: 'space-between' },
   channel: { alignItems: 'center', flex: 1 },
@@ -521,35 +523,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  channelLabel: { color: dark.textMuted, fontSize: 11.5, fontWeight: '600', marginTop: 7 },
+  channelLabel: { color: theme.textMuted, fontSize: 11.5, fontWeight: '600', marginTop: 7 },
 
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md - 2,
     height: 44,
   },
-  searchInput: { flex: 1, color: dark.text, fontSize: 14, padding: 0 },
+  searchInput: { flex: 1, color: theme.text, fontSize: 14, padding: 0 },
 
   // ---- contacts
   listCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 2,
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm + 4,
   },
   listState: { alignItems: 'center', paddingVertical: spacing.lg },
-  stateTitle: { color: dark.text, fontSize: 15, fontWeight: '700', marginTop: spacing.sm },
-  stateBody: { color: dark.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 4 },
+  stateTitle: { color: theme.text, fontSize: 15, fontWeight: '700', marginTop: spacing.sm },
+  stateBody: { color: theme.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 4 },
   stateButton: {
-    backgroundColor: dark.button,
+    backgroundColor: theme.accentFill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
@@ -557,11 +559,11 @@ const styles = StyleSheet.create({
   },
   stateButtonText: { color: '#04121C', fontSize: 13, fontWeight: '800' },
   contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm + 4 },
-  contactRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
-  contactPhoto: { width: 40, height: 40, borderRadius: 20, backgroundColor: dark.card2 },
+  contactRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
+  contactPhoto: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.card2 },
   contactBody: { flex: 1, marginLeft: spacing.sm + 4, marginRight: spacing.sm },
-  contactName: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  contactMeta: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  contactName: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  contactMeta: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   inviteChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -573,17 +575,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md - 3,
     paddingVertical: 6,
   },
-  inviteChipText: { color: dark.accentGreen, fontSize: 12.5, fontWeight: '800' },
+  inviteChipText: { color: theme.accentGreen, fontSize: 12.5, fontWeight: '800' },
   sentChip: { backgroundColor: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.40)' },
-  sentChipText: { color: '#22C55E' },
-  more: { color: dark.textMuted, fontSize: 12, textAlign: 'center', marginTop: spacing.sm + 4 },
+  sentChipText: { color: theme.success },
+  more: { color: theme.textMuted, fontSize: 12, textAlign: 'center', marginTop: spacing.sm + 4 },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm + 4,
     paddingBottom: spacing.sm + 4,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
-    backgroundColor: dark.background,
+    borderTopColor: theme.border,
+    backgroundColor: theme.background,
   },
 });
 

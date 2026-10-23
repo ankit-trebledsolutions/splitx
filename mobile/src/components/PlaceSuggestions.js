@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const COPY = {
   stay: { noun: 'hotels', finding: 'Finding hotels in', none: 'No hotels found in' },
@@ -46,6 +46,8 @@ const PlaceSuggestions = ({
   onOpen,
   onSetDestination,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { status, data, error, refreshing, refresh, retry } = suggestions;
   const copy = COPY[type] ?? COPY.attraction;
 
@@ -59,7 +61,7 @@ const PlaceSuggestions = ({
 
   const notice = (icon, text, action) => (
     <View style={styles.notice}>
-      <Ionicons name={icon} size={16} color={dark.textMuted} />
+      <Ionicons name={icon} size={16} color={theme.textMuted} />
       <Text style={styles.noticeText}>{text}</Text>
       {action ? (
         <TouchableOpacity style={styles.noticeButton} activeOpacity={0.8} onPress={action.onPress}>
@@ -74,7 +76,7 @@ const PlaceSuggestions = ({
       if (status === 'loading') {
         return (
           <View style={styles.loadingRow}>
-            <ActivityIndicator color={dark.accentGreen} size="small" />
+            <ActivityIndicator color={theme.accentGreen} size="small" />
             <Text style={styles.loadingText}>Finding suggestions…</Text>
           </View>
         );
@@ -105,7 +107,7 @@ const PlaceSuggestions = ({
     if (status === 'loading') {
       return (
         <View style={styles.loadingRow}>
-          <ActivityIndicator color={dark.accentGreen} size="small" />
+          <ActivityIndicator color={theme.accentGreen} size="small" />
           <Text style={styles.loadingText}>
             {copy.finding} {destination}…
           </Text>
@@ -156,13 +158,13 @@ const PlaceSuggestions = ({
                   <Ionicons
                     name={isAdded ? 'checkmark' : 'add'}
                     size={14}
-                    color={isAdded ? dark.textMuted : '#04121C'}
+                    color={isAdded ? theme.textMuted : '#04121C'}
                   />
                   <Text style={[styles.addText, isAdded && styles.addedText]}>{isAdded ? 'Added' : 'Add'}</Text>
                 </TouchableOpacity>
                 <View style={styles.detailsHint}>
                   <Text style={styles.detailsText}>Details</Text>
-                  <Ionicons name="chevron-forward" size={12} color={dark.textMuted} />
+                  <Ionicons name="chevron-forward" size={12} color={theme.textMuted} />
                 </View>
               </View>
             </TouchableOpacity>
@@ -189,9 +191,9 @@ const PlaceSuggestions = ({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             {refreshing ? (
-              <ActivityIndicator color={dark.accentGreen} size="small" />
+              <ActivityIndicator color={theme.accentGreen} size="small" />
             ) : (
-              <Ionicons name="refresh" size={14} color={dark.accentGreen} />
+              <Ionicons name="refresh" size={14} color={theme.accentGreen} />
             )}
           </TouchableOpacity>
         ) : null}
@@ -202,7 +204,7 @@ const PlaceSuggestions = ({
             onPress={onSetDestination}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="pencil" size={13} color={dark.textMuted} />
+            <Ionicons name="pencil" size={13} color={theme.textMuted} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -221,12 +223,12 @@ const PlaceSuggestions = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   section: { marginTop: spacing.md, marginBottom: spacing.sm },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   title: {
     flex: 1,
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.9,
@@ -234,35 +236,35 @@ const styles = StyleSheet.create({
   headerAction: { marginLeft: spacing.sm, padding: 2 },
 
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
-  loadingText: { color: dark.textMuted, fontSize: 12 },
+  loadingText: { color: theme.textMuted, fontSize: 12 },
 
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  noticeText: { flex: 1, color: dark.textMuted, fontSize: 12, lineHeight: 17 },
+  noticeText: { flex: 1, color: theme.textMuted, fontSize: 12, lineHeight: 17 },
   noticeButton: {
     borderWidth: 1,
-    borderColor: dark.accentGreen,
+    borderColor: theme.accentGreen,
     borderRadius: 10,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 5,
   },
-  noticeButtonText: { color: dark.accentGreen, fontSize: 11, fontWeight: '700' },
+  noticeButtonText: { color: theme.accentGreen, fontSize: 11, fontWeight: '700' },
 
   gap: { width: spacing.sm },
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.sm + 4,
   },
@@ -275,12 +277,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   detailsHint: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  detailsText: { color: dark.textMuted, fontSize: 11, fontWeight: '600' },
+  detailsText: { color: theme.textMuted, fontSize: 11, fontWeight: '600' },
   emojiTile: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm + 2,
@@ -289,29 +291,29 @@ const styles = StyleSheet.create({
   cardText: { flex: 1 },
   // Always two lines tall, so a one-line name does not pull the rest up.
   name: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: NAME_LINE_HEIGHT,
     height: NAME_LINE_HEIGHT * 2,
   },
-  meta: { color: dark.textMuted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  address: { color: dark.textMuted, fontSize: 11, lineHeight: 15, marginTop: spacing.sm },
+  meta: { color: theme.textMuted, fontSize: 11, lineHeight: 15, marginTop: 2 },
+  address: { color: theme.textMuted, fontSize: 11, lineHeight: 15, marginTop: spacing.sm },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderRadius: 10,
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 6,
   },
-  addedButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: dark.border },
+  addedButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border },
   addText: { color: '#04121C', fontSize: 11, fontWeight: '800' },
-  addedText: { color: dark.textMuted },
+  addedText: { color: theme.textMuted },
 
-  attribution: { color: dark.textMuted, fontSize: 10, marginTop: spacing.sm, opacity: 0.8 },
+  attribution: { color: theme.textMuted, fontSize: 10, marginTop: spacing.sm, opacity: 0.8 },
 });
 
 export default PlaceSuggestions;

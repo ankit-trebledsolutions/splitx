@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import GradientButton from './GradientButton';
 import useSheetBottom from '../hooks/useSheetBottom';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const COPY = {
   stay: { add: 'Add to Stays', added: 'Already in Stays' },
@@ -39,6 +39,8 @@ const openInMaps = (item) => {
  * group already has it.
  */
 const PlaceDetailSheet = ({ visible, type, item, destination, added, attribution, onClose, onAdd }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const sheetBottom = useSheetBottom(spacing.lg);
   const copy = COPY[type] ?? COPY.attraction;
   const hasCoords = typeof item?.lat === 'number' && typeof item?.lon === 'number';
@@ -46,7 +48,7 @@ const PlaceDetailSheet = ({ visible, type, item, destination, added, attribution
   const row = (icon, label, value) =>
     value ? (
       <View style={styles.row}>
-        <Ionicons name={icon} size={16} color={dark.textMuted} style={styles.rowIcon} />
+        <Ionicons name={icon} size={16} color={theme.textMuted} style={styles.rowIcon} />
         <View style={styles.rowBody}>
           <Text style={styles.rowLabel}>{label}</Text>
           <Text style={styles.rowValue}>{value}</Text>
@@ -77,14 +79,14 @@ const PlaceDetailSheet = ({ visible, type, item, destination, added, attribution
                     ) : null}
                     {added ? (
                       <View style={[styles.chip, styles.chipAdded]}>
-                        <Ionicons name="checkmark" size={11} color={dark.accentGreen} />
+                        <Ionicons name="checkmark" size={11} color={theme.accentGreen} />
                         <Text style={[styles.chipText, styles.chipAddedText]}>Added</Text>
                       </View>
                     ) : null}
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
-                  <Ionicons name="close" size={18} color={dark.text} />
+                  <Ionicons name="close" size={18} color={theme.text} />
                 </TouchableOpacity>
               </View>
 
@@ -107,14 +109,14 @@ const PlaceDetailSheet = ({ visible, type, item, destination, added, attribution
 
               {hasCoords ? (
                 <TouchableOpacity style={styles.mapsButton} activeOpacity={0.8} onPress={() => openInMaps(item)}>
-                  <Ionicons name="map-outline" size={15} color={dark.accentGreen} />
+                  <Ionicons name="map-outline" size={15} color={theme.accentGreen} />
                   <Text style={styles.mapsText}>Open in Maps</Text>
                 </TouchableOpacity>
               ) : null}
 
               {added ? (
                 <View style={styles.addedBox}>
-                  <Ionicons name="checkmark-circle" size={16} color={dark.accentGreen} />
+                  <Ionicons name="checkmark-circle" size={16} color={theme.accentGreen} />
                   <Text style={styles.addedText}>{copy.added}</Text>
                 </View>
               ) : (
@@ -130,14 +132,14 @@ const PlaceDetailSheet = ({ visible, type, item, destination, added, attribution
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.lg,
   },
   grabber: {
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: theme.overlayBold,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
@@ -154,32 +156,32 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
   emoji: { fontSize: 26 },
   headerText: { flex: 1 },
-  name: { color: dark.text, fontSize: 19, fontWeight: '800', lineHeight: 24 },
+  name: { color: theme.text, fontSize: 19, fontWeight: '800', lineHeight: 24 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     borderRadius: 10,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
-  chipText: { color: dark.text, fontSize: 11, fontWeight: '600' },
+  chipText: { color: theme.text, fontSize: 11, fontWeight: '600' },
   chipAdded: { backgroundColor: 'rgba(0,196,208,0.12)' },
-  chipAddedText: { color: dark.accentGreen },
+  chipAddedText: { color: theme.accentGreen },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: spacing.sm,
@@ -187,17 +189,17 @@ const styles = StyleSheet.create({
 
   rows: {
     marginTop: spacing.lg,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.sm + 4 },
   rowIcon: { marginTop: 2, marginRight: spacing.sm + 2 },
   rowBody: { flex: 1 },
-  rowLabel: { color: dark.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase' },
-  rowValue: { color: dark.text, fontSize: 13, lineHeight: 19, marginTop: 2 },
+  rowLabel: { color: theme.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase' },
+  rowValue: { color: theme.text, fontSize: 13, lineHeight: 19, marginTop: 2 },
 
   mapsButton: {
     flexDirection: 'row',
@@ -210,7 +212,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 4,
   },
-  mapsText: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
+  mapsText: { color: theme.accentGreen, fontSize: 13, fontWeight: '700' },
 
   addButton: { marginTop: spacing.md },
   addedBox: {
@@ -220,13 +222,13 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: spacing.md,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 6,
   },
-  addedText: { color: dark.textMuted, fontSize: 13, fontWeight: '700' },
+  addedText: { color: theme.textMuted, fontSize: 13, fontWeight: '700' },
 
-  attribution: { color: dark.textMuted, fontSize: 10, marginTop: spacing.md, opacity: 0.8, textAlign: 'center' },
+  attribution: { color: theme.textMuted, fontSize: 10, marginTop: spacing.md, opacity: 0.8, textAlign: 'center' },
 });
 
 export default PlaceDetailSheet;

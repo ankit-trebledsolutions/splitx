@@ -11,11 +11,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import StatTile from '../../components/StatTile';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import { formatDateTime, formatTime, isToday } from '../../utils/format';
 import { nextRingAt } from '../../utils/reminderAlarms';
 
-const TODAY = '#F5B342';
 
 // On for me: not switched off for everybody, and not by me for myself.
 const isOn = (reminder) => reminder.enabled && !reminder.muted;
@@ -38,6 +37,8 @@ const RemindersTab = ({
   refreshing,
   onRefresh,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { sections, stats } = useMemo(() => {
     const now = Date.now();
     // A weekly reminder is listed at its next turn, not at the date it began.
@@ -54,10 +55,10 @@ const RemindersTab = ({
     const upcoming = waiting.filter((r) => !isToday(r.ringsAt));
 
     const built = [];
-    if (today.length) built.push({ title: 'Today', accent: TODAY, data: today });
-    if (upcoming.length) built.push({ title: 'Upcoming', accent: dark.accentBlue, data: upcoming });
-    if (off.length) built.push({ title: 'Turned off', accent: dark.textMuted, data: off });
-    if (past.length) built.push({ title: 'Past', accent: dark.textMuted, data: past });
+    if (today.length) built.push({ title: 'Today', accent: theme.warning, data: today });
+    if (upcoming.length) built.push({ title: 'Upcoming', accent: theme.accentBlue, data: upcoming });
+    if (off.length) built.push({ title: 'Turned off', accent: theme.textMuted, data: off });
+    if (past.length) built.push({ title: 'Past', accent: theme.textMuted, data: past });
 
     return {
       sections: built,
@@ -68,7 +69,7 @@ const RemindersTab = ({
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
@@ -88,7 +89,7 @@ const RemindersTab = ({
         onPress={() => onOpen?.(item)}
       >
         <View style={styles.icon}>
-          <Ionicons name={item.icon || 'alarm-outline'} size={18} color={dark.text} />
+          <Ionicons name={item.icon || 'alarm-outline'} size={18} color={theme.text} />
         </View>
 
         <View style={styles.body}>
@@ -102,13 +103,13 @@ const RemindersTab = ({
           ) : null}
 
           <View style={styles.metaRow}>
-            <Ionicons name="time-outline" size={11} color={dark.accentGreen} />
+            <Ionicons name="time-outline" size={11} color={theme.accentGreen} />
             <Text style={styles.metaText}>
               {isToday(at) ? `Today · ${formatTime(at)}` : formatDateTime(at)}
             </Text>
             {item.repeatWeekly ? (
               <View style={styles.chip}>
-                <Ionicons name="repeat-outline" size={9} color={dark.textMuted} />
+                <Ionicons name="repeat-outline" size={9} color={theme.textMuted} />
                 <Text style={styles.chipText}>Weekly</Text>
               </View>
             ) : null}
@@ -119,7 +120,7 @@ const RemindersTab = ({
               <Ionicons
                 name={item.scope === 'me' ? 'person-outline' : 'people-outline'}
                 size={9}
-                color={dark.textMuted}
+                color={theme.textMuted}
               />
               <Text style={styles.chipText} numberOfLines={1}>
                 {showGroup
@@ -131,7 +132,7 @@ const RemindersTab = ({
             </View>
             {silenced ? (
               <View style={styles.chip}>
-                <Ionicons name="notifications-off-outline" size={9} color={TODAY} />
+                <Ionicons name="notifications-off-outline" size={9} color={theme.warning} />
                 <Text style={[styles.chipText, styles.chipWarn]}>Group muted</Text>
               </View>
             ) : null}
@@ -139,12 +140,12 @@ const RemindersTab = ({
         </View>
 
         {done ? (
-          <Ionicons name="checkmark-done-outline" size={18} color={dark.textMuted} />
+          <Ionicons name="checkmark-done-outline" size={18} color={theme.textMuted} />
         ) : (
           <Switch
             value={on}
             onValueChange={() => onToggle?.(item)}
-            trackColor={{ false: 'rgba(255,255,255,0.14)', true: dark.accentGreen }}
+            trackColor={{ false: theme.overlayStrong, true: theme.accentFill }}
             thumbColor="#FFFFFF"
             ios_backgroundColor="rgba(255,255,255,0.14)"
           />
@@ -166,15 +167,15 @@ const RemindersTab = ({
           <RefreshControl
             refreshing={Boolean(refreshing)}
             onRefresh={onRefresh}
-            tintColor={dark.accentGreen}
+            tintColor={theme.accentGreen}
           />
         ) : undefined
       }
       ListHeaderComponent={
         <View style={styles.statRow}>
-          <StatTile value={stats.active} label="Active" color={dark.accentBlue} />
-          <StatTile value={stats.today} label="Today" color={TODAY} />
-          <StatTile value={stats.off} label="Off" color={dark.textMuted} />
+          <StatTile value={stats.active} label="Active" color={theme.accentBlue} />
+          <StatTile value={stats.today} label="Today" color={theme.warning} />
+          <StatTile value={stats.off} label="Off" color={theme.textMuted} />
         </View>
       }
       renderSectionHeader={({ section }) => (
@@ -191,12 +192,12 @@ const RemindersTab = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingBottom: 100 },
   statRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -212,21 +213,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionDot: { width: 6, height: 6, borderRadius: 3 },
-  sectionTitle: { color: dark.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
+  sectionTitle: { color: theme.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
   sectionCount: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: theme.overlay,
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
-  sectionCountText: { color: dark.textMuted, fontSize: 9, fontWeight: '700' },
+  sectionCountText: { color: theme.textMuted, fontSize: 9, fontWeight: '700' },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -236,28 +237,28 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
   body: { flex: 1, marginRight: spacing.sm },
-  title: { color: dark.text, fontSize: 14, fontWeight: '600' },
-  subtitle: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  title: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  subtitle: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
-  metaText: { color: dark.accentGreen, fontSize: 10, fontWeight: '600' },
+  metaText: { color: theme.accentGreen, fontSize: 10, fontWeight: '600' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     maxWidth: 170,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     borderRadius: 6,
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  chipText: { color: dark.textMuted, fontSize: 9, fontWeight: '600' },
-  chipWarn: { color: TODAY },
+  chipText: { color: theme.textMuted, fontSize: 9, fontWeight: '600' },
+  chipWarn: { color: theme.warning },
 });
 
 export default RemindersTab;

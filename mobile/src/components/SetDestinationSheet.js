@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Text } from 'react-native';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
+import { useStyles } from '../theme';
 
 // Fills in a trip's destination after the fact (admin only, enforced by the
 // server too). Suggested stays and attractions need it.
 const SetDestinationSheet = ({ visible, current = '', onClose, onSubmit }) => {
+  const sheetStyles = useStyles(makeSheetStyles);
   const [location, setLocation] = useState(current);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);

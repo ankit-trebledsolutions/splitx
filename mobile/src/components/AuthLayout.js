@@ -13,52 +13,56 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import SplixLogo from './SplixLogo';
 import SplashGlow from '../assets/splash-glow.svg';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 
 // Shared dark scaffold for the Splix auth screens: glow background (same
 // asset as the splash screen), logo badge, heading + subtitle, scrollable body.
 // Pass onBack to show a back chevron above the logo.
-const AuthLayout = ({ title, subtitle, children, onBack }) => (
-  <View style={styles.screen}>
-    <SplashGlow
-      width="100%"
-      height="100%"
-      preserveAspectRatio="xMidYMid slice"
-      style={StyleSheet.absoluteFill}
-    />
-    <StatusBar style="light" />
-    <SafeAreaView style={styles.flex}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+const AuthLayout = ({ title, subtitle, children, onBack }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.screen}>
+      <SplashGlow
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid slice"
+        style={StyleSheet.absoluteFill}
+      />
+      <StatusBar style={theme.statusBar} />
+      <SafeAreaView style={styles.flex}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {onBack ? (
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={onBack}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="chevron-back" size={22} color={dark.text} />
-            </TouchableOpacity>
-          ) : null}
-          <SplixLogo size={64} />
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          {children}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  </View>
-);
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {onBack ? (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={onBack}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="chevron-back" size={22} color={theme.text} />
+              </TouchableOpacity>
+            ) : null}
+            <SplixLogo size={64} />
+            <Text style={styles.title}>{title}</Text>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0A0A' },
+const makeStyles = (theme) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.background },
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
@@ -72,13 +76,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   title: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 34,
     fontWeight: '800',
     marginTop: spacing.sm,
   },
   subtitle: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: spacing.xl,

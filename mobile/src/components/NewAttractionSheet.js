@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles } from '../theme';
 
 const EMOJIS = ['📍', '🎨', '🏙️', '⛩️', '🎮', '🐟', '🌸', '🗼', '🍣', '🏯', '🎡', '🌊'];
 
 // `initial` is a suggested place ({ name, category, distanceKm, emoji,
 // placeId }); see NewStaySheet.
 const NewAttractionSheet = ({ visible, initial = null, onClose, onSubmit }) => {
+  const sheetStyles = useStyles(makeSheetStyles);
+  const styles = useStyles(makeStyles);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [rating, setRating] = useState('');
@@ -128,7 +130,7 @@ const NewAttractionSheet = ({ visible, initial = null, onClose, onSubmit }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   half: { flex: 1 },
   fieldTight: { marginBottom: 0 },
   emojiGrid: {
@@ -142,13 +144,13 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emojiCellActive: {
-    borderColor: dark.accentGreen,
+    borderColor: theme.accentGreen,
     backgroundColor: 'rgba(0,196,208,0.10)',
   },
   emoji: { fontSize: 20 },

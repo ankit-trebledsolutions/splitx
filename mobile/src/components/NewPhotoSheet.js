@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
 import Avatar from './Avatar';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles } from '../theme';
 
 // Emoji stands in for the image until real upload exists (see Photo model).
 const EMOJIS = ['🌅', '🎉', '🌃', '🍜', '⛩️', '🐟', '🌸', '🗼', '🍣', '🎮', '🎆', '⌨️', '🏞️', '🖼️', '🎇'];
@@ -21,6 +21,8 @@ const colorFor = (emoji) => {
 };
 
 const NewPhotoSheet = ({ visible, members = [], onClose, onSubmit }) => {
+  const sheetStyles = useStyles(makeSheetStyles);
+  const styles = useStyles(makeStyles);
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [caption, setCaption] = useState('');
   const [tagged, setTagged] = useState([]);
@@ -116,7 +118,7 @@ const NewPhotoSheet = ({ visible, members = [], onClose, onSubmit }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emojiCellActive: { borderColor: dark.accentGreen },
+  emojiCellActive: { borderColor: theme.accentGreen },
   emoji: { fontSize: 24 },
   member: { position: 'relative' },
   memberIdle: { opacity: 0.45 },
@@ -144,7 +146,7 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
 });
 

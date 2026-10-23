@@ -32,6 +32,14 @@ export const accountSettings = [
     screen: 'Notifications',
   },
   {
+    // Dark, light or the phone's setting. The value is the current choice and
+    // the row opens the Appearance sheet (ProfileScreen), not a screen.
+    key: 'appearance',
+    icon: 'contrast',
+    label: 'Appearance',
+    value: 'Dark',
+  },
+  {
     // The value is the balance once it has loaded (ProfileScreen).
     key: 'wallet',
     icon: 'wallet',

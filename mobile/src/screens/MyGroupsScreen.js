@@ -16,20 +16,21 @@ import AiItineraryModal from '../components/AiItineraryModal';
 import { fetchGroups } from '../api/groups.api';
 import { fetchItineraryGeneration } from '../api/itinerary.api';
 import { initials, usd } from '../utils/format';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { useTour } from '../tour/TourProvider';
 import useTourTarget from '../tour/useTourTarget';
 
 // Matches the "You Owe" tile on the Expenses tab.
-const OWE_COLOR = '#F5883C';
 
 // What the user still owes, and is still owed, in one group. Both can be true
 // at once (they paid for one thing, someone else for another), so each gets
 // its own line. A group with nothing outstanding says so. The server sends
 // the balance with the group; until it does, the row keeps its arrow.
 const GroupBalance = ({ balance }) => {
-  if (!balance) return <Ionicons name="chevron-forward" size={18} color={dark.textMuted} />;
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  if (!balance) return <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />;
   const youOwe = balance.youOwe ?? 0;
   const owedToYou = balance.owedToYou ?? 0;
   if (youOwe < 0.005 && owedToYou < 0.005) {
@@ -39,13 +40,13 @@ const GroupBalance = ({ balance }) => {
     <View style={styles.balance}>
       {youOwe >= 0.005 && (
         <Text style={styles.balanceLine}>
-          You owe <Text style={[styles.balanceValue, { color: OWE_COLOR }]}>{usd(youOwe)}</Text>
+          You owe <Text style={[styles.balanceValue, { color: theme.owe }]}>{usd(youOwe)}</Text>
         </Text>
       )}
       {owedToYou >= 0.005 && (
         <Text style={styles.balanceLine}>
           You get{' '}
-          <Text style={[styles.balanceValue, { color: dark.accentGreen }]}>{usd(owedToYou)}</Text>
+          <Text style={[styles.balanceValue, { color: theme.accentGreen }]}>{usd(owedToYou)}</Text>
         </Text>
       )}
     </View>
@@ -53,6 +54,8 @@ const GroupBalance = ({ balance }) => {
 };
 
 const MyGroupsScreen = ({ navigation, route }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [groups, setGroups] = useState([]);
   const [query, setQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -146,7 +149,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
         }
       >
         <LinearGradient
-          colors={dark.gradient}
+          colors={theme.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.avatar}
@@ -177,7 +180,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
               onPress={navigation.goBack}
               activeOpacity={0.7}
             >
-              <Ionicons name="chevron-back" size={18} color={dark.text} />
+              <Ionicons name="chevron-back" size={18} color={theme.text} />
             </TouchableOpacity>
           ) : (
             <View style={styles.circleButton} />
@@ -187,7 +190,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
             onPress={() => navigation.navigate('Profile')}
             activeOpacity={0.7}
           >
-            <Ionicons name="options-outline" size={17} color={dark.text} />
+            <Ionicons name="options-outline" size={17} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -212,7 +215,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dark.textMuted} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textMuted} />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -235,7 +238,7 @@ const MyGroupsScreen = ({ navigation, route }) => {
         }}
       >
         <LinearGradient
-          colors={dark.gradient}
+          colors={theme.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.fabInner}
@@ -262,8 +265,8 @@ const MyGroupsScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  topArea: { backgroundColor: dark.card, paddingHorizontal: spacing.lg },
+const makeStyles = (theme) => StyleSheet.create({
+  topArea: { backgroundColor: theme.card, paddingHorizontal: spacing.lg },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,29 +277,29 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: dark.background,
+    backgroundColor: theme.background,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  title: { color: dark.text, fontSize: 30, fontWeight: '800', marginTop: spacing.sm },
-  subtitle: { color: dark.textMuted, fontSize: 14, marginTop: spacing.xs },
+  title: { color: theme.text, fontSize: 30, fontWeight: '800', marginTop: spacing.sm },
+  subtitle: { color: theme.textMuted, fontSize: 14, marginTop: spacing.xs },
   search: { marginTop: spacing.lg, marginBottom: spacing.lg },
 
   panel: {
     flex: 1,
-    backgroundColor: dark.background,
+    backgroundColor: theme.background,
     paddingTop: spacing.md,
   },
   list: { paddingHorizontal: spacing.md, paddingBottom: 120 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: theme.overlayFaint,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -311,16 +314,16 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: '#04121C', fontSize: 15, fontWeight: '800' },
   cardBody: { flex: 1 },
-  cardTitle: { color: dark.text, fontSize: 16, fontWeight: '700' },
-  cardSubtitle: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  cardTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  cardSubtitle: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   balance: { alignItems: 'flex-end', marginLeft: spacing.sm },
-  balanceLine: { color: dark.textMuted, fontSize: 12, lineHeight: 18 },
+  balanceLine: { color: theme.textMuted, fontSize: 12, lineHeight: 18 },
   balanceValue: { fontSize: 13, fontWeight: '700' },
-  settled: { color: dark.textMuted, fontSize: 12, marginLeft: spacing.sm },
+  settled: { color: theme.textMuted, fontSize: 12, marginLeft: spacing.sm },
   empty: { alignItems: 'center', paddingVertical: spacing.xl * 2 },
-  emptyTitle: { color: dark.text, fontSize: 17, fontWeight: '700' },
+  emptyTitle: { color: theme.text, fontSize: 17, fontWeight: '700' },
   emptyBody: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',

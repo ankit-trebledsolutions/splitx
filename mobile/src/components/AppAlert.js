@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 /**
  * In-app replacement for React Native's system Alert, styled like the rest of
@@ -16,8 +16,6 @@ import { dark, radius, spacing } from '../theme';
  * queued; alerts raised while one is showing wait their turn.
  */
 
-const DANGER = '#F97362';
-const SUCCESS = '#17E695';
 
 const queue = [];
 let notifyHost = null;
@@ -36,20 +34,22 @@ const alert = (title, message, buttons, options) => {
 const AppAlert = { alert };
 
 // The look is inferred from how the alert is used, so call sites stay plain.
-const toneFor = ({ title = '', buttons }) => {
+const toneFor = ({ title = '', buttons }, theme) => {
   if (buttons.some((b) => b.style === 'destructive')) {
-    return { icon: 'warning-outline', color: DANGER };
+    return { icon: 'warning-outline', color: theme.coral };
   }
   if (/^(could ?n[o']t|can ?n[o']t|unable|error|failed|invalid|oops|no longer)|\bfailed\b/i.test(title)) {
-    return { icon: 'alert-circle-outline', color: DANGER };
+    return { icon: 'alert-circle-outline', color: theme.coral };
   }
   if (/(sent|saved|success|copied|updated|done|added|created)\b/i.test(title)) {
-    return { icon: 'checkmark-circle-outline', color: SUCCESS };
+    return { icon: 'checkmark-circle-outline', color: theme.success };
   }
-  return { icon: 'information-circle-outline', color: dark.accentGreen };
+  return { icon: 'information-circle-outline', color: theme.accentGreen };
 };
 
 export const AppAlertHost = () => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [current, setCurrent] = useState(null);
 
   const showing = useRef(false);
@@ -82,7 +82,7 @@ export const AppAlertHost = () => {
   if (!current) return null;
 
   const { title, message, buttons, cancelable, onDismiss } = current;
-  const tone = toneFor(current);
+  const tone = toneFor(current, theme);
   const cancelButton = buttons.find((b) => b.style === 'cancel');
   const dismiss = () => {
     if (!cancelable) return;
@@ -135,7 +135,7 @@ export const AppAlertHost = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -146,9 +146,9 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 8,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -164,9 +164,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  title: { color: dark.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  title: { color: theme.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   message: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
@@ -182,13 +182,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonInline: { flex: 1 },
-  buttonPrimary: { backgroundColor: dark.button },
-  buttonDanger: { backgroundColor: DANGER },
-  buttonCancel: { backgroundColor: dark.surface, borderWidth: 1, borderColor: dark.border },
+  buttonPrimary: { backgroundColor: theme.accentFill },
+  buttonDanger: { backgroundColor: theme.coral },
+  buttonCancel: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
   buttonText: { fontSize: 14, fontWeight: '800' },
   buttonTextPrimary: { color: '#04121C' },
   buttonTextDanger: { color: '#FFFFFF' },
-  buttonTextCancel: { color: dark.text, fontWeight: '700' },
+  buttonTextCancel: { color: theme.text, fontWeight: '700' },
 });
 
 export default AppAlert;

@@ -5,11 +5,13 @@ import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import { joinGroup } from '../api/groups.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 // Entry point of the group flow: create a brand new group, or join an
 // existing one with an invite code / link / username.
 const GroupActionScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [invite, setInvite] = useState('');
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +50,7 @@ const GroupActionScreen = ({ navigation }) => {
         onPress={() => navigation.navigate('CreateGroup')}
       >
         <View style={styles.plusCircle}>
-          <Ionicons name="add" size={26} color={dark.text} />
+          <Ionicons name="add" size={26} color={theme.text} />
         </View>
         <Text style={styles.createText}>Create New group</Text>
       </TouchableOpacity>
@@ -91,12 +93,12 @@ const GroupActionScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   createCard: {
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.lg + 4,
     paddingVertical: spacing.xl,
     alignItems: 'center',
@@ -107,29 +109,29 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: theme.border,
+    backgroundColor: theme.overlayFaint,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  createText: { color: dark.text, fontSize: 15, fontWeight: '600' },
+  createText: { color: theme.text, fontSize: 15, fontWeight: '600' },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     marginVertical: spacing.lg,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: dark.border },
-  dividerText: { color: dark.textMuted, fontSize: 13 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.textMuted, fontSize: 13 },
   sectionTitle: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: spacing.sm,
   },
   inviteField: { marginBottom: spacing.sm },
-  helper: { color: dark.textMuted, fontSize: 12, lineHeight: 18 },
+  helper: { color: theme.textMuted, fontSize: 12, lineHeight: 18 },
   spacer: { flex: 1, minHeight: spacing.xl },
   joinButton: { marginBottom: spacing.md },
 });

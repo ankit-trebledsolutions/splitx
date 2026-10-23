@@ -48,7 +48,7 @@ import {
 import { labelToMinutes, minutesToLabel } from '../utils/time';
 import { formatDate } from '../utils/format';
 import { creditsLabel, isPaid } from '../data/wallet';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 // iOS keeps KeyboardAvoidingView; Android lifts the screen itself (see useKeyboardLift).
 const IS_IOS = Platform.OS === 'ios';
@@ -96,6 +96,8 @@ const seedChoices = (last) => {
  * Route params: { groupId, groupName, replace = false, from: 'groups' | 'group' }
  */
 const AiItineraryPrefsScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { groupId, groupName, from } = route.params;
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
@@ -326,7 +328,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
 
   const readOnlyRow = (icon, text) => (
     <View style={[styles.fieldBox, styles.row]}>
-      <Ionicons name={icon} size={15} color={dark.textMuted} />
+      <Ionicons name={icon} size={15} color={theme.textMuted} />
       <Text style={styles.rowText} numberOfLines={1}>
         {text}
       </Text>
@@ -371,11 +373,11 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
           // Drawn as the same box as the rows around it, not as DateField's own field.
           renderTrigger={({ open, value }) => (
             <TouchableOpacity style={styles.fieldBox} activeOpacity={0.8} onPress={open}>
-              <Ionicons name="calendar-outline" size={15} color={dark.accentGreen} />
+              <Ionicons name="calendar-outline" size={15} color={theme.accentGreen} />
               <Text style={[styles.rowText, !value && styles.rowPlaceholder]} numberOfLines={1}>
                 {value ? formatDate(value) : 'Add a start date (optional)'}
               </Text>
-              <Ionicons name="chevron-down" size={14} color={dark.textMuted} />
+              <Ionicons name="chevron-down" size={14} color={theme.textMuted} />
             </TouchableOpacity>
           )}
         />
@@ -458,7 +460,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
         activeOpacity={0.8}
         onPress={() => setChoice(key)(defaultMinutes)}
       >
-        <Ionicons name="add" size={16} color={dark.accentGreen} />
+        <Ionicons name="add" size={16} color={theme.accentGreen} />
         <Text style={styles.addTimeText}>{addLabel}</Text>
       </TouchableOpacity>
     ) : (
@@ -513,7 +515,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
       >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={goBackOneStep} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={18} color={dark.text} />
+            <Ionicons name="chevron-back" size={18} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {step === 1 ? 'Plan with AI' : 'More options'}
@@ -522,7 +524,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
 
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator color={dark.accentGreen} />
+            <ActivityIndicator color={theme.accentGreen} />
           </View>
         ) : (
           <>
@@ -566,7 +568,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
                   disabled={submitting}
                 >
                   <Text style={styles.moreLinkText}>More options</Text>
-                  <Ionicons name="chevron-forward" size={14} color={dark.accentGreen} />
+                  <Ionicons name="chevron-forward" size={14} color={theme.accentGreen} />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -577,7 +579,7 @@ const AiItineraryPrefsScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -592,15 +594,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
-    color: dark.text,
+    color: theme.text,
     fontSize: 18,
     fontWeight: '800',
     marginLeft: spacing.md,
@@ -609,7 +611,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
 
   label: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -621,24 +623,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     minHeight: 48,
   },
   row: { marginBottom: spacing.sm },
-  rowText: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600' },
-  rowPlaceholder: { color: dark.textMuted, fontWeight: '400' },
+  rowText: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600' },
+  rowPlaceholder: { color: theme.textMuted, fontWeight: '400' },
   helper: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     lineHeight: 16,
     marginTop: -2,
     marginBottom: spacing.sm,
   },
-  errorText: { color: '#F87171', fontSize: 11, marginTop: -2, marginBottom: spacing.sm },
+  errorText: { color: theme.danger, fontSize: 11, marginTop: -2, marginBottom: spacing.sm },
 
   addTime: {
     flexDirection: 'row',
@@ -651,7 +653,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     minHeight: 48,
   },
-  addTimeText: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
+  addTimeText: { color: theme.accentGreen, fontSize: 13, fontWeight: '700' },
 
   notes: { marginBottom: 0 },
   notesInput: { minHeight: 96, paddingTop: spacing.md - 2 },
@@ -660,16 +662,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm + 2,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
+    borderTopColor: theme.border,
   },
   cost: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
-  costShort: { color: '#F5B342' },
+  costShort: { color: theme.warning },
   moreLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -677,7 +679,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingTop: spacing.md - 2,
   },
-  moreLinkText: { color: dark.accentGreen, fontSize: 14, fontWeight: '700' },
+  moreLinkText: { color: theme.accentGreen, fontSize: 14, fontWeight: '700' },
 });
 
 export default AiItineraryPrefsScreen;

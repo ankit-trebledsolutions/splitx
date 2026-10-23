@@ -2,11 +2,13 @@ import React from 'react';
 import { View, Text, Modal, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import GradientButton from './GradientButton';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { formatDateTime } from '../utils/format';
 
 // Confirmation shown after a task is saved, offering to chain a reminder onto it.
 const TaskSavedModal = ({ visible, task, onSetReminder, onDismiss }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const assignedTo = task?.assignees?.length
     ? task.assignees.map((a) => a.name?.split(' ')[0]).join(', ')
     : 'everyone';
@@ -34,7 +36,7 @@ const TaskSavedModal = ({ visible, task, onSetReminder, onDismiss }) => {
 
           <View style={styles.promptRow}>
             <View style={styles.promptIcon}>
-              <Ionicons name="alarm-outline" size={16} color={dark.accentBlue} />
+              <Ionicons name="alarm-outline" size={16} color={theme.accentBlue} />
             </View>
             <Text style={styles.promptTitle}>Add a reminder too?</Text>
           </View>
@@ -56,7 +58,7 @@ const TaskSavedModal = ({ visible, task, onSetReminder, onDismiss }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -64,9 +66,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   card: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 24,
     padding: spacing.lg,
     alignItems: 'center',
@@ -84,19 +86,19 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { color: dark.text, fontSize: 20, fontWeight: '800', marginTop: spacing.md },
+  title: { color: theme.text, fontSize: 20, fontWeight: '800', marginTop: spacing.md },
   quote: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     textAlign: 'center',
     marginTop: spacing.xs,
   },
   meta: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     textAlign: 'center',
     marginTop: spacing.xs,
@@ -104,7 +106,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     alignSelf: 'stretch',
-    backgroundColor: dark.border,
+    backgroundColor: theme.border,
     marginVertical: spacing.md,
   },
   promptRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -116,9 +118,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  promptTitle: { color: dark.text, fontSize: 15, fontWeight: '700' },
+  promptTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
   promptBody: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
@@ -130,13 +132,13 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     marginTop: spacing.sm,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  secondaryText: { color: dark.text, fontSize: 15, fontWeight: '600' },
+  secondaryText: { color: theme.text, fontSize: 15, fontWeight: '600' },
 });
 
 export default TaskSavedModal;

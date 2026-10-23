@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { spacing } from '../theme';
-import { panelStyles } from './pickerPanel';
+import { spacing, useStyles } from '../theme';
+import { makePanelStyles } from './pickerPanel';
 import MonthScroller from './MonthScroller';
 
 /**
@@ -13,6 +13,7 @@ import MonthScroller from './MonthScroller';
  *   <CalendarPanel value={date} onChange={(date) => ...} onDone={() => ...} />
  */
 const CalendarPanel = ({ value, onChange, onDone, allowPast = false }) => {
+  const panelStyles = useStyles(makePanelStyles);
   const today = useMemo(() => new Date(), []);
 
   const pick = (day) => {

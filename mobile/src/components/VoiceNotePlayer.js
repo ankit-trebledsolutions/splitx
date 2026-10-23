@@ -2,14 +2,16 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 import { formatDuration } from '../utils/attachments';
 
 // Only one voice note plays at a time: starting one pauses whichever was playing.
 let pauseCurrent = null;
 
 const Shell = ({ mine, icon, busy, onPress, progress, label }) => {
-  const tint = mine ? '#04241A' : dark.text;
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  const tint = mine ? '#04241A' : theme.text;
   return (
     <View style={styles.row}>
       <TouchableOpacity
@@ -120,7 +122,7 @@ const VoiceNotePlayer = ({ uri, durationMs = 0, mine = false }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, minWidth: 190 },
   button: {
     width: 36,
@@ -129,21 +131,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonTheirs: { backgroundColor: 'rgba(255,255,255,0.10)' },
+  buttonTheirs: { backgroundColor: theme.overlay },
   buttonMine: { backgroundColor: 'rgba(4,36,26,0.16)' },
   playNudge: { marginLeft: 2 },
   body: { flex: 1 },
   track: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: theme.overlayStrong,
     overflow: 'hidden',
     marginTop: 6,
   },
   trackMine: { backgroundColor: 'rgba(4,36,26,0.22)' },
-  fill: { height: 4, borderRadius: 2, backgroundColor: dark.accentGreen },
+  fill: { height: 4, borderRadius: 2, backgroundColor: theme.accentFill },
   fillMine: { backgroundColor: '#04241A' },
-  time: { color: dark.textMuted, fontSize: 10, marginTop: 4 },
+  time: { color: theme.textMuted, fontSize: 10, marginTop: 4 },
   timeMine: { color: 'rgba(4,36,26,0.7)' },
 });
 

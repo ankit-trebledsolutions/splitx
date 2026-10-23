@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles } from '../theme';
 import { useTour, useTourRegistry } from './TourProvider';
 
 /**
@@ -36,7 +36,6 @@ import { useTour, useTourRegistry } from './TourProvider';
  */
 
 const DIM = 'rgba(0,0,0,0.76)';
-const CARD_BG = '#0E1014';
 const CARD_MARGIN = 18;
 const HOLE_PAD = 7;
 const HOLE_RADIUS = 12;
@@ -74,6 +73,7 @@ const holeFor = (rect, step) => {
 };
 
 const TourOverlay = () => {
+  const styles = useStyles(makeStyles);
   const { active, next, skip } = useTour();
   const { targets, registryVersion } = useTourRegistry();
   const insets = useSafeAreaInsets();
@@ -349,13 +349,13 @@ const TourOverlay = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   fill: { ...StyleSheet.absoluteFillObject },
   block: { position: 'absolute' },
   ring: {
     position: 'absolute',
     borderWidth: 2,
-    borderColor: dark.tabActive,
+    borderColor: theme.tabActive,
   },
   cardWrap: {
     position: 'absolute',
@@ -363,9 +363,9 @@ const styles = StyleSheet.create({
     right: CARD_MARGIN,
   },
   card: {
-    backgroundColor: CARD_BG,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md - 2,
@@ -376,22 +376,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: CARET,
     height: CARET,
-    backgroundColor: CARD_BG,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     transform: [{ rotate: '45deg' }],
   },
   caretUp: { top: -CARET / 2 },
   caretDown: { bottom: -CARET / 2 },
   stepLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.9,
   },
-  title: { color: dark.text, fontSize: 16, fontWeight: '800', marginTop: 4 },
+  title: { color: theme.text, fontSize: 16, fontWeight: '800', marginTop: 4 },
   body: {
-    color: 'rgba(244,247,250,0.78)',
+    color: theme.textSoft,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 3,
@@ -403,10 +403,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm + 4,
   },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
-  skip: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
-  hint: { color: dark.tabActive, fontSize: 12, fontWeight: '600' },
+  skip: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
+  hint: { color: theme.tabActive, fontSize: 12, fontWeight: '600' },
   next: {
-    backgroundColor: dark.button,
+    backgroundColor: theme.accentFill,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: spacing.md + 2,

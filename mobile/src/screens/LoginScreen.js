@@ -7,11 +7,13 @@ import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
 import GoogleIcon from '../assets/google.svg';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { ACCOUNT_SUSPENDED } from '../api/client';
 
 const LoginScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { login, loginWithGoogle, suspendedNotice, clearSuspendedNotice } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -116,7 +118,7 @@ const LoginScreen = ({ navigation }) => {
           activeOpacity={0.8}
         >
           {googleLoading ? (
-            <ActivityIndicator color={dark.text} />
+            <ActivityIndicator color={theme.text} />
           ) : (
             <>
               <GoogleIcon width={20} height={20} />
@@ -130,7 +132,7 @@ const LoginScreen = ({ navigation }) => {
           disabled={busy}
           activeOpacity={0.8}
         >
-          <Ionicons name="logo-apple" size={22} color={dark.text} />
+          <Ionicons name="logo-apple" size={22} color={theme.text} />
           <Text style={styles.socialText}>Apple</Text>
         </TouchableOpacity>
       </View>
@@ -144,9 +146,9 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   forgotWrap: { alignSelf: 'flex-end', marginBottom: spacing.lg },
-  forgotText: { color: dark.textMuted, fontSize: 14, fontWeight: '600' },
+  forgotText: { color: theme.textMuted, fontSize: 14, fontWeight: '600' },
   loginBtn: { marginTop: 85, marginBottom: 30 },
   dividerRow: {
     flexDirection: 'row',
@@ -154,8 +156,8 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xl,
     gap: spacing.md,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: dark.border },
-  dividerText: { color: dark.textMuted, fontSize: 14 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.textMuted, fontSize: 14 },
   socialRow: { flexDirection: 'row', gap: spacing.md },
   socialButton: {
     flex: 1,
@@ -163,14 +165,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
   },
   socialDisabled: { opacity: 0.6 },
-  socialText: { color: dark.text, fontSize: 16, fontWeight: '600' },
+  socialText: { color: theme.text, fontSize: 16, fontWeight: '600' },
 });
 
 export default LoginScreen;

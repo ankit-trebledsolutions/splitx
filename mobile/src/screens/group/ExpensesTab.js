@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../../components/Avatar';
 import MemberAvatars from '../../components/MemberAvatars';
 import StatTile from '../../components/StatTile';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import { usd, formatDate } from '../../utils/format';
 import { categoryIcon } from '../../utils/expenseCategory';
 
@@ -35,6 +35,8 @@ const ExpensesTab = ({
   currentUserId,
   onOpenExpense,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const totals = useMemo(() => {
     if (serverTotals) return serverTotals;
     let spent = 0;
@@ -79,7 +81,7 @@ const ExpensesTab = ({
             <Ionicons
               name={categoryIcon(item.category)}
               size={17}
-              color={dark.text}
+              color={theme.text}
             />
           </View>
 
@@ -134,7 +136,7 @@ const ExpensesTab = ({
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
@@ -149,14 +151,14 @@ const ExpensesTab = ({
       onEndReached={hasMore ? onLoadMore : undefined}
       onEndReachedThreshold={0.5}
       ListFooterComponent={
-        loadingMore ? <ActivityIndicator color={dark.accentGreen} style={styles.more} /> : null
+        loadingMore ? <ActivityIndicator color={theme.accentGreen} style={styles.more} /> : null
       }
       ListHeaderComponent={
         <View>
           <View style={styles.statRow}>
             <StatTile value={usd(totals.spent)} label="Total Spent" />
             <StatTile value={usd(totals.youOwe)} label="You Owe" color="#F5883C" />
-            <StatTile value={usd(totals.owedYou)} label="Owed You" color={dark.accentGreen} />
+            <StatTile value={usd(totals.owedYou)} label="Owed You" color={theme.accentGreen} />
           </View>
           <Text style={styles.sectionLabel}>All Expenses</Text>
         </View>
@@ -168,13 +170,13 @@ const ExpensesTab = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingBottom: 100 },
   more: { marginVertical: spacing.md },
   statRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -182,12 +184,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  empty: { color: dark.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl },
+  empty: { color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl },
 
   card: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -197,26 +199,26 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm + 2,
   },
   cardHead: { flex: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { color: dark.text, fontSize: 15, fontWeight: '700', flexShrink: 1 },
+  title: { color: theme.text, fontSize: 15, fontWeight: '700', flexShrink: 1 },
   categoryChip: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: theme.overlay,
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  categoryText: { color: dark.textMuted, fontSize: 9, fontWeight: '700' },
-  date: { color: dark.textMuted, fontSize: 11, marginTop: 3 },
+  categoryText: { color: theme.textMuted, fontSize: 9, fontWeight: '700' },
+  date: { color: theme.textMuted, fontSize: 11, marginTop: 3 },
   amountColumn: { alignItems: 'flex-end' },
-  amount: { color: dark.text, fontSize: 16, fontWeight: '800' },
-  settled: { color: dark.accentGreen, fontSize: 10, marginTop: 3 },
-  owed: { color: '#F87171', fontSize: 10, marginTop: 3 },
+  amount: { color: theme.text, fontSize: 16, fontWeight: '800' },
+  settled: { color: theme.accentGreen, fontSize: 10, marginTop: 3 },
+  owed: { color: theme.danger, fontSize: 10, marginTop: 3 },
 
   cardBottom: {
     flexDirection: 'row',
@@ -224,15 +226,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingTop: spacing.sm + 2,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
+    borderTopColor: theme.border,
     gap: spacing.md,
   },
   payerBlock: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   payerText: {},
-  payerLabel: { color: dark.textMuted, fontSize: 8, fontWeight: '800', letterSpacing: 0.6 },
-  payerName: { color: dark.text, fontSize: 12, fontWeight: '600' },
+  payerLabel: { color: theme.textMuted, fontSize: 8, fontWeight: '800', letterSpacing: 0.6 },
+  payerName: { color: theme.text, fontSize: 12, fontWeight: '600' },
   splitBlock: { flex: 1, alignItems: 'flex-start', gap: 3 },
-  splitNote: { color: dark.textMuted, fontSize: 10 },
+  splitNote: { color: theme.textMuted, fontSize: 10 },
 });
 
 export default ExpensesTab;

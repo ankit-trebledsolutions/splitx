@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 
 const STAR_WORDS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'];
 
 // Stars and a few words about a stay, given from its card once the group has
 // stayed there (not when it is first added). Opens on what was saved before.
 const ReviewStaySheet = ({ visible, stay, onClose, onSubmit }) => {
+  const theme = useTheme();
+  const sheetStyles = useStyles(makeSheetStyles);
+  const styles = useStyles(makeStyles);
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
   const [error, setError] = useState('');
@@ -60,7 +63,7 @@ const ReviewStaySheet = ({ visible, stay, onClose, onSubmit }) => {
             <Ionicons
               name={value <= stars ? 'star' : 'star-outline'}
               size={32}
-              color={value <= stars ? '#F5B342' : dark.textMuted}
+              color={value <= stars ? theme.warning : theme.textMuted}
             />
           </TouchableOpacity>
         ))}
@@ -81,15 +84,15 @@ const ReviewStaySheet = ({ visible, stay, onClose, onSubmit }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   starRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  starWord: { color: dark.textMuted, fontSize: 13, fontWeight: '600', marginLeft: spacing.xs },
-  error: { color: '#F87171', fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md },
+  starWord: { color: theme.textMuted, fontSize: 13, fontWeight: '600', marginLeft: spacing.xs },
+  error: { color: theme.danger, fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md },
   reviewInput: { minHeight: 96, textAlignVertical: 'top' },
 });
 

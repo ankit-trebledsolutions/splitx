@@ -2,15 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Svg, { Line, Circle, Path, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { STOP_STATUS } from '../utils/itineraryProgress';
 
-// The road's three colours, shared with the roadmap so the two read as one.
-export const ROAD_DONE = dark.accentGreen;
-export const ROAD_NOW = '#F6B042';
-export const ROAD_BASE = 'rgba(255,255,255,0.14)';
-export const ROAD_EDGE = 'rgba(255,255,255,0.32)';
-export const ON_ROAD = '#04241A';
+// The road's colours are the palette's `road` set (theme.road), shared with
+// the roadmap and the itinerary tab so the three read as one.
 
 const STRIP_H = 28;
 const MID = STRIP_H / 2;
@@ -41,13 +37,14 @@ const placeOnStrip = (progress, width) => {
 };
 
 const Milestone = ({ x, row }) => {
+  const theme = useTheme();
   if (row.status === STOP_STATUS.done) {
     return (
       <>
-        <Circle cx={x} cy={MID} r={MILESTONE_R} fill={ROAD_DONE} />
+        <Circle cx={x} cy={MID} r={MILESTONE_R} fill={theme.road.done} />
         <Path
           d={`M${x - 3.2} ${MID} l2.2 2.2 l4.4 -4.6`}
-          stroke={ON_ROAD}
+          stroke={theme.road.ink}
           strokeWidth={1.8}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -63,8 +60,8 @@ const Milestone = ({ x, row }) => {
         cx={x}
         cy={MID}
         r={MILESTONE_R}
-        fill={current ? ROAD_NOW : dark.card}
-        stroke={current ? ROAD_NOW : ROAD_EDGE}
+        fill={current ? theme.road.now : theme.card}
+        stroke={current ? theme.road.now : theme.road.edge}
         strokeWidth={1.5}
       />
       <SvgText
@@ -73,7 +70,7 @@ const Milestone = ({ x, row }) => {
         fontSize="9"
         fontWeight="700"
         textAnchor="middle"
-        fill={current ? ON_ROAD : dark.textMuted}
+        fill={current ? theme.road.ink : theme.textMuted}
       >
         {row.dayNumber}
       </SvgText>
@@ -82,14 +79,15 @@ const Milestone = ({ x, row }) => {
 };
 
 const Dot = ({ x, stop }) => {
+  const theme = useTheme();
   switch (stop.status) {
     case STOP_STATUS.done:
-      return <Circle cx={x} cy={MID} r={3} fill={ROAD_DONE} />;
+      return <Circle cx={x} cy={MID} r={3} fill={theme.road.done} />;
     case STOP_STATUS.current:
       return (
         <>
-          <Circle cx={x} cy={MID} r={7} fill={ROAD_NOW} opacity={0.3} />
-          <Circle cx={x} cy={MID} r={4} fill={ROAD_NOW} />
+          <Circle cx={x} cy={MID} r={7} fill={theme.road.now} opacity={0.3} />
+          <Circle cx={x} cy={MID} r={4} fill={theme.road.now} />
         </>
       );
     default:
@@ -98,8 +96,8 @@ const Dot = ({ x, stop }) => {
           cx={x}
           cy={MID}
           r={3}
-          fill={dark.card}
-          stroke={ROAD_EDGE}
+          fill={theme.card}
+          stroke={theme.road.edge}
           strokeWidth={1.2}
           opacity={stop.status === STOP_STATUS.skipped ? 0.5 : 1}
         />
@@ -107,34 +105,40 @@ const Dot = ({ x, stop }) => {
   }
 };
 
-const ViewToggle = ({ view, onChange }) => (
-  <View style={styles.toggle}>
-    {[
-      ['list', 'list'],
-      ['map', 'map-outline'],
-    ].map(([key, icon]) => {
-      const active = view === key;
-      return (
-        <TouchableOpacity
-          key={key}
-          style={[styles.toggleItem, active && styles.toggleItemActive]}
-          activeOpacity={0.8}
-          onPress={() => onChange(key)}
-          accessibilityRole="button"
-          accessibilityState={{ selected: active }}
-          accessibilityLabel={key === 'list' ? 'Day list' : 'Roadmap'}
-        >
-          <Ionicons name={icon} size={15} color={active ? dark.accentGreen : dark.textMuted} />
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-);
+const ViewToggle = ({ view, onChange }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.toggle}>
+      {[
+        ['list', 'list'],
+        ['map', 'map-outline'],
+      ].map(([key, icon]) => {
+        const active = view === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            style={[styles.toggleItem, active && styles.toggleItemActive]}
+            activeOpacity={0.8}
+            onPress={() => onChange(key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={key === 'list' ? 'Day list' : 'Roadmap'}
+          >
+            <Ionicons name={icon} size={15} color={active ? theme.accentGreen : theme.textMuted} />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
 
 // "Day 2 of 3 · 6 of 13 stops" above a metro-style line of the whole trip,
 // filled up to where the group is now. Sits above the day list and the
 // roadmap alike, and carries the switch between the two.
 const ItineraryProgressStrip = ({ progress, view, onChangeView }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [width, setWidth] = useState(0);
   if (!progress.dayCount) return null;
 
@@ -175,7 +179,7 @@ const ItineraryProgressStrip = ({ progress, view, onChangeView }) => {
               y1={MID}
               x2={width - PAD}
               y2={MID}
-              stroke={ROAD_BASE}
+              stroke={theme.road.base}
               strokeWidth={3}
               strokeLinecap="round"
             />
@@ -185,7 +189,7 @@ const ItineraryProgressStrip = ({ progress, view, onChangeView }) => {
                 y1={MID}
                 x2={placed.fillTo}
                 y2={MID}
-                stroke={ROAD_DONE}
+                stroke={theme.road.done}
                 strokeWidth={3}
                 strokeLinecap="round"
               />
@@ -209,11 +213,11 @@ const ItineraryProgressStrip = ({ progress, view, onChangeView }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrap: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm + 4,
@@ -222,13 +226,13 @@ const styles = StyleSheet.create({
   },
   headRow: { flexDirection: 'row', alignItems: 'center' },
   headText: { flex: 1, marginRight: spacing.sm },
-  title: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  stats: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  title: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  stats: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.sm + 2,
     padding: 2,
   },
@@ -241,7 +245,7 @@ const styles = StyleSheet.create({
   },
   toggleItemActive: { backgroundColor: 'rgba(0,196,208,0.18)' },
   strip: { marginTop: spacing.sm, height: STRIP_H },
-  now: { color: dark.textMuted, fontSize: 11, marginTop: 4 },
+  now: { color: theme.textMuted, fontSize: 11, marginTop: 4 },
 });
 
 export default ItineraryProgressStrip;

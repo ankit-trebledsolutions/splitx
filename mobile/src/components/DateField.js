@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, dark, radius, spacing } from '../theme';
+import { colors, radius, spacing, useStyles, useTheme } from '../theme';
 import { formatDate } from '../utils/format';
 import useSheetBottom from '../hooks/useSheetBottom';
 import MonthScroller from './MonthScroller';
@@ -22,6 +22,8 @@ const DateField = ({
   style,
   renderTrigger,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [open, setOpen] = useState(false);
   const sheetBottom = useSheetBottom(spacing.xl);
 
@@ -52,7 +54,7 @@ const DateField = ({
             <Text style={[styles.value, !value && styles.placeholder]}>
               {value ? formatDate(value) : placeholder}
             </Text>
-            <Ionicons name="calendar-outline" size={18} color={dark.textMuted} />
+            <Ionicons name="calendar-outline" size={18} color={theme.textMuted} />
           </TouchableOpacity>
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </>
@@ -71,7 +73,7 @@ const DateField = ({
                 onPress={() => setOpen(false)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="close" size={18} color={dark.text} />
+                <Ionicons name="close" size={18} color={theme.text} />
               </TouchableOpacity>
             </View>
             {open ? (
@@ -84,10 +86,10 @@ const DateField = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrapper: { marginBottom: spacing.md },
   label: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     fontWeight: '500',
     marginBottom: spacing.sm,
@@ -96,28 +98,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
   fieldError: { borderColor: colors.danger },
   error: { color: colors.danger, fontSize: 12, marginTop: spacing.xs },
-  value: { color: dark.text, fontSize: 16 },
-  placeholder: { color: dark.textMuted },
+  value: { color: theme.text, fontSize: 16 },
+  placeholder: { color: theme.textMuted },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: radius.lg + 8,
     borderTopRightRadius: radius.lg + 8,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
@@ -128,12 +130,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  sheetTitle: { color: dark.text, fontSize: 16, fontWeight: '700' },
+  sheetTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },

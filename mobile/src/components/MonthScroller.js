@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles } from '../theme';
 
 /**
  * The one calendar of the app: months one under the other in a single list,
@@ -47,6 +47,7 @@ const weeksOf = (month) => {
 };
 
 const MonthScroller = ({ value, minDate, onPick, height = 300 }) => {
+  const styles = useStyles(makeStyles);
   const listRef = useRef(null);
   const today = useMemo(() => startOfDay(new Date()), []);
   const min = minDate ? startOfDay(minDate) : null;
@@ -172,18 +173,18 @@ const MonthScroller = ({ value, minDate, onPick, height = 300 }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   weekdays: {
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: theme.overlay,
   },
   month: { overflow: 'hidden' },
   week: { flexDirection: 'row' },
   weekday: {
     flex: 1,
     textAlign: 'center',
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   title: {
     height: TITLE,
     lineHeight: TITLE,
-    color: dark.text,
+    color: theme.text,
     fontSize: 16,
     fontWeight: '700',
     paddingHorizontal: spacing.sm,
@@ -204,16 +205,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayToday: { borderWidth: 1, borderColor: dark.border },
+  dayToday: { borderWidth: 1, borderColor: theme.border },
   dayChosen: {
     position: 'absolute',
     width: DAY,
     height: DAY,
     borderRadius: DAY / 2,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
-  dayText: { color: dark.text, fontSize: 16, fontWeight: '500' },
-  dayTextGone: { color: 'rgba(255,255,255,0.22)' },
+  dayText: { color: theme.text, fontSize: 16, fontWeight: '500' },
+  dayTextGone: { color: theme.textDisabled },
   dayTextChosen: { color: '#04121C', fontWeight: '800' },
 });
 

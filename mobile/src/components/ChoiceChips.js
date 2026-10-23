@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 /**
  * Tap-to-select chips for a short list of choices.
@@ -21,6 +21,8 @@ const ChoiceChips = ({
   equal = false,
   style,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const isActive = (option) => (multi ? (value ?? []).includes(option.value) : value === option.value);
 
   const press = (option) => {
@@ -52,7 +54,7 @@ const ChoiceChips = ({
               <Ionicons
                 name={option.icon}
                 size={14}
-                color={active ? dark.accentGreen : dark.textMuted}
+                color={active ? theme.accentGreen : theme.textMuted}
               />
             ) : null}
             <Text
@@ -72,7 +74,7 @@ const ChoiceChips = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   equalRow: { flexDirection: 'row', gap: spacing.sm },
 
@@ -81,16 +83,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 18,
     paddingHorizontal: spacing.md - 2,
     paddingVertical: 7,
   },
-  pillActive: { borderColor: dark.accentGreen, backgroundColor: 'rgba(0,196,208,0.10)' },
-  pillText: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
-  pillTextActive: { color: dark.accentGreen },
+  pillActive: { borderColor: theme.accentFill, backgroundColor: 'rgba(0,196,208,0.10)' },
+  pillText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
+  pillTextActive: { color: theme.accentGreen },
 
   // The New Task priority block.
   block: {
@@ -100,14 +102,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
   },
-  blockActive: { borderColor: dark.accentGreen, backgroundColor: `${dark.accentGreen}1F` },
-  blockText: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
-  blockTextActive: { color: dark.text },
+  blockActive: { borderColor: theme.accentFill, backgroundColor: `${theme.accentFill}1F` },
+  blockText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
+  blockTextActive: { color: theme.text },
 });
 
 export default ChoiceChips;

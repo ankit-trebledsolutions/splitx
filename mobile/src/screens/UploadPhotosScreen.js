@@ -16,7 +16,7 @@ import GradientButton from '../components/GradientButton';
 import { uploadPhotoFile, uploadVideoFile } from '../api/gallery.api';
 import { formatDuration } from '../utils/attachments';
 import { MAX_VIDEO_BYTES, makePoster } from '../utils/video';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
@@ -59,6 +59,8 @@ const newBatchKey = () => `${Date.now().toString(36)}-${Math.random().toString(3
 // Pick images (or, with `media: 'video'`, videos) from the device and upload
 // them to the group gallery with per-file progress, per the upload-photos mockup.
 const UploadPhotosScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { groupId, groupName, media } = route.params;
   const videos = media === 'video';
   const kind = videos ? KINDS.video : KINDS.photo;
@@ -215,7 +217,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
           onPress={navigation.goBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{kind.title}</Text>
         <View style={styles.backButtonGhost} />
@@ -235,7 +237,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
             <Ionicons
               name={videos ? 'videocam-outline' : 'cloud-upload-outline'}
               size={24}
-              color={dark.accentGreen}
+              color={theme.accentGreen}
             />
           </View>
           <Text style={styles.dropTitle}>{kind.browse}</Text>
@@ -255,7 +257,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
               <View key={file.id} style={styles.fileRow}>
                 {videos && !file.poster ? (
                   <View style={[styles.thumb, styles.videoThumb]}>
-                    <Ionicons name="videocam" size={16} color={dark.textMuted} />
+                    <Ionicons name="videocam" size={16} color={theme.textMuted} />
                   </View>
                 ) : (
                   <Image source={{ uri: file.poster ?? file.uri }} style={styles.thumb} />
@@ -298,7 +300,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
                     activeOpacity={0.8}
                     onPress={() => removeFile(file.id)}
                   >
-                    <Ionicons name="close" size={13} color={dark.textMuted} />
+                    <Ionicons name="close" size={13} color={theme.textMuted} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -336,7 +338,7 @@ const UploadPhotosScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -347,9 +349,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -357,7 +359,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -368,17 +370,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm + 2,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     marginBottom: spacing.md,
   },
   groupFlag: { fontSize: 18 },
-  groupName: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  groupMeta: { color: dark.textMuted, fontSize: 11, marginTop: 1 },
+  groupName: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  groupMeta: { color: theme.textMuted, fontSize: 11, marginTop: 1 },
 
   dropZone: {
     borderWidth: 1.5,
@@ -399,8 +401,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  dropTitle: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  dropMeta: { color: dark.textMuted, fontSize: 11, marginTop: 4 },
+  dropTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  dropMeta: { color: theme.textMuted, fontSize: 11, marginTop: 4 },
 
   uploadHeader: {
     flexDirection: 'row',
@@ -408,49 +410,49 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  uploadLabel: { color: dark.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  uploadTotal: { color: dark.accentGreen, fontSize: 11, fontWeight: '700' },
+  uploadLabel: { color: theme.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  uploadTotal: { color: theme.accentGreen, fontSize: 11, fontWeight: '700' },
 
   fileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     padding: spacing.sm + 2,
     marginBottom: spacing.sm,
   },
   thumb: { width: 38, height: 38, borderRadius: 8, marginRight: spacing.sm + 2 },
   videoThumb: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fileBody: { flex: 1, marginRight: spacing.sm },
   fileTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fileName: { flex: 1, color: dark.text, fontSize: 12, fontWeight: '600', marginRight: spacing.sm },
-  filePercent: { color: dark.textMuted, fontSize: 11, fontWeight: '700' },
+  fileName: { flex: 1, color: theme.text, fontSize: 12, fontWeight: '600', marginRight: spacing.sm },
+  filePercent: { color: theme.textMuted, fontSize: 11, fontWeight: '700' },
   progressTrack: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: theme.overlay,
     marginTop: 6,
     overflow: 'hidden',
   },
   progressFill: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
   progressError: { backgroundColor: '#F87171' },
-  fileMeta: { color: dark.textMuted, fontSize: 10, marginTop: 4 },
-  fileError: { color: '#F87171' },
+  fileMeta: { color: theme.textMuted, fontSize: 10, marginTop: 4 },
+  fileError: { color: theme.danger },
   removeButton: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -462,7 +464,7 @@ const styles = StyleSheet.create({
     bottom: spacing.lg,
   },
   footerHint: {
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
@@ -476,7 +478,7 @@ const styles = StyleSheet.create({
     right: -6,
     bottom: -6,
     borderRadius: radius.lg + 10,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
 });
 

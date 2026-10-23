@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, dark, radius, spacing } from '../theme';
+import { colors, radius, spacing, useStyles, useTheme } from '../theme';
 
 // Single labeled input used across the whole app.
 //   variant: 'dark' (default, Figma auth styling) | 'light'
@@ -16,6 +16,8 @@ const TextField = ({
   inputStyle,
   ...inputProps
 }) => {
+  const theme = useTheme();
+  const darkStyles = useStyles(makeDarkStyles);
   const [hidden, setHidden] = useState(true);
   const isDark = variant === 'dark';
   const v = isDark ? darkStyles : lightStyles;
@@ -26,7 +28,7 @@ const TextField = ({
       <View style={styles.inputWrap}>
         <TextInput
           style={[v.input, secure && styles.inputSecure, error && v.inputError, inputStyle]}
-          placeholderTextColor={isDark ? dark.textMuted : colors.textMuted}
+          placeholderTextColor={isDark ? theme.textMuted : colors.textMuted}
           secureTextEntry={secure && hidden}
           {...inputProps}
         />
@@ -39,7 +41,7 @@ const TextField = ({
             <Ionicons
               name={hidden ? 'eye-off-outline' : 'eye-outline'}
               size={22}
-              color={isDark ? dark.textMuted : colors.textMuted}
+              color={isDark ? theme.textMuted : colors.textMuted}
             />
           </TouchableOpacity>
         )}
@@ -62,22 +64,22 @@ const styles = StyleSheet.create({
   },
 });
 
-const darkStyles = StyleSheet.create({
+const makeDarkStyles = (theme) => StyleSheet.create({
   label: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     fontWeight: '500',
     marginBottom: spacing.sm,
   },
   input: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md - 2,
     fontSize: 16,
-    color: dark.text,
+    color: theme.text,
   },
   inputError: { borderColor: colors.danger },
   error: { color: colors.danger, fontSize: 12, marginTop: spacing.xs },

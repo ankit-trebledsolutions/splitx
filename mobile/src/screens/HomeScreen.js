@@ -23,7 +23,7 @@ import { quickActions } from '../data/dashboard';
 import { usd } from '../utils/format';
 import { tripFlag } from '../utils/tripFlag';
 import { categoryIcon } from '../utils/expenseCategory';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { useTour } from '../tour/TourProvider';
 import { CHAPTERS } from '../tour/steps';
@@ -92,6 +92,8 @@ const greeting = () => {
 };
 
 const HomeScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { user } = useAuth();
   const name = user?.name || profileDefaults.name;
   const [hasUnread, setHasUnread] = useState(false);
@@ -187,7 +189,7 @@ const HomeScreen = ({ navigation }) => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dark.accentGreen} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accentGreen} />
         }
       >
         <View style={styles.upperBg}>
@@ -202,14 +204,14 @@ const HomeScreen = ({ navigation }) => {
             activeOpacity={0.8}
             onPress={() => navigation.navigate('Reminders')}
           >
-            <Ionicons name="alarm-outline" size={20} color={dark.text} />
+            <Ionicons name="alarm-outline" size={20} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bell}
             activeOpacity={0.8}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="notifications-outline" size={20} color={dark.text} />
+            <Ionicons name="notifications-outline" size={20} color={theme.text} />
             {hasUnread && <View style={styles.bellDot} />}
           </TouchableOpacity>
         </View>
@@ -246,7 +248,7 @@ const HomeScreen = ({ navigation }) => {
 
             <View style={styles.stat}>
               <View style={styles.statIcon}>
-                <Ionicons name="trending-up" size={15} color={dark.accentGreen} />
+                <Ionicons name="trending-up" size={15} color={theme.accentGreen} />
               </View>
               <View>
                 <Text style={styles.statLabel}>OWED TO YOU</Text>
@@ -271,7 +273,7 @@ const HomeScreen = ({ navigation }) => {
                   { backgroundColor: `${action.tint}14`, borderColor: `${action.tint}3D` },
                 ]}
               >
-                <Ionicons name={action.icon} size={22} color={action.tint} />
+                <Ionicons name={action.icon} size={22} color={theme.ink(action.tint)} />
               </View>
               <Text style={styles.actionLabel} numberOfLines={2}>
                 {action.label}
@@ -285,7 +287,7 @@ const HomeScreen = ({ navigation }) => {
           activeOpacity={0.85}
           onPress={openContributions}
         >
-          <Ionicons name="heart-outline" size={20} color={dark.accentGreen} />
+          <Ionicons name="heart-outline" size={20} color={theme.accentGreen} />
           <View style={styles.contribBody}>
             <Text style={styles.contribTitle}>View Contributions</Text>
             <Text style={styles.contribMeta}>See community giving & impact</Text>
@@ -352,7 +354,7 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('TaskDetail', { taskId: task._id })}
               >
                 <View style={[styles.tag, { backgroundColor: `${tagColor}22` }]}>
-                  <Text style={[styles.tagText, { color: tagColor }]} numberOfLines={1}>
+                  <Text style={[styles.tagText, { color: theme.ink(tagColor) }]} numberOfLines={1}>
                     {task.group?.name ?? 'Group'}
                   </Text>
                 </View>
@@ -396,7 +398,7 @@ const HomeScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('ExpenseDetail', { expenseId: expense._id })}
           >
             <View style={styles.expenseIcon}>
-              <Ionicons name={categoryIcon(expense.category)} size={18} color={dark.text} />
+              <Ionicons name={categoryIcon(expense.category)} size={18} color={theme.text} />
             </View>
             <View style={styles.expenseBody}>
               <Text style={styles.expenseTitle} numberOfLines={1}>
@@ -425,21 +427,21 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   content: { paddingBottom: spacing.xl },
-  upperBg: {flex: 1, backgroundColor: dark.card, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg},
+  upperBg: {flex: 1, backgroundColor: theme.card, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg},
   lowerBg: {flex: 1, paddingHorizontal: spacing.lg},
   topRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
   topText: { flex: 1, marginLeft: spacing.md },
-  greeting: { color: dark.textMuted, fontSize: 13 },
-  name: { color: dark.text, fontSize: 20, fontWeight: '700', marginTop: 2 },
+  greeting: { color: theme.textMuted, fontSize: 13 },
+  name: { color: theme.text, fontSize: 20, fontWeight: '700', marginTop: 2 },
   bell: {
     width: 40,
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.card,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -452,9 +454,9 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderWidth: 1.5,
-    borderColor: dark.card,
+    borderColor: theme.card,
   },
 
   balanceCard: {
@@ -519,28 +521,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  actionLabel: { color: dark.textMuted, fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  actionLabel: { color: theme.textMuted, fontSize: 10, fontWeight: '600', textAlign: 'center' },
 
   contribCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm + 2,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
     marginTop: spacing.md,
   },
   contribBody: { flex: 1 },
-  contribTitle: { color: dark.text, fontSize: 13, fontWeight: '700' },
-  contribMeta: { color: dark.textMuted, fontSize: 10, marginTop: 1 },
+  contribTitle: { color: theme.text, fontSize: 13, fontWeight: '700' },
+  contribMeta: { color: theme.textMuted, fontSize: 10, marginTop: 1 },
   contribButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: dark.button,
+    backgroundColor: theme.accentFill,
     borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm - 1,
@@ -550,36 +552,36 @@ const styles = StyleSheet.create({
   hList: { gap: spacing.sm, paddingRight: spacing.lg },
   tripCard: {
     width: 190,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  empty: { color: dark.textMuted, fontSize: 12, marginBottom: spacing.sm },
+  empty: { color: theme.textMuted, fontSize: 12, marginBottom: spacing.sm },
   flag: { fontSize: 20 },
-  tripName: { color: dark.text, fontSize: 15, fontWeight: '700', marginTop: spacing.sm },
-  tripDates: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  tripName: { color: theme.text, fontSize: 15, fontWeight: '700', marginTop: spacing.sm },
+  tripDates: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   tripFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  tripMeta: { color: dark.textMuted, fontSize: 11 },
+  tripMeta: { color: theme.textMuted, fontSize: 11 },
   statusChip: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
   },
-  statusText: { color: dark.textMuted, fontSize: 10, fontWeight: '600' },
+  statusText: { color: theme.textMuted, fontSize: 10, fontWeight: '600' },
 
   taskCard: {
     width: 190,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
   },
@@ -593,16 +595,16 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 10, fontWeight: '700' },
   taskBody: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   taskTextWrap: { flex: 1 },
-  taskTitle: { color: dark.text, fontSize: 14, fontWeight: '600' },
-  taskMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  taskTitle: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  taskMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   taskDot: { width: 10, height: 10, borderRadius: 5, marginLeft: spacing.sm },
 
   expenseRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -611,19 +613,19 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
   expenseBody: { flex: 1 },
-  expenseTitle: { color: dark.text, fontSize: 14, fontWeight: '600' },
-  expenseMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  expenseTitle: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  expenseMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   expenseRight: { alignItems: 'flex-end' },
-  expenseAmount: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  settled: { color: dark.accentGreen, fontSize: 11, marginTop: 2 },
-  owed: { color: dark.accentGreen, fontSize: 11, marginTop: 2 },
-  share: { color: '#F87171', fontSize: 11, marginTop: 2 },
+  expenseAmount: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  settled: { color: theme.accentGreen, fontSize: 11, marginTop: 2 },
+  owed: { color: theme.accentGreen, fontSize: 11, marginTop: 2 },
+  share: { color: theme.danger, fontSize: 11, marginTop: 2 },
 });
 
 export default HomeScreen;

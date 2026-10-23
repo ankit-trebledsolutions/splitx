@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from '../components/DarkScreen';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const SECTIONS = [
   {
@@ -35,41 +35,45 @@ const SECTIONS = [
   },
 ];
 
-const PrivacyPolicyScreen = ({ navigation }) => (
-  <DarkScreen>
-    <View style={styles.header}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={navigation.goBack}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="chevron-back" size={18} color={dark.text} />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>Privacy Policy</Text>
-      <View style={styles.versionChip}>
-        <Text style={styles.versionText}>v1.4</Text>
-      </View>
-    </View>
-
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.intro}>
-        This Privacy Policy describes how Splix collects, uses, and shares your personal
-        information when you use our group expense splitting mobile application.
-      </Text>
-
-      {SECTIONS.map((section) => (
-        <View key={section.title}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionBody}>{section.body}</Text>
-          </View>
+const PrivacyPolicyScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <DarkScreen>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={navigation.goBack}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Privacy Policy</Text>
+        <View style={styles.versionChip}>
+          <Text style={styles.versionText}>v1.4</Text>
         </View>
-      ))}
-    </ScrollView>
-  </DarkScreen>
-);
+      </View>
 
-const styles = StyleSheet.create({
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.intro}>
+          This Privacy Policy describes how Splix collects, uses, and shares your personal
+          information when you use our group expense splitting mobile application.
+        </Text>
+
+        {SECTIONS.map((section) => (
+          <View key={section.title}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionBody}>{section.body}</Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </DarkScreen>
+  );
+};
+
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,15 +84,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
-    color: dark.text,
+    color: theme.text,
     fontSize: 20,
     fontWeight: '800',
     marginLeft: spacing.md,
@@ -101,31 +105,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  versionText: { color: dark.accentGreen, fontSize: 10, fontWeight: '700' },
+  versionText: { color: theme.accentGreen, fontSize: 10, fontWeight: '700' },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   intro: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     lineHeight: 18,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     fontWeight: '700',
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
   sectionCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  sectionBody: { color: dark.textMuted, fontSize: 12, lineHeight: 19 },
+  sectionBody: { color: theme.textMuted, fontSize: 12, lineHeight: 19 },
 });
 
 export default PrivacyPolicyScreen;

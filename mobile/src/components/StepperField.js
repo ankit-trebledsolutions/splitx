@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles } from '../theme';
 
 // "−  value  +" counter used for the trip length on Create Group.
 const StepperField = ({ label, value, onChange, min = 1, max = 365, style }) => {
+  const styles = useStyles(makeStyles);
   const step = (delta) => {
     const next = Math.min(max, Math.max(min, value + delta));
     if (next !== value) onChange?.(next);
@@ -38,10 +39,10 @@ const StepperField = ({ label, value, onChange, min = 1, max = 365, style }) => 
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrapper: { marginBottom: spacing.md },
   label: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     fontWeight: '500',
     marginBottom: spacing.sm,
@@ -50,17 +51,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   button: { width: 44, height: 36, alignItems: 'center', justifyContent: 'center' },
-  sign: { color: dark.text, fontSize: 22, fontWeight: '500' },
-  signDisabled: { color: dark.textMuted, opacity: 0.5 },
-  value: { color: dark.text, fontSize: 17, fontWeight: '600' },
+  sign: { color: theme.text, fontSize: 22, fontWeight: '500' },
+  signDisabled: { color: theme.textMuted, opacity: 0.5 },
+  value: { color: theme.text, fontSize: 17, fontWeight: '600' },
 });
 
 export default StepperField;

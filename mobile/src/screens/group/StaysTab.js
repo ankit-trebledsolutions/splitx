@@ -11,29 +11,31 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '../../components/Avatar';
 import useListFocus from '../../hooks/useListFocus';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import { usd } from '../../utils/format';
 
-const STATUS = {
+// Each status tints its card: deep gradients on the dark theme, pastel ones
+// on the light theme, so the card's text keeps the theme's own colours.
+const statusOf = (theme) => ({
   pending: {
     label: 'PENDING',
-    color: '#F5B342',
+    color: theme.warning,
     chipBg: 'rgba(245,179,66,0.14)',
-    gradient: ['#221534', '#120D1E'],
+    gradient: theme.isDark ? ['#221534', '#120D1E'] : ['#F4EEFF', '#EBE2FF'],
   },
   confirmed: {
     label: 'CONFIRMED',
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     chipBg: 'rgba(0,196,208,0.14)',
-    gradient: ['#122642', '#0B1730'],
+    gradient: theme.isDark ? ['#122642', '#0B1730'] : ['#EAF2FF', '#DDE9FF'],
   },
   cancelled: {
     label: 'CANCELLED',
-    color: '#F87171',
+    color: theme.danger,
     chipBg: 'rgba(248,113,113,0.14)',
-    gradient: ['#2A1518', '#150D0E'],
+    gradient: theme.isDark ? ['#2A1518', '#150D0E'] : ['#FFF0EE', '#FFE3DF'],
   },
-};
+});
 
 const shortDate = (value) =>
   new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -58,6 +60,8 @@ const StaysTab = ({
   focusId,
   onFocusDone,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { highlightId, listProps } = useListFocus({
     // Waits for the list itself: nothing to scroll while it is loading.
     items: loading ? [] : stays,
@@ -68,13 +72,14 @@ const StaysTab = ({
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
 
   const renderStay = ({ item }) => {
-    const status = STATUS[item.status] ?? STATUS.pending;
+    const statuses = statusOf(theme);
+    const status = statuses[item.status] ?? statuses.pending;
     const nights = nightsBetween(item.checkIn, item.checkOut);
     const total = nights * item.pricePerNight;
     const isOrganiser = item.bookedBy?._id === organiserId;
@@ -149,7 +154,7 @@ const StaysTab = ({
             </View>
             {isOrganiser && (
               <View style={styles.organiserChip}>
-                <Ionicons name="ribbon-outline" size={10} color={dark.textMuted} />
+                <Ionicons name="ribbon-outline" size={10} color={theme.textMuted} />
                 <Text style={styles.organiserText}>Organiser</Text>
               </View>
             )}
@@ -171,7 +176,7 @@ const StaysTab = ({
                     {item.reviewedBy.name}
                   </Text>
                 ) : null}
-                <Ionicons name="pencil" size={12} color={dark.textMuted} />
+                <Ionicons name="pencil" size={12} color={theme.textMuted} />
               </View>
               {item.review ? (
                 <Text style={styles.reviewText} numberOfLines={4}>
@@ -192,7 +197,7 @@ const StaysTab = ({
 
           {item.address ? (
             <View style={styles.addressRow}>
-              <Ionicons name="location-outline" size={12} color={dark.textMuted} />
+              <Ionicons name="location-outline" size={12} color={theme.textMuted} />
               <Text style={styles.addressText} numberOfLines={1}>
                 {item.address}
               </Text>
@@ -222,11 +227,11 @@ const StaysTab = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 100 },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -237,39 +242,39 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radius.lg + 4,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  cardHighlighted: { borderColor: dark.accentGreen, borderWidth: 1.5 },
+  cardHighlighted: { borderColor: theme.accentGreen, borderWidth: 1.5 },
   topRow: { flexDirection: 'row', alignItems: 'center' },
   emojiTile: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm + 2,
   },
   emoji: { fontSize: 21 },
   titleWrap: { flex: 1, marginRight: spacing.sm },
-  name: { color: dark.text, fontSize: 15, fontWeight: '700' },
+  name: { color: theme.text, fontSize: 15, fontWeight: '700' },
   statusChip: { borderRadius: 12, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 },
   statusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
 
   dateRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   dateBox: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
   },
-  dateLabel: { color: dark.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
-  dateValue: { color: dark.text, fontSize: 15, fontWeight: '700', marginTop: 3 },
+  dateLabel: { color: theme.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
+  dateValue: { color: theme.text, fontSize: 15, fontWeight: '700', marginTop: 3 },
 
   priceRow: {
     flexDirection: 'row',
@@ -277,49 +282,49 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  priceMeta: { color: dark.textMuted, fontSize: 12 },
+  priceMeta: { color: theme.textMuted, fontSize: 12 },
   priceWrap: { flexDirection: 'row', alignItems: 'baseline' },
-  priceTotal: { color: dark.text, fontSize: 17, fontWeight: '800' },
-  pricePer: { color: dark.textMuted, fontSize: 11 },
+  priceTotal: { color: theme.text, fontSize: 17, fontWeight: '800' },
+  pricePer: { color: theme.textMuted, fontSize: 11 },
 
   amenities: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm - 2, marginTop: spacing.md },
   amenityChip: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     borderRadius: 12,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
-  amenityText: { color: dark.text, fontSize: 10, fontWeight: '600' },
+  amenityText: { color: theme.text, fontSize: 10, fontWeight: '600' },
 
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: spacing.md },
+  divider: { height: 1, backgroundColor: theme.overlay, marginVertical: spacing.md },
 
   bookerRow: { flexDirection: 'row', alignItems: 'center' },
   bookerBody: { flex: 1, marginLeft: spacing.sm },
-  bookerName: { color: dark.text, fontSize: 12, fontWeight: '700' },
-  bookerMeta: { color: dark.textMuted, fontSize: 10, marginTop: 1 },
+  bookerName: { color: theme.text, fontSize: 12, fontWeight: '700' },
+  bookerMeta: { color: theme.textMuted, fontSize: 10, marginTop: 1 },
   organiserChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 10,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
   },
-  organiserText: { color: dark.textMuted, fontSize: 9, fontWeight: '700' },
+  organiserText: { color: theme.textMuted, fontSize: 9, fontWeight: '700' },
 
   reviewBox: {
     marginTop: spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     borderRadius: radius.md,
     padding: spacing.sm + 2,
   },
   reviewHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  stars: { color: '#F5B342', fontSize: 13, letterSpacing: 1.5 },
-  starsOff: { color: 'rgba(255,255,255,0.18)' },
-  reviewBy: { flex: 1, color: dark.textMuted, fontSize: 11 },
-  reviewText: { color: dark.text, fontSize: 12, lineHeight: 18, marginTop: spacing.xs },
+  stars: { color: theme.warning, fontSize: 13, letterSpacing: 1.5 },
+  starsOff: { color: theme.textDisabled },
+  reviewBy: { flex: 1, color: theme.textMuted, fontSize: 11 },
+  reviewText: { color: theme.text, fontSize: 12, lineHeight: 18, marginTop: spacing.xs },
   rateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -331,10 +336,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.sm,
   },
-  rateText: { color: '#F5B342', fontSize: 12, fontWeight: '700' },
+  rateText: { color: theme.warning, fontSize: 12, fontWeight: '700' },
 
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
-  addressText: { color: dark.textMuted, fontSize: 11, flex: 1 },
+  addressText: { color: theme.textMuted, fontSize: 11, flex: 1 },
 });
 
 export default StaysTab;

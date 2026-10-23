@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import GradientButton from './GradientButton';
 import useSheetBottom from '../hooks/useSheetBottom';
 import { getAlarmPermissions, openAlarmSettings } from '../utils/reminderAlarms';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 /**
  * "Turn on alarms and calls": what Android still has to allow before a
@@ -24,7 +24,6 @@ import { dark, radius, spacing } from '../theme';
  * shows the sheet only if something that purpose needs is missing, and
  * resolves when it closes.
  */
-const GRANTED = '#17E695';
 
 // Phones whose makers stop closed apps unless the owner exempts them. Android
 // gives no way to read or change that switch, so the sheet can only point at it.
@@ -57,6 +56,8 @@ export const ensureAlarmPermissions = () => ensure(allowsAlarms);
 export const ensureCallPermissions = () => ensure(allowsCalls);
 
 export const AlarmPermissionHost = () => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // Everyone waiting for the sheet to close; empty while it is not showing.
   // More than one when it is asked for again while already up (a call started
   // during the first-time prompt): each is answered when it closes.
@@ -140,7 +141,7 @@ export const AlarmPermissionHost = () => {
           <View style={styles.grabber} />
 
           <View style={styles.badge}>
-            <Ionicons name="alarm-outline" size={26} color={dark.accentGreen} />
+            <Ionicons name="alarm-outline" size={26} color={theme.accentGreen} />
           </View>
           <Text style={styles.title}>Turn on alarms and calls</Text>
           <Text style={styles.subtitle}>
@@ -151,7 +152,7 @@ export const AlarmPermissionHost = () => {
           {rows.map((row) => (
             <View key={row.key} style={styles.row}>
               <View style={styles.rowIcon}>
-                <Ionicons name={row.icon} size={18} color={dark.text} />
+                <Ionicons name={row.icon} size={18} color={theme.text} />
               </View>
               <View style={styles.rowBody}>
                 <Text style={styles.rowTitle}>{row.title}</Text>
@@ -160,7 +161,7 @@ export const AlarmPermissionHost = () => {
                 </Text>
               </View>
               {row.granted ? (
-                <Ionicons name="checkmark-circle" size={24} color={GRANTED} />
+                <Ionicons name="checkmark-circle" size={24} color={theme.success} />
               ) : (
                 <TouchableOpacity style={styles.allow} onPress={row.onAllow} activeOpacity={0.85}>
                   <Text style={styles.allowText}>Allow</Text>
@@ -203,14 +204,14 @@ export const AlarmPermissionHost = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.lg,
   },
   grabber: {
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: theme.overlayBold,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
@@ -234,14 +235,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 20,
     fontWeight: '800',
     textAlign: 'center',
     marginTop: spacing.md,
   },
   subtitle: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
@@ -252,9 +253,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md - 2,
     marginBottom: spacing.sm,
@@ -263,16 +264,16 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md - 4,
   },
   rowBody: { flex: 1, marginRight: spacing.sm },
-  rowTitle: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  rowText: { color: dark.textMuted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  rowTitle: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  rowText: { color: theme.textMuted, fontSize: 11, lineHeight: 16, marginTop: 2 },
   allow: {
-    backgroundColor: dark.button,
+    backgroundColor: theme.accentFill,
     borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm - 1,
@@ -289,11 +290,11 @@ const styles = StyleSheet.create({
     padding: spacing.md - 4,
     marginBottom: spacing.sm,
   },
-  tipText: { flex: 1, color: dark.textMuted, fontSize: 11, lineHeight: 16 },
+  tipText: { flex: 1, color: theme.textMuted, fontSize: 11, lineHeight: 16 },
 
   done: { marginTop: spacing.sm },
   footnote: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     lineHeight: 16,
     textAlign: 'center',
@@ -302,11 +303,11 @@ const styles = StyleSheet.create({
   later: {
     marginTop: spacing.sm + 2,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  laterText: { color: dark.text, fontSize: 15, fontWeight: '600' },
+  laterText: { color: theme.text, fontSize: 15, fontWeight: '600' },
 });

@@ -2,9 +2,8 @@ import React from 'react';
 import { View, Text, Modal, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
-const DANGER = '#F87171';
 
 /**
  * What long-pressing a chat message opens: a sheet of actions for it.
@@ -12,6 +11,8 @@ const DANGER = '#F87171';
  * itself before running the chosen one.
  */
 const MessageActionsSheet = ({ visible, preview, actions = [], onClose }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   return (
     <Modal
@@ -48,7 +49,7 @@ const MessageActionsSheet = ({ visible, preview, actions = [], onClose }) => {
               <Ionicons
                 name={action.icon}
                 size={19}
-                color={action.destructive ? DANGER : dark.text}
+                color={action.destructive ? theme.danger : theme.text}
               />
               <Text style={[styles.label, action.destructive && styles.labelDanger]}>
                 {action.label}
@@ -61,14 +62,14 @@ const MessageActionsSheet = ({ visible, preview, actions = [], onClose }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderTopLeftRadius: radius.lg + 8,
     borderTopRightRadius: radius.lg + 8,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
   },
@@ -77,17 +78,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: theme.overlayStrong,
     marginBottom: spacing.sm,
   },
   preview: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     lineHeight: 17,
     paddingHorizontal: spacing.sm,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
+    borderBottomColor: theme.border,
     marginBottom: spacing.xs,
   },
   item: {
@@ -97,8 +98,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md - 2,
   },
-  label: { color: dark.text, fontSize: 15, fontWeight: '600' },
-  labelDanger: { color: DANGER },
+  label: { color: theme.text, fontSize: 15, fontWeight: '600' },
+  labelDanger: { color: theme.danger },
 });
 
 export default MessageActionsSheet;

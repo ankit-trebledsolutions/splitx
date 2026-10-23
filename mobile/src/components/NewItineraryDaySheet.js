@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Text } from 'react-native';
-import FormSheet, { sheetStyles } from './FormSheet';
+import FormSheet, { makeSheetStyles } from './FormSheet';
 import TextField from './TextField';
 import DateChip from './DateChip';
 import CalendarPanel from './CalendarPanel';
+import { useStyles } from '../theme';
 
 const dateLabel = (date) =>
   date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -21,6 +22,7 @@ const atNoon = (value) => {
 //   defaultDate: the calendar day this day number falls on (Date or ISO
 //     string), worked out by the parent from the trip's dates. Today if absent.
 const NewItineraryDaySheet = ({ visible, nextDayNumber = 1, defaultDate, onClose, onSubmit }) => {
+  const sheetStyles = useStyles(makeSheetStyles);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(() => atNoon(defaultDate));
   const [calendarOpen, setCalendarOpen] = useState(false);

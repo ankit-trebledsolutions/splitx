@@ -19,7 +19,7 @@ import {
   fetchItinerary,
   updateItineraryActivity,
 } from '../api/itinerary.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { isValidTimeText, normalizeTimeText } from '../utils/time';
 
@@ -39,6 +39,8 @@ const dayDateLabel = (value) =>
 // becomes a DAY picker that can move the activity to another day, and it saves
 // through the per-activity PATCH.
 const AddActivityScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { day, activity } = route.params;
   const editing = Boolean(activity);
 
@@ -137,7 +139,7 @@ const AddActivityScreen = ({ route, navigation }) => {
   // also the trigger of the day dropdown, and a small chevron says so.
   const dayBox = (
     <>
-      <Ionicons name="calendar-outline" size={15} color={dark.textMuted} />
+      <Ionicons name="calendar-outline" size={15} color={theme.textMuted} />
       <Text style={styles.dateText}>{dayDateLabel(chosenDay.date)}</Text>
       <Text style={styles.dayChipText}>DAY {chosenDay.dayNumber}</Text>
     </>
@@ -151,7 +153,7 @@ const AddActivityScreen = ({ route, navigation }) => {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={navigation.goBack} activeOpacity={0.7} hitSlop={styles.hitSlop}>
-            <Ionicons name="arrow-back" size={22} color={dark.text} />
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{editing ? 'Edit Activity' : 'Add Activity'}</Text>
         </View>
@@ -171,21 +173,21 @@ const AddActivityScreen = ({ route, navigation }) => {
                 if (error) setError('');
               }}
               placeholder="e.g. Shibuya Sky Observation Deck"
-              placeholderTextColor={dark.textMuted}
+              placeholderTextColor={theme.textMuted}
             />
-            <Ionicons name="pencil" size={13} color={dark.accentBlue} />
+            <Ionicons name="pencil" size={13} color={theme.accentBlue} />
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <Text style={styles.label}>LOCATION</Text>
           <View style={styles.fieldBox}>
-            <Ionicons name="location-outline" size={15} color={dark.accentGreen} />
+            <Ionicons name="location-outline" size={15} color={theme.accentGreen} />
             <TextInput
               style={styles.fieldInput}
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. 2-24-12 Shibuya, Tokyo, 150-6145"
-              placeholderTextColor={dark.textMuted}
+              placeholderTextColor={theme.textMuted}
             />
           </View>
 
@@ -206,7 +208,7 @@ const AddActivityScreen = ({ route, navigation }) => {
                   }}
                 >
                   {dayBox}
-                  <Ionicons name="chevron-down" size={14} color={dark.textMuted} />
+                  <Ionicons name="chevron-down" size={14} color={theme.textMuted} />
                 </TouchableOpacity>
               )}
             />
@@ -218,13 +220,13 @@ const AddActivityScreen = ({ route, navigation }) => {
             <View style={styles.timeColumn}>
               <Text style={styles.label}>START TIME</Text>
               <View style={[styles.fieldBox, startTimeOk ? null : styles.fieldBoxError]}>
-                <Ionicons name="time-outline" size={15} color={dark.accentGreen} />
+                <Ionicons name="time-outline" size={15} color={theme.accentGreen} />
                 <TextInput
                   style={[styles.fieldInput, styles.startTimeInput]}
                   value={startTime}
                   onChangeText={setStartTime}
                   placeholder="10:30 AM"
-                  placeholderTextColor={dark.textMuted}
+                  placeholderTextColor={theme.textMuted}
                 />
               </View>
             </View>
@@ -232,13 +234,13 @@ const AddActivityScreen = ({ route, navigation }) => {
             <View style={styles.timeColumn}>
               <Text style={styles.label}>END TIME</Text>
               <View style={[styles.fieldBox, endTimeOk ? null : styles.fieldBoxError]}>
-                <Ionicons name="time-outline" size={15} color={dark.textMuted} />
+                <Ionicons name="time-outline" size={15} color={theme.textMuted} />
                 <TextInput
                   style={styles.fieldInput}
                   value={endTime}
                   onChangeText={setEndTime}
                   placeholder="12:00 PM"
-                  placeholderTextColor={dark.textMuted}
+                  placeholderTextColor={theme.textMuted}
                 />
               </View>
             </View>
@@ -251,7 +253,7 @@ const AddActivityScreen = ({ route, navigation }) => {
               value={notes}
               onChangeText={setNotes}
               placeholder="Remember to reserve the slot exactly 30 days prior. Tickets sell out in minutes!"
-              placeholderTextColor={dark.textMuted}
+              placeholderTextColor={theme.textMuted}
               multiline
               textAlignVertical="top"
             />
@@ -270,7 +272,7 @@ const AddActivityScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
 
@@ -281,12 +283,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  headerTitle: { color: dark.text, fontSize: 20, fontWeight: '800' },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: '800' },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
 
   label: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -297,29 +299,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     minHeight: 48,
   },
-  fieldBoxError: { borderColor: '#F87171' },
+  fieldBoxError: { borderColor: theme.danger },
   fieldInput: {
     flex: 1,
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     fontWeight: '600',
     paddingVertical: 12,
   },
-  errorText: { color: '#F87171', fontSize: 11, marginTop: spacing.xs },
+  errorText: { color: theme.danger, fontSize: 11, marginTop: spacing.xs },
 
-  dateText: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600' },
-  dayChipText: { color: dark.accentGreen, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  dateText: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600' },
+  dayChipText: { color: theme.accentGreen, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
 
   timeRow: { flexDirection: 'row', gap: spacing.sm },
   timeColumn: { flex: 1 },
-  startTimeInput: { color: dark.accentGreen },
+  startTimeInput: { color: theme.accentGreen },
 
   notesBox: { alignItems: 'flex-start', paddingVertical: spacing.xs },
   notesInput: { minHeight: 92, fontWeight: '400', lineHeight: 20 },

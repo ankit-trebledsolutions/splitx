@@ -18,7 +18,7 @@ import {
   markNotificationRead,
   clearNotification,
 } from '../api/notifications.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { timeAgo } from '../utils/format';
 import AppAlert from '../components/AppAlert';
 
@@ -33,7 +33,7 @@ const TYPE_STYLE = {
   attraction: { icon: 'compass-outline', tint: '#2DD4BF' },
   stay: { icon: 'bed-outline', tint: '#4A7DF7' },
   support: { icon: 'chatbubble-ellipses-outline', tint: '#00C4D0' },
-  system: { icon: 'sparkles-outline', tint: dark.textMuted },
+  system: { icon: 'sparkles-outline', tint: '#8A97A6' },
 };
 
 const FILTERS = [
@@ -54,6 +54,8 @@ const signedAmount = (amount) =>
   `${amount < 0 ? '-' : '+'}$${Math.abs(amount).toFixed(2)}`;
 
 const NotificationsScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -127,7 +129,7 @@ const NotificationsScreen = ({ navigation }) => {
             <Ionicons
               name={look.icon}
               size={18}
-              color={item.read ? `${look.tint}99` : look.tint}
+              color={item.read ? `${theme.ink(look.tint)}99` : theme.ink(look.tint)}
             />
           </View>
 
@@ -156,7 +158,7 @@ const NotificationsScreen = ({ navigation }) => {
           onPress={navigation.goBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
         <View style={styles.backButtonGhost} />
@@ -188,7 +190,7 @@ const NotificationsScreen = ({ navigation }) => {
 
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       ) : (
         <FlatList
@@ -210,7 +212,7 @@ const NotificationsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,9 +223,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -231,7 +233,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -242,21 +244,21 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 16,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm - 1,
   },
-  chipActive: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
-  chipText: { color: dark.textMuted, fontSize: 12, fontWeight: '600' },
+  chipActive: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
+  chipText: { color: theme.textMuted, fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: '#04121C', fontWeight: '800' },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xl },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -266,15 +268,15 @@ const styles = StyleSheet.create({
 
   card: {
     flexDirection: 'row',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm + 2,
   },
   // Viewed notifications sit back: darker fill, plain border, dimmed content.
-  cardRead: { backgroundColor: '#090B0E', borderColor: 'rgba(255,255,255,0.06)' },
+  cardRead: { backgroundColor: theme.readCard, borderColor: theme.overlayFaint },
   iconTile: {
     width: 38,
     height: 38,
@@ -284,19 +286,19 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   body: { flex: 1, marginRight: spacing.sm },
-  title: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  titleRead: { color: 'rgba(244,247,250,0.55)' },
-  message: { color: dark.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 },
-  messageRead: { color: 'rgba(138,151,166,0.6)' },
-  time: { color: dark.textMuted, fontSize: 10, marginTop: spacing.sm },
+  title: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  titleRead: { color: theme.textFaint },
+  message: { color: theme.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  messageRead: { color: theme.textFaint },
+  time: { color: theme.textMuted, fontSize: 10, marginTop: spacing.sm },
   right: { alignItems: 'flex-end', justifyContent: 'space-between' },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
   },
-  amount: { color: dark.text, fontSize: 13, fontWeight: '800' },
+  amount: { color: theme.text, fontSize: 13, fontWeight: '800' },
 });
 
 export default NotificationsScreen;

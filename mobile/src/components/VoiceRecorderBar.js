@@ -10,7 +10,7 @@ import {
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import AppAlert from './AppAlert';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 import { formatDuration } from '../utils/attachments';
 
 // Anything shorter is a slip of the thumb, not a message.
@@ -30,6 +30,8 @@ const discard = (uri) => {
  * onSend receives { uri, name, type, durationMs }; both callbacks unmount it.
  */
 const VoiceRecorderBar = ({ onSend, onCancel, style }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const state = useAudioRecorderState(recorder, 200);
   const [ready, setReady] = useState(false);
@@ -128,7 +130,7 @@ const VoiceRecorderBar = ({ onSend, onCancel, style }) => {
         {ready ? (
           <Animated.View style={[styles.dot, { opacity: pulse }]} />
         ) : (
-          <ActivityIndicator size="small" color={dark.textMuted} />
+          <ActivityIndicator size="small" color={theme.textMuted} />
         )}
         <Text style={styles.timer}>{formatDuration(state.durationMillis ?? 0)}</Text>
         <Text style={styles.hint} numberOfLines={1}>
@@ -148,7 +150,7 @@ const VoiceRecorderBar = ({ onSend, onCancel, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,16 +158,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
-    backgroundColor: '#080D10',
+    borderTopColor: theme.border,
+    backgroundColor: theme.composer,
   },
   cancel: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -176,19 +178,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     height: 42,
     borderRadius: 21,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.md,
   },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#F87171' },
-  timer: { color: dark.text, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  hint: { flex: 1, color: dark.textMuted, fontSize: 12 },
+  timer: { color: theme.text, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  hint: { flex: 1, color: theme.textMuted, fontSize: 12 },
   send: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

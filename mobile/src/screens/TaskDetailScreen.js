@@ -15,14 +15,14 @@ import DarkScreen from '../components/DarkScreen';
 import GradientButton from '../components/GradientButton';
 import Avatar from '../components/Avatar';
 import { fetchTask, updateTask, deleteTask } from '../api/tasks.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 
-const PRIORITY = {
-  high: { label: 'HIGH PRIORITY', color: '#F87171' },
-  med: { label: 'MED PRIORITY', color: '#F5B342' },
-  low: { label: 'LOW PRIORITY', color: '#17E695' },
-};
+const priorityOf = (theme) => ({
+  high: { label: 'HIGH PRIORITY', color: theme.danger },
+  med: { label: 'MED PRIORITY', color: theme.warning },
+  low: { label: 'LOW PRIORITY', color: theme.success },
+});
 
 const dueLabel = (value) => {
   if (!value) return 'No due date';
@@ -39,6 +39,8 @@ const dueLabel = (value) => {
 // Full task view per the task-detail mockup: chips, due/assignee boxes, notes,
 // checkable subtasks, links, and Mark as Done.
 const TaskDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { taskId } = route.params;
   const [task, setTask] = useState(null);
   const [newSubtask, setNewSubtask] = useState('');
@@ -133,13 +135,14 @@ const TaskDetailScreen = ({ route, navigation }) => {
     return (
       <DarkScreen>
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       </DarkScreen>
     );
   }
 
-  const priority = PRIORITY[task.priority] ?? PRIORITY.med;
+  const priorities = priorityOf(theme);
+  const priority = priorities[task.priority] ?? priorities.med;
   const isDone = task.status === 'done';
   const assignee = task.assignees?.[0];
   const doneCount = task.subtasks?.filter((s) => s.done).length ?? 0;
@@ -152,7 +155,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
           onPress={navigation.goBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Task Details</Text>
         <TouchableOpacity
@@ -160,7 +163,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
           onPress={confirmDelete}
         >
-          <Ionicons name="ellipsis-horizontal" size={16} color={dark.text} />
+          <Ionicons name="ellipsis-horizontal" size={16} color={theme.text} />
         </TouchableOpacity>
       </View>
 
@@ -181,7 +184,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
               { backgroundColor: isDone ? 'rgba(0,196,208,0.14)' : 'rgba(245,179,66,0.14)' },
             ]}
           >
-            <Text style={[styles.chipText, { color: isDone ? dark.accentGreen : '#F5B342' }]}>
+            <Text style={[styles.chipText, { color: isDone ? theme.accentGreen : theme.warning }]}>
               {isDone ? 'DONE' : 'PENDING'}
             </Text>
           </View>
@@ -253,12 +256,12 @@ const TaskDetailScreen = ({ route, navigation }) => {
             value={newSubtask}
             onChangeText={setNewSubtask}
             placeholder="Add a subtask…"
-            placeholderTextColor={dark.textMuted}
+            placeholderTextColor={theme.textMuted}
             onSubmitEditing={addSubtask}
             returnKeyType="done"
           />
           <TouchableOpacity style={styles.addSubtaskButton} activeOpacity={0.8} onPress={addSubtask}>
-            <Ionicons name="add" size={16} color={dark.accentGreen} />
+            <Ionicons name="add" size={16} color={theme.accentGreen} />
           </TouchableOpacity>
         </View>
 
@@ -273,7 +276,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
                 onPress={() => Linking.openURL(link.url).catch(() => {})}
               >
                 <View style={styles.linkIcon}>
-                  <Ionicons name="link-outline" size={15} color={dark.accentBlue} />
+                  <Ionicons name="link-outline" size={15} color={theme.accentBlue} />
                 </View>
                 <View style={styles.linkBody}>
                   <Text style={styles.linkTitle} numberOfLines={1}>
@@ -283,7 +286,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
                     {link.url.replace(/^https?:\/\//, '')}
                   </Text>
                 </View>
-                <Ionicons name="open-outline" size={14} color={dark.textMuted} />
+                <Ionicons name="open-outline" size={14} color={theme.textMuted} />
               </TouchableOpacity>
             ))}
           </>
@@ -301,7 +304,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
@@ -314,22 +317,22 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 16,
     fontWeight: '800',
   },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: 120 },
-  title: { color: dark.text, fontSize: 26, fontWeight: '800', lineHeight: 33, marginTop: spacing.sm },
+  title: { color: theme.text, fontSize: 26, fontWeight: '800', lineHeight: 33, marginTop: spacing.sm },
 
   chipRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, flexWrap: 'wrap' },
   chip: { borderRadius: 10, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 },
@@ -338,19 +341,19 @@ const styles = StyleSheet.create({
   boxRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   infoBox: {
     flex: 1,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  boxLabel: { color: dark.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  boxLabel: { color: theme.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
   boxValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm },
-  boxValue: { color: dark.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  boxValueMuted: { color: dark.textMuted, fontSize: 13 },
+  boxValue: { color: theme.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  boxValueMuted: { color: theme.textMuted, fontSize: 13 },
 
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -362,24 +365,24 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
   },
-  sectionMeta: { color: dark.accentGreen, fontSize: 11, fontWeight: '600', marginBottom: spacing.sm },
+  sectionMeta: { color: theme.accentGreen, fontSize: 11, fontWeight: '600', marginBottom: spacing.sm },
 
   notesCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  notesText: { color: dark.text, fontSize: 13, lineHeight: 20 },
-  notesEmpty: { color: dark.textMuted, fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
+  notesText: { color: theme.text, fontSize: 13, lineHeight: 20 },
+  notesEmpty: { color: theme.textMuted, fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
 
   subtaskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
@@ -390,25 +393,25 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: dark.textMuted,
+    borderColor: theme.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
-  checkboxDone: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
-  subtaskText: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '600' },
-  subtaskTextDone: { color: dark.textMuted, textDecorationLine: 'line-through' },
+  checkboxDone: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
+  subtaskText: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600' },
+  subtaskTextDone: { color: theme.textMuted, textDecorationLine: 'line-through' },
 
   addSubtaskRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   addSubtaskInput: {
     flex: 1,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
-    color: dark.text,
+    color: theme.text,
     fontSize: 13,
   },
   addSubtaskButton: {
@@ -425,9 +428,9 @@ const styles = StyleSheet.create({
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -442,8 +445,8 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   linkBody: { flex: 1, marginRight: spacing.sm },
-  linkTitle: { color: dark.text, fontSize: 13, fontWeight: '600' },
-  linkUrl: { color: dark.textMuted, fontSize: 11, marginTop: 1 },
+  linkTitle: { color: theme.text, fontSize: 13, fontWeight: '600' },
+  linkUrl: { color: theme.textMuted, fontSize: 11, marginTop: 1 },
 
   footer: {
     position: 'absolute',

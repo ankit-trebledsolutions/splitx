@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DarkScreen from '../components/DarkScreen';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const FAQS = [
   {
@@ -50,6 +50,8 @@ const FAQS = [
 ];
 
 const FaqScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // The first item starts expanded, matching the design.
   const [openIds, setOpenIds] = useState(new Set([FAQS[0].id]));
 
@@ -70,7 +72,7 @@ const FaqScreen = ({ navigation }) => {
           onPress={navigation.goBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>FAQ</Text>
         <View style={styles.backButtonGhost} />
@@ -97,7 +99,7 @@ const FaqScreen = ({ navigation }) => {
                 <Ionicons
                   name={open ? 'chevron-up' : 'chevron-down'}
                   size={15}
-                  color={open ? dark.accentGreen : dark.textMuted}
+                  color={open ? theme.accentGreen : theme.textMuted}
                 />
               </View>
               {open && <Text style={styles.answer}>{faq.answer}</Text>}
@@ -109,7 +111,7 @@ const FaqScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -120,9 +122,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -130,14 +132,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 20,
     fontWeight: '800',
   },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   intro: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: spacing.sm,
@@ -145,9 +147,9 @@ const styles = StyleSheet.create({
   },
 
   item: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -158,9 +160,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,196,208,0.30)',
   },
   questionRow: { flexDirection: 'row', alignItems: 'center' },
-  question: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600', marginRight: spacing.sm },
-  questionOpen: { color: dark.accentGreen },
-  answer: { color: dark.textMuted, fontSize: 13, lineHeight: 20, marginTop: spacing.sm },
+  question: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600', marginRight: spacing.sm },
+  questionOpen: { color: theme.accentGreen },
+  answer: { color: theme.textMuted, fontSize: 13, lineHeight: 20, marginTop: spacing.sm },
 });
 
 export default FaqScreen;

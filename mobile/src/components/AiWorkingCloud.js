@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark } from '../theme';
+import { useTheme } from '../theme';
 
 const SPARKLE_BLUE = '#4A8CFF';
 
@@ -23,6 +23,7 @@ const SPARKLES = [
  * Transform and opacity only, so every frame stays on the native driver.
  */
 const AiWorkingCloud = ({ size = 72, style }) => {
+  const theme = useTheme();
   const float = useRef(new Animated.Value(0)).current;
   const twinkles = useRef(SPARKLES.map(() => new Animated.Value(0))).current;
 
@@ -78,7 +79,7 @@ const AiWorkingCloud = ({ size = 72, style }) => {
           ],
         }}
       >
-        <Ionicons name="cloud" size={size} color={dark.accentGreen} />
+        <Ionicons name="cloud" size={size} color={theme.accentGreen} />
       </Animated.View>
 
       {SPARKLES.map((sparkle, index) => (

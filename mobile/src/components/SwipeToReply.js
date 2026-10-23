@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark } from '../theme';
+import { useStyles, useTheme } from '../theme';
 
 // How far the row follows the finger, and how far it must go to count.
 const MAX_PULL = 84;
@@ -15,6 +15,8 @@ const TRIGGER_AT = 56;
  * react-native-gesture-handler).
  */
 const SwipeToReply = ({ children, onReply, enabled = true }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const translateX = useRef(new Animated.Value(0)).current;
   // The responder is created once, so it reads the latest props through a ref.
   const latest = useRef({ onReply, enabled });
@@ -62,7 +64,7 @@ const SwipeToReply = ({ children, onReply, enabled = true }) => {
   return (
     <View>
       <Animated.View style={[styles.arrow, arrow]} pointerEvents="none">
-        <Ionicons name="arrow-undo" size={15} color={dark.text} />
+        <Ionicons name="arrow-undo" size={15} color={theme.text} />
       </Animated.View>
       <Animated.View style={{ transform: [{ translateX }] }} {...responder.panHandlers}>
         {children}
@@ -71,7 +73,7 @@ const SwipeToReply = ({ children, onReply, enabled = true }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   arrow: {
     position: 'absolute',
     left: 4,
@@ -80,9 +82,9 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },

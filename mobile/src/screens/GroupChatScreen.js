@@ -50,7 +50,7 @@ import {
 import { fetchStays, createStay, updateStay, deleteStay } from '../api/stays.api';
 import { detectTask } from '../utils/taskDetect';
 import { AI_ALERTS, replaceConfirmMessage } from '../constants/aiItineraryOptions';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 import { useTour } from '../tour/TourProvider';
 import useTourTarget, { measureView } from '../tour/useTourTarget';
@@ -122,6 +122,8 @@ const dateForDayNumber = (dayNumber, startDate, days) => {
 };
 
 const GroupChatScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // groupType is only a hint from the list the user came from, so the right
   // tabs are there on the first frame; the loaded group always has the last word.
   const { groupId, initialTab, aiJob, groupType: groupTypeHint } = route.params;
@@ -1337,7 +1339,7 @@ const GroupChatScreen = ({ route, navigation }) => {
     <DarkScreen edges={TOP_ONLY} style={tab !== 'chat' && { paddingBottom: insets.bottom }}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={dark.text} />
+          <Ionicons name="chevron-back" size={20} color={theme.text} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1364,7 +1366,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             navigation.navigate('Call');
           }}
         >
-          <Ionicons name="call-outline" size={17} color={dark.text} />
+          <Ionicons name="call-outline" size={17} color={theme.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerIcon}
@@ -1374,7 +1376,7 @@ const GroupChatScreen = ({ route, navigation }) => {
             navigation.navigate('Call');
           }}
         >
-          <Ionicons name="videocam-outline" size={17} color={dark.text} />
+          <Ionicons name="videocam-outline" size={17} color={theme.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerIcon}
@@ -1382,14 +1384,14 @@ const GroupChatScreen = ({ route, navigation }) => {
           onPress={() => navigation.navigate('GroupInvite', { group })}
           disabled={!group}
         >
-          <Ionicons name="person-add-outline" size={16} color={dark.text} />
+          <Ionicons name="person-add-outline" size={16} color={theme.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerIcon}
           activeOpacity={0.7}
           onPress={() => navigation.navigate('GroupDetail', { groupId })}
         >
-          <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
+          <Ionicons name="ellipsis-vertical" size={15} color={theme.text} />
         </TouchableOpacity>
       </View>
 
@@ -1431,7 +1433,7 @@ const GroupChatScreen = ({ route, navigation }) => {
                 <Ionicons
                   name={item.icon}
                   size={14}
-                  color={active ? dark.accentGreen : dark.textMuted}
+                  color={active ? theme.accentGreen : theme.textMuted}
                 />
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>{item.label}</Text>
               </TouchableOpacity>
@@ -1511,7 +1513,7 @@ const GroupChatScreen = ({ route, navigation }) => {
                 <Text style={styles.aiNudgeChipText}>Plan</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={dismissAiNudge} hitSlop={styles.hitSlop}>
-                <Ionicons name="close" size={16} color={dark.textMuted} />
+                <Ionicons name="close" size={16} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
           )}
@@ -1624,7 +1626,7 @@ const GroupChatScreen = ({ route, navigation }) => {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.actionIcon, { backgroundColor: `${item.tint}26` }]}>
-                    <Ionicons name={item.icon} size={15} color={item.tint} />
+                    <Ionicons name={item.icon} size={15} color={theme.ink(item.tint)} />
                   </View>
                   <Text style={styles.actionText}>{item.label}</Text>
                 </TouchableOpacity>
@@ -1634,7 +1636,7 @@ const GroupChatScreen = ({ route, navigation }) => {
 
           <TouchableOpacity ref={fabRef} style={styles.fab} activeOpacity={0.9} onPress={pressFab}>
             <LinearGradient
-              colors={dark.gradient}
+              colors={theme.gradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.fabInner}
@@ -1729,7 +1731,7 @@ const GroupChatScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1741,22 +1743,22 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   headerAvatar: { marginHorizontal: spacing.sm },
   headerText: { flex: 1, marginRight: spacing.sm },
-  headerTitle: { color: dark.text, fontSize: 16, fontWeight: '700' },
-  headerSubtitle: { color: dark.textMuted, fontSize: 11, marginTop: 1 },
+  headerTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  headerSubtitle: { color: theme.textMuted, fontSize: 11, marginTop: 1 },
 
   tabBar: {
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: dark.border,
+    borderBottomColor: theme.border,
   },
   tab: {
     flexDirection: 'row',
@@ -1768,9 +1770,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  tabActive: { borderBottomColor: dark.accentGreen },
-  tabText: { color: dark.textMuted, fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: dark.accentGreen },
+  tabActive: { borderBottomColor: theme.accentGreen },
+  tabText: { color: theme.textMuted, fontSize: 12, fontWeight: '600' },
+  tabTextActive: { color: theme.accentGreen },
 
   flex: { flex: 1 },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
@@ -1783,7 +1785,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
-    backgroundColor: '#0F1A20',
+    backgroundColor: theme.raised,
     borderWidth: 1,
     borderColor: 'rgba(0,196,208,0.35)',
     borderRadius: radius.md,
@@ -1794,13 +1796,13 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  aiNudgeText: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '600' },
+  aiNudgeText: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600' },
   aiNudgeChip: {
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderRadius: radius.sm,
     paddingVertical: 6,
     paddingHorizontal: spacing.md,

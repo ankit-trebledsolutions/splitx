@@ -14,9 +14,8 @@ import { useSocket } from '../context/SocketProvider';
 import useReminderActions from '../hooks/useReminderActions';
 import { fetchMyReminders } from '../api/reminders.api';
 import { getAlarmPermissions } from '../utils/reminderAlarms';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
-const WARN = '#F5B342';
 
 /**
  * Every reminder that can ring for me: the shared ones from all my groups, my
@@ -24,6 +23,8 @@ const WARN = '#F5B342';
  * made here are personal; a group's own are made from that group.
  */
 const RemindersScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { user } = useAuth();
   const { socket, connected } = useSocket();
 
@@ -80,7 +81,7 @@ const RemindersScreen = ({ navigation }) => {
 
       {permissions && !permissions.complete ? (
         <TouchableOpacity style={styles.banner} activeOpacity={0.85} onPress={turnOnAlarms}>
-          <Ionicons name="alert-circle-outline" size={18} color={WARN} />
+          <Ionicons name="alert-circle-outline" size={18} color={theme.warning} />
           <Text style={styles.bannerText}>
             Alarms are off, so reminders arrive as normal notifications.
           </Text>
@@ -101,7 +102,7 @@ const RemindersScreen = ({ navigation }) => {
 
       <TouchableOpacity style={styles.fab} activeOpacity={0.9} onPress={() => actions.openNew()}>
         <LinearGradient
-          colors={dark.gradient}
+          colors={theme.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.fabInner}
@@ -115,7 +116,7 @@ const RemindersScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -129,8 +130,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md - 4,
     paddingVertical: spacing.sm + 2,
   },
-  bannerText: { flex: 1, color: dark.text, fontSize: 12, lineHeight: 17 },
-  bannerAction: { color: WARN, fontSize: 12, fontWeight: '800' },
+  bannerText: { flex: 1, color: theme.text, fontSize: 12, lineHeight: 17 },
+  bannerAction: { color: theme.warning, fontSize: 12, fontWeight: '800' },
 
   // DarkScreen's inner view already ends above the system navigation bar.
   fab: { position: 'absolute', right: spacing.lg, bottom: spacing.lg },

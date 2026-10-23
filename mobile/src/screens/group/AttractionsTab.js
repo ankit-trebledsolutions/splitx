@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import AppAlert from '../../components/AppAlert';
 import useListFocus from '../../hooks/useListFocus';
 
@@ -25,6 +25,8 @@ const AttractionsTab = ({
   focusId,
   onFocusDone,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { highlightId, listProps } = useListFocus({
     items: loading ? [] : attractions,
     focusId,
@@ -34,7 +36,7 @@ const AttractionsTab = ({
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
@@ -81,7 +83,7 @@ const AttractionsTab = ({
           <Ionicons
             name={saved ? 'bookmark' : 'bookmark-outline'}
             size={16}
-            color={saved ? '#04241A' : dark.textMuted}
+            color={saved ? '#04241A' : theme.textMuted}
           />
         </TouchableOpacity>
       </TouchableOpacity>
@@ -107,7 +109,7 @@ const AttractionsTab = ({
             activeOpacity={0.8}
             onPress={() => AppAlert.alert('Map View', 'The attractions map is coming soon.')}
           >
-            <Ionicons name="map-outline" size={13} color={dark.accentGreen} />
+            <Ionicons name="map-outline" size={13} color={theme.accentGreen} />
             <Text style={styles.mapLinkText}>Map View</Text>
           </TouchableOpacity>
           </View>
@@ -122,11 +124,11 @@ const AttractionsTab = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingBottom: 100 },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -141,48 +143,48 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  headerTitle: { color: dark.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
+  headerTitle: { color: theme.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
   mapLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  mapLinkText: { color: dark.accentGreen, fontSize: 12, fontWeight: '600' },
+  mapLinkText: { color: theme.accentGreen, fontSize: 12, fontWeight: '600' },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm + 2,
   },
-  cardHighlighted: { borderColor: dark.accentGreen, backgroundColor: 'rgba(0,196,208,0.10)' },
+  cardHighlighted: { borderColor: theme.accentFill, backgroundColor: 'rgba(0,196,208,0.10)' },
   emojiTile: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
   emoji: { fontSize: 22 },
   cardBody: { flex: 1, marginRight: spacing.sm },
-  name: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  category: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  name: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  category: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  metaText: { color: dark.textMuted, fontSize: 11, fontWeight: '600' },
+  metaText: { color: theme.textMuted, fontSize: 11, fontWeight: '600' },
 
   bookmark: {
     width: 34,
     height: 34,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: theme.border,
+    backgroundColor: theme.overlayFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bookmarkSaved: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
+  bookmarkSaved: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
 });
 
 export default AttractionsTab;

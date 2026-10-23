@@ -14,7 +14,7 @@ import {
   nameError,
   bioError,
 } from '../utils/profileValidation';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles } from '../theme';
 
 /**
  * The first screen after sign-up (email or Google). RootNavigator shows it in
@@ -25,6 +25,7 @@ import { dark, spacing } from '../theme';
  * sign-up) is filled in, so most people only need to pick a username.
  */
 const CompleteProfileScreen = () => {
+  const styles = useStyles(makeStyles);
   const { user, updateProfile, logout } = useAuth();
   const [form, setForm] = useState({
     name: user?.name ?? '',
@@ -130,11 +131,11 @@ const CompleteProfileScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   bioField: { marginBottom: spacing.xs },
   bioInput: { height: 110, paddingTop: spacing.md },
   counter: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     textAlign: 'right',
     marginBottom: spacing.md,

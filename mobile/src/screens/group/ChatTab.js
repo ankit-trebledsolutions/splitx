@@ -20,7 +20,7 @@ import TypingDots from '../../components/TypingDots';
 import { avatarColor } from '../../components/Avatar';
 import useKeyboardVisible from '../../hooks/useKeyboardVisible';
 import useKeyboardLift from '../../hooks/useKeyboardLift';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import { formatDayDivider } from '../../utils/format';
 import ImageViewer from '../../components/ImageViewer';
 import AppAlert from '../../components/AppAlert';
@@ -107,6 +107,8 @@ const ChatTab = ({
   onOpenAttraction,
   onOpenMedia,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [awayFromLatest, setAwayFromLatest] = useState(false);
@@ -460,7 +462,7 @@ const ChatTab = ({
     >
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       ) : rows.length === 0 ? (
         <View style={styles.flex}>
@@ -493,7 +495,7 @@ const ChatTab = ({
             windowSize={9}
             removeClippedSubviews={Platform.OS === 'android'}
             ListFooterComponent={
-              loadingOlder ? <ActivityIndicator color={dark.accentGreen} style={styles.older} /> : null
+              loadingOlder ? <ActivityIndicator color={theme.accentGreen} style={styles.older} /> : null
             }
           />
 
@@ -503,7 +505,7 @@ const ChatTab = ({
               activeOpacity={0.85}
               onPress={jumpToLatest}
             >
-              <Ionicons name="chevron-down" size={18} color={dark.text} />
+              <Ionicons name="chevron-down" size={18} color={theme.text} />
               {unseen && <View style={styles.jumpDot} />}
             </TouchableOpacity>
           )}
@@ -521,7 +523,7 @@ const ChatTab = ({
             </View>
             <Text style={styles.suggestTitle}>SPLIX SUGGEST</Text>
             <TouchableOpacity onPress={onDismissSuggestion} hitSlop={styles.hitSlop}>
-              <Ionicons name="close" size={16} color={dark.textMuted} />
+              <Ionicons name="close" size={16} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -544,7 +546,7 @@ const ChatTab = ({
               activeOpacity={0.85}
               onPress={onRemindSuggestion}
             >
-              <Ionicons name="alarm-outline" size={15} color={dark.text} />
+              <Ionicons name="alarm-outline" size={15} color={theme.text} />
               <Text style={styles.suggestSecondaryText}>Remind</Text>
             </TouchableOpacity>
           </View>
@@ -575,7 +577,7 @@ const ChatTab = ({
               onPress={() => attach(option)}
             >
               <View style={[styles.attachIcon, { backgroundColor: `${option.tint}26` }]}>
-                <Ionicons name={option.icon} size={20} color={option.tint} />
+                <Ionicons name={option.icon} size={20} color={theme.ink(option.tint)} />
               </View>
               <Text style={styles.attachLabel}>{option.label}</Text>
             </TouchableOpacity>
@@ -587,7 +589,7 @@ const ChatTab = ({
           voice note) goes out as a reply to it. */}
       {replyingTo && (
         <View style={styles.replyBar}>
-          <Ionicons name="arrow-undo" size={15} color={dark.accentGreen} />
+          <Ionicons name="arrow-undo" size={15} color={theme.accentGreen} />
           <View style={styles.replyBody}>
             <Text style={styles.replyName} numberOfLines={1}>
               Replying to{' '}
@@ -598,7 +600,7 @@ const ChatTab = ({
             </Text>
           </View>
           <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={styles.hitSlop}>
-            <Ionicons name="close" size={17} color={dark.textMuted} />
+            <Ionicons name="close" size={17} color={theme.textMuted} />
           </TouchableOpacity>
         </View>
       )}
@@ -625,7 +627,7 @@ const ChatTab = ({
           <Ionicons
             name={attachOpen ? 'close' : 'attach'}
             size={20}
-            color={attachOpen ? dark.accentGreen : dark.textMuted}
+            color={attachOpen ? theme.accentGreen : theme.textMuted}
           />
         </TouchableOpacity>
 
@@ -639,11 +641,11 @@ const ChatTab = ({
               onTyping?.(value.trim().length > 0);
             }}
             placeholder="Message..."
-            placeholderTextColor={dark.textMuted}
+            placeholderTextColor={theme.textMuted}
             multiline
             onSubmitEditing={submit}
           />
-          <Ionicons name="happy-outline" size={18} color={dark.textMuted} />
+          <Ionicons name="happy-outline" size={18} color={theme.textMuted} />
         </View>
 
         {draft.trim() ? (
@@ -653,10 +655,10 @@ const ChatTab = ({
         ) : (
           <>
             <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={onOpenCamera}>
-              <Ionicons name="camera-outline" size={19} color={dark.textMuted} />
+              <Ionicons name="camera-outline" size={19} color={theme.textMuted} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} activeOpacity={0.7} onPress={startRecording}>
-              <Ionicons name="mic-outline" size={19} color={dark.textMuted} />
+              <Ionicons name="mic-outline" size={19} color={theme.textMuted} />
             </TouchableOpacity>
           </>
         )}
@@ -696,7 +698,7 @@ const typingLabel = (names) => {
   return `${names[0]}, ${names[1]} & ${others} other${others === 1 ? '' : 's'}`;
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   listUnderFab: { paddingTop: 76 },
   older: { paddingVertical: spacing.md },
@@ -707,9 +709,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -721,14 +723,14 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderWidth: 2,
-    borderColor: dark.card2,
+    borderColor: theme.card2,
   },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.md },
-  empty: { color: dark.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl },
+  empty: { color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl },
   typing: { marginLeft: spacing.md, marginBottom: spacing.sm },
 
   dividerRow: {
@@ -737,13 +739,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginVertical: spacing.md,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: dark.border },
-  dividerText: { color: dark.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
 
   suggest: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: '#0F1A20',
+    backgroundColor: theme.raised,
     borderWidth: 1,
     borderColor: 'rgba(0,196,208,0.35)',
     borderRadius: radius.lg,
@@ -754,19 +756,19 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   suggestTitle: {
     flex: 1,
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.9,
   },
-  suggestBody: { color: dark.textMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.sm },
-  suggestQuote: { color: dark.text, fontWeight: '700' },
+  suggestBody: { color: theme.textMuted, fontSize: 12, lineHeight: 18, marginTop: spacing.sm },
+  suggestQuote: { color: theme.text, fontWeight: '700' },
   suggestActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   suggestPrimary: {
     flex: 1,
@@ -774,7 +776,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
   },
@@ -786,12 +788,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: dark.border,
-    backgroundColor: dark.surface,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
   },
-  suggestSecondaryText: { color: dark.text, fontSize: 13, fontWeight: '600' },
+  suggestSecondaryText: { color: theme.text, fontSize: 13, fontWeight: '600' },
 
   composer: {
     flexDirection: 'row',
@@ -800,16 +802,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
-    backgroundColor: '#080D10',
+    borderTopColor: theme.border,
+    backgroundColor: theme.composer,
   },
   iconButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -819,26 +821,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 2,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderLeftWidth: 3,
-    borderLeftColor: dark.accentGreen,
+    borderLeftColor: theme.accentGreen,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: spacing.sm,
   },
   replyBody: { flex: 1 },
-  replyName: { color: dark.accentGreen, fontSize: 11, fontWeight: '800' },
-  replyText: { color: dark.textMuted, fontSize: 12, marginTop: 1 },
-  iconButtonActive: { borderColor: dark.accentGreen },
+  replyName: { color: theme.accentGreen, fontSize: 11, fontWeight: '800' },
+  replyText: { color: theme.textMuted, fontSize: 12, marginTop: 1 },
+  iconButtonActive: { borderColor: theme.accentGreen },
   attachMenu: {
     flexDirection: 'row',
     gap: spacing.lg,
     alignSelf: 'flex-start',
     marginLeft: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -851,15 +853,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  attachLabel: { color: dark.text, fontSize: 11, fontWeight: '600' },
+  attachLabel: { color: theme.text, fontSize: 11, fontWeight: '600' },
   inputWrap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 21,
     minHeight: 42,
     paddingLeft: spacing.md + 2,
@@ -870,7 +872,7 @@ const styles = StyleSheet.create({
   // text sits centred in the pill at one line and grows evenly after that.
   input: {
     flex: 1,
-    color: dark.text,
+    color: theme.text,
     fontSize: 15,
     lineHeight: 20,
     maxHeight: 100,
@@ -883,7 +885,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import GradientButton from './GradientButton';
 import useSheetBottom from '../hooks/useSheetBottom';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 
 /**
  * Shared bottom-sheet shell (grabber, header, scrollable body, gradient
@@ -30,6 +30,8 @@ const FormSheet = ({
   onSubmit,
   children,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const sheetBottom = useSheetBottom(spacing.lg);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -51,7 +53,7 @@ const FormSheet = ({
                 {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
               </View>
               <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
-                <Ionicons name="close" size={18} color={dark.text} />
+                <Ionicons name="close" size={18} color={theme.text} />
               </TouchableOpacity>
             </View>
 
@@ -71,9 +73,9 @@ const FormSheet = ({
   );
 };
 
-export const sheetStyles = StyleSheet.create({
+export const makeSheetStyles = (theme) => StyleSheet.create({
   label: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.7,
@@ -85,9 +87,9 @@ export const sheetStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 2,
     paddingVertical: spacing.sm,
@@ -95,18 +97,18 @@ export const sheetStyles = StyleSheet.create({
   },
   stepButton: { paddingHorizontal: 6, paddingVertical: 2 },
   stepValue: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stepText: { color: dark.text, fontSize: 12, fontWeight: '600' },
+  stepText: { color: theme.text, fontSize: 12, fontWeight: '600' },
 });
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheetWrap: { maxHeight: '92%' },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
   },
@@ -115,19 +117,19 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: theme.overlayBold,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
   headerText: { flex: 1 },
-  title: { color: dark.text, fontSize: 22, fontWeight: '800' },
-  subtitle: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  title: { color: theme.text, fontSize: 22, fontWeight: '800' },
+  subtitle: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   closeButton: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },

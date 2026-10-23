@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Avatar from './Avatar';
-import { dark } from '../theme';
+import { useStyles } from '../theme';
 
 // Overlapping row of member avatars, with a "+N" chip once the list is capped.
 const MemberAvatars = ({ users = [], size = 22, max = 5, style }) => {
+  const styles = useStyles(makeStyles);
   const shown = users.slice(0, max);
   const extra = users.length - shown.length;
 
@@ -33,17 +34,17 @@ const MemberAvatars = ({ users = [], size = 22, max = 5, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { borderWidth: 1.5, borderColor: '#0B1116' },
+  avatar: { borderWidth: 1.5, borderColor: theme.card },
   more: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: theme.overlayStrong,
     borderWidth: 1.5,
-    borderColor: '#0B1116',
+    borderColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  moreText: { color: dark.text, fontWeight: '700' },
+  moreText: { color: theme.text, fontWeight: '700' },
 });
 
 export default MemberAvatars;

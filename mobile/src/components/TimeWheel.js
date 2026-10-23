@@ -1,8 +1,8 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, PixelRatio, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { dark, radius } from '../theme';
-import { PANEL_BG, PANEL_BG_CLEAR, panelStyles } from './pickerPanel';
+import { radius, useStyles, useTheme } from '../theme';
+import { makePanelStyles } from './pickerPanel';
 
 /**
  * The time, picked the way a phone's alarm clock does it: three wheels (hour,
@@ -34,15 +34,18 @@ const PERIODS = [
 ];
 
 // A row only re-renders when it becomes, or stops being, the chosen one.
-const Row = memo(({ label, chosen }) => (
-  // Not a touch target itself: the wheel underneath takes every touch, so a
-  // slow drag scrolls it as surely as a flick.
-  <View style={styles.row} pointerEvents="none">
-    <Text style={[styles.rowText, chosen && styles.rowTextChosen]} numberOfLines={1}>
-      {label}
-    </Text>
-  </View>
-));
+const Row = memo(({ label, chosen }) => {
+  const styles = useStyles(makeStyles);
+  return (
+    // Not a touch target itself: the wheel underneath takes every touch, so a
+    // slow drag scrolls it as surely as a flick.
+    <View style={styles.row} pointerEvents="none">
+      <Text style={[styles.rowText, chosen && styles.rowTextChosen]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+});
 
 /**
  * One wheel. `index` is the chosen item; `onChange` is called with the new
@@ -54,6 +57,7 @@ const Row = memo(({ label, chosen }) => (
  * wheel is only 180 rows.
  */
 const Wheel = ({ items, index, onChange, cyclic = false, style }) => {
+  const styles = useStyles(makeStyles);
   const list = useRef(null);
   // The index this wheel last told its parent, so a prop that merely echoes
   // it back does not move the wheel while the person is still sliding it.
@@ -118,6 +122,9 @@ const Wheel = ({ items, index, onChange, cyclic = false, style }) => {
 };
 
 const TimeWheel = ({ value, onChange, onDone }) => {
+  const theme = useTheme();
+  const panelStyles = useStyles(makePanelStyles);
+  const styles = useStyles(makeStyles);
   const hours = value.getHours();
   const hourIndex = (hours % 12 || 12) - 1;
   const minuteIndex = value.getMinutes();
@@ -154,12 +161,12 @@ const TimeWheel = ({ value, onChange, onDone }) => {
         {/* The rows above and below fade into the card. */}
         <LinearGradient
           pointerEvents="none"
-          colors={[PANEL_BG, PANEL_BG_CLEAR]}
+          colors={[theme.panel, theme.panelClear]}
           style={[styles.fade, styles.fadeTop]}
         />
         <LinearGradient
           pointerEvents="none"
-          colors={[PANEL_BG_CLEAR, PANEL_BG]}
+          colors={[theme.panelClear, theme.panel]}
           style={[styles.fade, styles.fadeBottom]}
         />
       </View>
@@ -170,7 +177,7 @@ const TimeWheel = ({ value, onChange, onDone }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wheels: {
     flexDirection: 'row',
     height: HEIGHT,
@@ -180,8 +187,8 @@ const styles = StyleSheet.create({
   wheel: { flex: 1, height: HEIGHT },
   rows: { paddingVertical: ROW * SIDE },
   row: { height: ROW, alignItems: 'center', justifyContent: 'center' },
-  rowText: { color: dark.textMuted, fontSize: 20, fontWeight: '500' },
-  rowTextChosen: { color: dark.text, fontSize: 24, fontWeight: '700' },
+  rowText: { color: theme.textMuted, fontSize: 20, fontWeight: '500' },
+  rowTextChosen: { color: theme.text, fontSize: 24, fontWeight: '700' },
   selection: {
     position: 'absolute',
     left: 0,
@@ -189,7 +196,7 @@ const styles = StyleSheet.create({
     top: ROW * SIDE,
     height: ROW,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: theme.overlay,
   },
   fade: { position: 'absolute', left: 0, right: 0, height: ROW * (SIDE - 0.5) },
   fadeTop: { top: 0 },

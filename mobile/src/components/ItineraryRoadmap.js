@@ -10,10 +10,9 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 import { STOP_STATUS, nextDoneFor } from '../utils/itineraryProgress';
 import { layoutRoadmap, MILESTONE_R, STOP_R } from '../utils/roadmapLayout';
-import { ROAD_BASE, ROAD_DONE, ROAD_EDGE, ROAD_NOW, ON_ROAD } from './ItineraryProgressStrip';
 
 // The trip as one winding road: a milestone per day on the left, its stops
 // snaking right and back, the road ahead dashed and the road behind solid
@@ -38,6 +37,7 @@ const STATUS_WORD = {
 };
 
 const PulseRing = ({ x, y }) => {
+  const theme = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -65,7 +65,7 @@ const PulseRing = ({ x, y }) => {
         width: size,
         height: size,
         borderRadius: STOP_R,
-        backgroundColor: ROAD_NOW,
+        backgroundColor: theme.road.now,
         opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
         transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1.3, 2.6] }) }],
       }}
@@ -73,20 +73,20 @@ const PulseRing = ({ x, y }) => {
   );
 };
 
-const circleStyle = (status, r) => {
+const circleStyle = (theme, status, r) => {
   const base = { width: r * 2, height: r * 2, borderRadius: r };
   switch (status) {
     case STOP_STATUS.done:
-      return [base, { backgroundColor: ROAD_DONE }];
+      return [base, { backgroundColor: theme.road.done }];
     case STOP_STATUS.current:
-      return [base, { backgroundColor: ROAD_NOW }];
+      return [base, { backgroundColor: theme.road.now }];
     case STOP_STATUS.skipped:
       return [
         base,
-        { backgroundColor: dark.card, borderWidth: 1.5, borderColor: ROAD_EDGE, borderStyle: 'dashed' },
+        { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.road.edge, borderStyle: 'dashed' },
       ];
     default:
-      return [base, { backgroundColor: dark.card, borderWidth: 1.5, borderColor: ROAD_EDGE }];
+      return [base, { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.road.edge }];
   }
 };
 
@@ -96,34 +96,39 @@ const ALIGN = { left: 'flex-start', center: 'center', right: 'flex-end' };
 // hugs the text, so only the words (not the empty road beside them) react
 // to a tap. The circle carries the accessibility role and label for both,
 // so a screen reader meets each stop once.
-const Label = ({ box, onPress, children }) => (
-  <View
-    pointerEvents="box-none"
-    style={[
-      styles.label,
-      {
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        height: box.height,
-        alignItems: ALIGN[box.align],
-        justifyContent: box.align === 'center' ? 'flex-start' : 'center',
-      },
-    ]}
-  >
-    <TouchableOpacity
-      style={styles.labelTouch}
-      activeOpacity={0.8}
-      onPress={onPress}
-      accessible={false}
-      importantForAccessibility="no-hide-descendants"
+const Label = ({ box, onPress, children }) => {
+  const styles = useStyles(makeStyles);
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.label,
+        {
+          left: box.left,
+          top: box.top,
+          width: box.width,
+          height: box.height,
+          alignItems: ALIGN[box.align],
+          justifyContent: box.align === 'center' ? 'flex-start' : 'center',
+        },
+      ]}
     >
-      {children}
-    </TouchableOpacity>
-  </View>
-);
+      <TouchableOpacity
+        style={styles.labelTouch}
+        activeOpacity={0.8}
+        onPress={onPress}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
+        {children}
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 const DayNode = ({ node, onPress }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { row, x, y, label } = node;
   const status = row.status;
   const counts = row.total ? `${row.done} of ${row.total} done` : 'No stops yet';
@@ -132,7 +137,7 @@ const DayNode = ({ node, onPress }) => {
   return (
     <>
       <TouchableOpacity
-        style={[styles.node, circleStyle(status, MILESTONE_R), { left: x - MILESTONE_R, top: y - MILESTONE_R }]}
+        style={[styles.node, circleStyle(theme, status, MILESTONE_R), { left: x - MILESTONE_R, top: y - MILESTONE_R }]}
         activeOpacity={0.8}
         onPress={onPress}
         accessibilityRole="button"
@@ -140,7 +145,7 @@ const DayNode = ({ node, onPress }) => {
         accessibilityHint="Edits this day"
       >
         {status === STOP_STATUS.done ? (
-          <Ionicons name="checkmark" size={18} color={ON_ROAD} />
+          <Ionicons name="checkmark" size={18} color={theme.road.ink} />
         ) : (
           <Text
             style={[styles.dayNumber, status === STOP_STATUS.current && styles.onRoad]}
@@ -155,7 +160,7 @@ const DayNode = ({ node, onPress }) => {
           <Text style={styles.dayTitle} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE_CAP}>
             Day {row.dayNumber} · {row.day.title}
           </Text>
-          <Ionicons name="pencil" size={11} color={dark.accentGreen} style={styles.pencil} />
+          <Ionicons name="pencil" size={11} color={theme.accentGreen} style={styles.pencil} />
         </View>
         <Text style={styles.dayMeta} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE_CAP}>
           {parts.filter(Boolean).join(' · ')}
@@ -166,6 +171,8 @@ const DayNode = ({ node, onPress }) => {
 };
 
 const StopNode = ({ node, onPress }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { stop, x, y, label } = node;
   const { status, activity } = stop;
   const done = status === STOP_STATUS.done;
@@ -176,7 +183,7 @@ const StopNode = ({ node, onPress }) => {
     <>
       {current && <PulseRing x={x} y={y} />}
       <TouchableOpacity
-        style={[styles.node, circleStyle(status, STOP_R), { left: x - STOP_R, top: y - STOP_R }]}
+        style={[styles.node, circleStyle(theme, status, STOP_R), { left: x - STOP_R, top: y - STOP_R }]}
         activeOpacity={0.8}
         onPress={onPress}
         hitSlop={styles.hitSlop}
@@ -185,9 +192,9 @@ const StopNode = ({ node, onPress }) => {
         accessibilityLabel={`${activity.title}, ${STATUS_WORD[status]}`}
       >
         {done ? (
-          <Ionicons name="checkmark" size={13} color={ON_ROAD} />
+          <Ionicons name="checkmark" size={13} color={theme.road.ink} />
         ) : skipped ? (
-          <Ionicons name="close" size={11} color={dark.textMuted} />
+          <Ionicons name="close" size={11} color={theme.textMuted} />
         ) : null}
       </TouchableOpacity>
       <Label box={label} onPress={onPress}>
@@ -209,29 +216,35 @@ const StopNode = ({ node, onPress }) => {
   );
 };
 
-const AddNode = ({ node, onPress }) => (
-  <>
-    <TouchableOpacity
-      style={[styles.node, styles.addNode, { left: node.x - MILESTONE_R, top: node.y - MILESTONE_R }]}
-      activeOpacity={0.8}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="Add day"
-    >
-      <Ionicons name="add" size={20} color={dark.accentGreen} />
-    </TouchableOpacity>
-    <Label box={node.label} onPress={onPress}>
-      <Text style={styles.addText} maxFontSizeMultiplier={FONT_SCALE_CAP}>
-        Add Day
-      </Text>
-      <Text style={styles.dayMeta} maxFontSizeMultiplier={FONT_SCALE_CAP}>
-        The road goes on from here
-      </Text>
-    </Label>
-  </>
-);
+const AddNode = ({ node, onPress }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <>
+      <TouchableOpacity
+        style={[styles.node, styles.addNode, { left: node.x - MILESTONE_R, top: node.y - MILESTONE_R }]}
+        activeOpacity={0.8}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel="Add day"
+      >
+        <Ionicons name="add" size={20} color={theme.accentGreen} />
+      </TouchableOpacity>
+      <Label box={node.label} onPress={onPress}>
+        <Text style={styles.addText} maxFontSizeMultiplier={FONT_SCALE_CAP}>
+          Add Day
+        </Text>
+        <Text style={styles.dayMeta} maxFontSizeMultiplier={FONT_SCALE_CAP}>
+          The road goes on from here
+        </Text>
+      </Label>
+    </>
+  );
+};
 
 const ItineraryRoadmap = ({ progress, onToggleStop, onAddDay, onEditDay, header }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [outerWidth, setOuterWidth] = useState(0);
   // The road sits inside the list's side padding.
   const width = Math.max(0, outerWidth - 2 * spacing.md);
@@ -288,16 +301,16 @@ const ItineraryRoadmap = ({ progress, onToggleStop, onAddDay, onEditDay, header 
             <Svg width={width} height={laid.height} style={StyleSheet.absoluteFill}>
               <Path
                 d={laid.roadPath}
-                stroke={ROAD_BASE}
+                stroke={theme.road.base}
                 strokeWidth={3}
                 fill="none"
                 strokeLinecap="round"
                 strokeDasharray="6 6"
               />
               {!!laid.travelledPath && (
-                <Path d={laid.travelledPath} stroke={ROAD_DONE} strokeWidth={3} fill="none" strokeLinecap="round" />
+                <Path d={laid.travelledPath} stroke={theme.road.done} strokeWidth={3} fill="none" strokeLinecap="round" />
               )}
-              {current && <Circle cx={current.x} cy={current.y} r={STOP_R + 5} fill={ROAD_NOW} opacity={0.28} />}
+              {current && <Circle cx={current.x} cy={current.y} r={STOP_R + 5} fill={theme.road.now} opacity={0.28} />}
             </Svg>
             {laid.nodes.map((node) => {
               if (node.kind === 'day') {
@@ -323,7 +336,7 @@ const ItineraryRoadmap = ({ progress, onToggleStop, onAddDay, onEditDay, header 
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
@@ -332,24 +345,24 @@ const styles = StyleSheet.create({
     width: MILESTONE_R * 2,
     height: MILESTONE_R * 2,
     borderRadius: MILESTONE_R,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1.5,
     borderColor: 'rgba(0,196,208,0.55)',
     borderStyle: 'dashed',
   },
-  dayNumber: { color: dark.textMuted, fontSize: 14, fontWeight: '800' },
-  onRoad: { color: ON_ROAD },
+  dayNumber: { color: theme.textMuted, fontSize: 14, fontWeight: '800' },
+  onRoad: { color: theme.road.ink },
   label: { position: 'absolute' },
   labelTouch: { maxWidth: '100%' },
   dayTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  dayTitle: { color: dark.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  dayTitle: { color: theme.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
   pencil: { marginLeft: 6 },
-  dayMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
-  addText: { color: dark.accentGreen, fontSize: 14, fontWeight: '700' },
-  stopTitle: { color: '#C3CBD5', fontSize: 12.5, lineHeight: 16 },
-  stopTitleNow: { color: dark.text, fontSize: 13.5, lineHeight: 17, fontWeight: '700' },
-  stopTitleDone: { color: dark.textMuted },
-  stopTitleSkipped: { color: dark.textMuted, textDecorationLine: 'line-through' },
+  dayMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
+  addText: { color: theme.accentGreen, fontSize: 14, fontWeight: '700' },
+  stopTitle: { color: theme.textSoft, fontSize: 12.5, lineHeight: 16 },
+  stopTitleNow: { color: theme.text, fontSize: 13.5, lineHeight: 17, fontWeight: '700' },
+  stopTitleDone: { color: theme.textMuted },
+  stopTitleSkipped: { color: theme.textMuted, textDecorationLine: 'line-through' },
 });
 
 export default ItineraryRoadmap;

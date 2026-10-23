@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet } fr
 import { Ionicons } from '@expo/vector-icons';
 import Avatar, { avatarColor } from './Avatar';
 import MemberAvatars from './MemberAvatars';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { usd, formatTime, formatDateTime } from '../utils/format';
 import {
   absoluteUrl,
@@ -21,16 +21,13 @@ export const USER_TYPES = ['text', 'image', 'audio', 'file'];
 const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
 
 const PRIORITY_COLOR = { high: '#F87171', med: '#F5B342', low: '#17E695' };
-const DONE_COLOR = '#22C55E';
-const STAY_COLOR = '#B79CFF';
-const ATTRACTION_COLOR = '#F5B342';
 const GALLERY_COLOR = '#2DD4BF';
 
-const STAY_STATUS = {
-  pending: { label: 'Pending', color: '#F5B342' },
-  confirmed: { label: 'Confirmed', color: dark.accentGreen },
-  cancelled: { label: 'Cancelled', color: '#F87171' },
-};
+const stayStatus = (theme) => ({
+  pending: { label: 'Pending', color: theme.warning },
+  confirmed: { label: 'Confirmed', color: theme.accentGreen },
+  cancelled: { label: 'Cancelled', color: theme.danger },
+});
 
 const shortDate = (value) =>
   new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -57,12 +54,14 @@ const capitalise = (text) => (text ? `${text[0].toUpperCase()}${text.slice(1)}` 
 
 // Activity cards are buttons as a whole: a tap opens what the card is about.
 const CardShell = ({ accent, icon, label, onPress, children }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const Shell = onPress ? TouchableOpacity : View;
   return (
     <Shell style={styles.card} {...(onPress ? { onPress, activeOpacity: 0.8 } : {})}>
       <View style={[styles.cardHeader, { backgroundColor: `${accent}1F` }]}>
-        <Ionicons name={icon} size={13} color={accent} />
-        <Text style={[styles.cardHeaderText, { color: accent }]} numberOfLines={2}>
+        <Ionicons name={icon} size={13} color={theme.ink(accent)} />
+        <Text style={[styles.cardHeaderText, { color: theme.ink(accent) }]} numberOfLines={2}>
           {label}
         </Text>
       </View>
@@ -72,12 +71,16 @@ const CardShell = ({ accent, icon, label, onPress, children }) => {
 };
 
 // The "View ›" at the foot of a card. Not a button of its own: the card is.
-const ViewLink = ({ label = 'View' }) => (
-  <View style={styles.viewLink}>
-    <Text style={styles.viewText}>{label}</Text>
-    <Ionicons name="chevron-forward" size={13} color={dark.accentBlue} />
-  </View>
-);
+const ViewLink = ({ label = 'View' }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.viewLink}>
+      <Text style={styles.viewText}>{label}</Text>
+      <Ionicons name="chevron-forward" size={13} color={theme.accentBlue} />
+    </View>
+  );
+};
 
 /**
  * One row of the group chat. Text messages render as bubbles; everything added
@@ -107,6 +110,8 @@ const ChatMessage = ({
   // Briefly true after someone jumps here from a reply's quote.
   highlighted = false,
 }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { type, sender } = message;
   const isMine = sender?._id === currentUserId;
 
@@ -131,7 +136,7 @@ const ChatMessage = ({
         ))}
       <View style={styles.rowBody}>
         {!isMine && sender && (
-          <Text style={[styles.senderName, { color: avatarColor(sender.name) }]}>
+          <Text style={[styles.senderName, { color: theme.ink(avatarColor(sender.name)) }]}>
             {sender.name}
           </Text>
         )}
@@ -142,7 +147,7 @@ const ChatMessage = ({
             <Ionicons
               name={message.pending ? 'time-outline' : 'checkmark-done'}
               size={13}
-              color={message.pending ? dark.textMuted : dark.accentGreen}
+              color={message.pending ? theme.textMuted : theme.accentGreen}
             />
           )}
         </View>
@@ -154,13 +159,13 @@ const ChatMessage = ({
 
   if (USER_TYPES.includes(type)) {
     const bubble = [styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs];
-    const ink = isMine ? '#04241A' : dark.text;
+    const ink = isMine ? '#04241A' : theme.text;
 
     // "Delete for everyone" leaves this behind in place of the message.
     if (message.deletedAt) {
       return wrapper(
         <View style={[styles.bubble, styles.bubbleTheirs, styles.deletedBubble]}>
-          <Ionicons name="ban-outline" size={13} color={dark.textMuted} />
+          <Ionicons name="ban-outline" size={13} color={theme.textMuted} />
           <Text style={styles.deleted}>
             {isMine ? 'You deleted this message' : 'This message was deleted'}
           </Text>
@@ -191,7 +196,7 @@ const ChatMessage = ({
         onPress={() => onOpenQuote?.(quoted._id)}
       >
         <Text
-          style={[styles.quoteName, { color: isMine ? '#04241A' : avatarColor(quoted.sender?.name ?? '') }]}
+          style={[styles.quoteName, { color: isMine ? '#04241A' : theme.ink(avatarColor(quoted.sender?.name ?? '')) }]}
           numberOfLines={1}
         >
           {quoted.sender?._id === currentUserId ? 'You' : quoted.sender?.name ?? 'Message'}
@@ -251,7 +256,7 @@ const ChatMessage = ({
           <Image source={{ uri }} style={styles.image} resizeMode="cover" />
           {pending && (
             <View style={styles.imagePending}>
-              <ActivityIndicator color={dark.text} />
+              <ActivityIndicator color={theme.text} />
             </View>
           )}
           {caption && <View style={[styles.imageInset, styles.imageCaption]}>{caption}</View>}
@@ -326,7 +331,7 @@ const ChatMessage = ({
 
     return wrapper(
       <CardShell
-        accent={dark.accentGreen}
+        accent={theme.accentGreen}
         icon="cash-outline"
         label="EXPENSE ADDED"
         onPress={() => onOpenExpense?.(expense)}
@@ -340,7 +345,7 @@ const ChatMessage = ({
         {myShare && (
           <View style={styles.cardRow}>
             <Text style={styles.cardLabel}>Your share</Text>
-            <Text style={[styles.cardValue, { color: dark.accentGreen }]}>
+            <Text style={[styles.cardValue, { color: theme.accentGreen }]}>
               {usd(myShare.amount)}
             </Text>
           </View>
@@ -359,7 +364,7 @@ const ChatMessage = ({
   if (type === 'task') {
     const task = message.task;
     if (!task) return wrapper(<Text style={styles.deleted}>This task was deleted</Text>);
-    const accent = PRIORITY_COLOR[task.priority] ?? dark.accentBlue;
+    const accent = PRIORITY_COLOR[task.priority] ?? theme.accentBlue;
     // Who it was for when the card was posted. Cards from before that was
     // recorded only have the task's own list.
     const recorded = Array.isArray(message.assignees) ? message.assignees : task.assignees ?? [];
@@ -396,13 +401,13 @@ const ChatMessage = ({
 
     return wrapper(
       <CardShell
-        accent={DONE_COLOR}
+        accent={theme.success}
         icon="checkmark-done-outline"
         label="TASK COMPLETED"
         onPress={() => onOpenTask?.(task)}
       >
         <View style={styles.doneTitleRow}>
-          <Ionicons name="checkmark-circle" size={18} color={DONE_COLOR} />
+          <Ionicons name="checkmark-circle" size={18} color={theme.success} />
           <Text style={[styles.cardTitle, styles.doneTitle]}>{task.title}</Text>
         </View>
         <View style={styles.personRow}>
@@ -413,7 +418,7 @@ const ChatMessage = ({
         </View>
         <View style={styles.personRow}>
           <Text style={styles.cardLabel}>Completed by</Text>
-          <Text style={[styles.personValue, { color: DONE_COLOR }]} numberOfLines={1}>
+          <Text style={[styles.personValue, { color: theme.success }]} numberOfLines={1}>
             {doneBy}
           </Text>
         </View>
@@ -430,7 +435,7 @@ const ChatMessage = ({
 
     return wrapper(
       <CardShell
-        accent={dark.accentBlue}
+        accent={theme.accentBlue}
         icon="alarm-outline"
         label="REMINDER SET"
         onPress={() => onOpenReminders?.(reminder)}
@@ -448,10 +453,11 @@ const ChatMessage = ({
     const stay = message.stay;
     if (!stay) return wrapper(<Text style={styles.deleted}>This stay was deleted</Text>);
     const nights = nightsBetween(stay.checkIn, stay.checkOut);
-    const status = STAY_STATUS[stay.status] ?? STAY_STATUS.pending;
+    const statuses = stayStatus(theme);
+    const status = statuses[stay.status] ?? statuses.pending;
 
     return wrapper(
-      <CardShell accent={STAY_COLOR} icon="bed-outline" label="STAY ADDED" onPress={() => onOpenStay?.(stay)}>
+      <CardShell accent={theme.stay} icon="bed-outline" label="STAY ADDED" onPress={() => onOpenStay?.(stay)}>
         <View style={styles.entityRow}>
           <Text style={styles.entityEmoji}>{stay.emoji || '🏨'}</Text>
           <View style={styles.entityBody}>
@@ -495,7 +501,7 @@ const ChatMessage = ({
 
     return wrapper(
       <CardShell
-        accent={ATTRACTION_COLOR}
+        accent={theme.warning}
         icon="compass-outline"
         label="ATTRACTION ADDED"
         onPress={() => onOpenAttraction?.(attraction)}
@@ -556,7 +562,7 @@ const ChatMessage = ({
                 {thumb ? (
                   <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : (
-                  <Ionicons name={isVideo ? 'videocam' : 'image-outline'} size={22} color={dark.textMuted} />
+                  <Ionicons name={isVideo ? 'videocam' : 'image-outline'} size={22} color={theme.textMuted} />
                 )}
                 {isVideo && (
                   <View style={styles.mediaPlay} pointerEvents="none">
@@ -585,9 +591,9 @@ const ChatMessage = ({
   return null;
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   system: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     textAlign: 'center',
     marginVertical: spacing.sm,
@@ -614,13 +620,13 @@ const styles = StyleSheet.create({
 
   bubble: { borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2 },
   bubbleTheirs: {
-    backgroundColor: '#161D22',
+    backgroundColor: theme.bubble,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderBottomLeftRadius: 4,
   },
-  bubbleMine: { backgroundColor: dark.accentGreen, borderBottomRightRadius: 4 },
-  bubbleText: { color: dark.text, fontSize: 14, lineHeight: 20 },
+  bubbleMine: { backgroundColor: theme.accentFill, borderBottomRightRadius: 4 },
+  bubbleText: { color: theme.text, fontSize: 14, lineHeight: 20 },
   bubbleTextMine: { color: '#04241A' },
 
   caption: { marginTop: spacing.sm },
@@ -629,8 +635,8 @@ const styles = StyleSheet.create({
   // The quoted message above a reply: a tinted block with a bar down its left.
   quote: {
     borderLeftWidth: 3,
-    borderLeftColor: dark.accentGreen,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderLeftColor: theme.accentGreen,
+    backgroundColor: theme.overlayFaint,
     borderRadius: 6,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
@@ -639,7 +645,7 @@ const styles = StyleSheet.create({
   },
   quoteMine: { borderLeftColor: '#04241A', backgroundColor: 'rgba(4,36,26,0.14)' },
   quoteName: { fontSize: 11, fontWeight: '800' },
-  quoteText: { color: dark.textMuted, fontSize: 12, lineHeight: 16, marginTop: 1 },
+  quoteText: { color: theme.textMuted, fontSize: 12, lineHeight: 16, marginTop: 1 },
   quoteTextMine: { color: 'rgba(4,36,26,0.75)' },
 
   // The photo runs right to the bubble's edge inside a hairline outline; only a
@@ -652,7 +658,7 @@ const styles = StyleSheet.create({
   },
   imageBubbleMine: { borderColor: 'rgba(0,196,208,0.55)' },
   imageInset: { width: 220, paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
-  image: { width: 220, height: 220, backgroundColor: '#0B1116' },
+  image: { width: 220, height: 220, backgroundColor: theme.raised },
   imagePending: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -668,24 +674,24 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: theme.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fileIconMine: { backgroundColor: 'rgba(4,36,26,0.16)' },
   fileBody: { flexShrink: 1 },
   fileName: { fontSize: 13, fontWeight: '600' },
-  fileMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  fileMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   fileMetaMine: { color: 'rgba(4,36,26,0.7)' },
 
   stampRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   stampRowMine: { justifyContent: 'flex-end' },
-  stamp: { color: dark.textMuted, fontSize: 10, marginTop: 4 },
+  stamp: { color: theme.textMuted, fontSize: 10, marginTop: 4 },
 
   card: {
-    backgroundColor: '#12191E',
+    backgroundColor: theme.chatCard,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     overflow: 'hidden',
     minWidth: 230,
@@ -699,15 +705,15 @@ const styles = StyleSheet.create({
   },
   cardHeaderText: { flexShrink: 1, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   cardBody: { padding: spacing.md },
-  cardTitle: { color: dark.text, fontSize: 15, fontWeight: '700', marginBottom: spacing.sm },
+  cardTitle: { color: theme.text, fontSize: 15, fontWeight: '700', marginBottom: spacing.sm },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  cardLabel: { color: dark.textMuted, fontSize: 12 },
-  cardValue: { color: dark.text, fontSize: 15, fontWeight: '700' },
+  cardLabel: { color: theme.textMuted, fontSize: 12 },
+  cardValue: { color: theme.text, fontSize: 15, fontWeight: '700' },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -715,14 +721,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm + 2,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
+    borderTopColor: theme.border,
   },
-  cardFootnote: { color: dark.textMuted, fontSize: 11, flexShrink: 1 },
+  cardFootnote: { color: theme.textMuted, fontSize: 11, flexShrink: 1 },
   // Cards whose footer holds only the "View" link keep it on the right.
   cardFooterEnd: { justifyContent: 'flex-end' },
   viewLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewText: { color: dark.accentBlue, fontSize: 12, fontWeight: '700' },
-  deleted: { color: dark.textMuted, fontSize: 12, fontStyle: 'italic' },
+  viewText: { color: theme.accentBlue, fontSize: 12, fontWeight: '700' },
+  deleted: { color: theme.textMuted, fontSize: 12, fontStyle: 'italic' },
 
   // "Task completed": the title with a tick, then who it was for and who did it.
   doneTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
@@ -737,7 +743,7 @@ const styles = StyleSheet.create({
   personValue: {
     flexShrink: 1,
     textAlign: 'right',
-    color: dark.text,
+    color: theme.text,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -746,8 +752,8 @@ const styles = StyleSheet.create({
   entityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, marginBottom: spacing.sm },
   entityEmoji: { fontSize: 24 },
   entityBody: { flexShrink: 1 },
-  entityTitle: { color: dark.text, fontSize: 15, fontWeight: '700' },
-  entityMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  entityTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  entityMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
 
   // Gallery cards: up to four tiles, two to a row; a single one is larger.
   mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, width: 204 },
@@ -756,7 +762,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#0B1116',
+    backgroundColor: theme.raised,
     alignItems: 'center',
     justifyContent: 'center',
   },

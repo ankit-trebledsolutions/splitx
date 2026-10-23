@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { dark } from '../theme';
+import { useTheme } from '../theme';
 import { initials } from '../utils/format';
 
 // Per-member palette so each person keeps a stable colour across the chat,
@@ -20,6 +20,7 @@ export const avatarColor = (name = '') => {
  * The design uses photos; until image upload exists, initials stand in.
  */
 const Avatar = ({ name, size = 44, solid = false, style, textStyle }) => {
+  const theme = useTheme();
   const dimensions = { width: size, height: size, borderRadius: size / 2 };
   const label = <Text style={[styles.text, { fontSize: size * 0.36 }, solid && styles.textSolid, textStyle]}>{initials(name)}</Text>;
 
@@ -33,7 +34,7 @@ const Avatar = ({ name, size = 44, solid = false, style, textStyle }) => {
 
   return (
     <LinearGradient
-      colors={dark.gradient}
+      colors={theme.gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[dimensions, styles.center, style]}

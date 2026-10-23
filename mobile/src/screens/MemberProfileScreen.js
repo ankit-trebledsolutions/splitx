@@ -13,7 +13,7 @@ import DarkScreen from '../components/DarkScreen';
 import Avatar, { avatarColor } from '../components/Avatar';
 import GradientButton from '../components/GradientButton';
 import { fetchGroups, removeMember } from '../api/groups.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { presenceFrom, phoneFor } from '../utils/presence';
 import { useGroupPresence } from '../hooks/useGroupPresence';
 import { initials } from '../utils/format';
@@ -21,6 +21,8 @@ import AppAlert from '../components/AppAlert';
 
 // Profile page for another group member (never opened for yourself).
 const MemberProfileScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // isAdmin: the person being viewed is the admin. viewerIsAdmin: we are.
   const { member, groupId, isAdmin, viewerIsAdmin } = route.params;
 
@@ -75,11 +77,11 @@ const MemberProfileScreen = ({ route, navigation }) => {
     <DarkScreen>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity style={styles.headerIcon} activeOpacity={0.7}>
-          <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
+          <Ionicons name="ellipsis-vertical" size={15} color={theme.text} />
         </TouchableOpacity>
       </View>
 
@@ -100,13 +102,13 @@ const MemberProfileScreen = ({ route, navigation }) => {
             <View
               style={[
                 styles.presenceDot,
-                { backgroundColor: presence.online ? '#22C55E' : dark.textMuted },
+                { backgroundColor: presence.online ? '#22C55E' : theme.textMuted },
               ]}
             />
             <Text
               style={[
                 styles.presenceText,
-                { color: presence.online ? '#22C55E' : dark.textMuted },
+                { color: presence.online ? theme.success : theme.textMuted },
               ]}
             >
               {presence.label}
@@ -118,7 +120,7 @@ const MemberProfileScreen = ({ route, navigation }) => {
         <View style={styles.card}>
           <View style={styles.contactRow}>
             <View style={styles.contactIcon}>
-              <Ionicons name="call-outline" size={16} color={dark.textMuted} />
+              <Ionicons name="call-outline" size={16} color={theme.textMuted} />
             </View>
             <View style={styles.contactBody}>
               <Text style={styles.contactLabel}>Phone</Text>
@@ -127,7 +129,7 @@ const MemberProfileScreen = ({ route, navigation }) => {
           </View>
           <View style={[styles.contactRow, styles.contactRowBorder]}>
             <View style={styles.contactIcon}>
-              <Ionicons name="mail-outline" size={16} color={dark.textMuted} />
+              <Ionicons name="mail-outline" size={16} color={theme.textMuted} />
             </View>
             <View style={styles.contactBody}>
               <Text style={styles.contactLabel}>Email</Text>
@@ -139,7 +141,7 @@ const MemberProfileScreen = ({ route, navigation }) => {
         <Text style={[styles.sectionLabel, styles.groupsLabel]}>GROUPS IN COMMON</Text>
         {commonGroups === null ? (
           <View style={styles.card}>
-            <ActivityIndicator color={dark.accentGreen} style={styles.groupsLoading} />
+            <ActivityIndicator color={theme.accentGreen} style={styles.groupsLoading} />
           </View>
         ) : commonGroups.length ? (
           <View style={styles.card}>
@@ -161,7 +163,7 @@ const MemberProfileScreen = ({ route, navigation }) => {
                     {g.members?.length ?? 0} Member{(g.members?.length ?? 0) === 1 ? '' : 's'}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+                <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
               </TouchableOpacity>
             ))}
           </View>
@@ -196,7 +198,7 @@ const MemberProfileScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -208,13 +210,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
@@ -223,7 +225,7 @@ const styles = StyleSheet.create({
     padding: 3,
     borderRadius: 52,
     borderWidth: 2,
-    borderColor: dark.accentGreen,
+    borderColor: theme.accentGreen,
   },
   nameRow: {
     flexDirection: 'row',
@@ -231,7 +233,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.md,
   },
-  name: { color: dark.text, fontSize: 24, fontWeight: '800' },
+  name: { color: theme.text, fontSize: 24, fontWeight: '800' },
   adminBadge: {
     backgroundColor: 'rgba(0,196,208,0.14)',
     borderWidth: 1,
@@ -240,13 +242,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 3,
   },
-  adminBadgeText: { color: dark.accentGreen, fontSize: 11, fontWeight: '700' },
+  adminBadgeText: { color: theme.accentGreen, fontSize: 11, fontWeight: '700' },
   presenceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   presenceDot: { width: 8, height: 8, borderRadius: 4 },
   presenceText: { fontSize: 12, fontWeight: '600' },
 
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.9,
@@ -255,9 +257,9 @@ const styles = StyleSheet.create({
   groupsLabel: { marginTop: spacing.lg },
 
   card: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -267,25 +269,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm + 4,
   },
-  contactRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
+  contactRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
   contactIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   contactBody: { flex: 1, marginLeft: spacing.sm + 4 },
-  contactLabel: { color: dark.textMuted, fontSize: 11 },
-  contactValue: { color: dark.text, fontSize: 14, fontWeight: '600', marginTop: 2 },
+  contactLabel: { color: theme.textMuted, fontSize: 11 },
+  contactValue: { color: theme.text, fontSize: 14, fontWeight: '600', marginTop: 2 },
 
   groupRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm + 4,
   },
-  groupRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
+  groupRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
   groupTile: {
     width: 40,
     height: 40,
@@ -295,10 +297,10 @@ const styles = StyleSheet.create({
   },
   groupTileText: { color: '#0B1116', fontSize: 13, fontWeight: '800' },
   groupBody: { flex: 1, marginLeft: spacing.sm + 4 },
-  groupName: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  groupMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  groupName: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  groupMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   groupsLoading: { paddingVertical: spacing.md },
-  empty: { color: dark.textMuted, fontSize: 12, paddingVertical: spacing.md },
+  empty: { color: theme.textMuted, fontSize: 12, paddingVertical: spacing.md },
 
   sendButton: { marginTop: spacing.lg },
   removeButton: {
@@ -310,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.sm + 4,
   },
-  removeButtonText: { color: '#F97362', fontSize: 15, fontWeight: '700' },
+  removeButtonText: { color: theme.coral, fontSize: 15, fontWeight: '700' },
 });
 
 export default MemberProfileScreen;

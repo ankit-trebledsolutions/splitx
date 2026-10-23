@@ -17,13 +17,15 @@ import GradientButton from '../components/GradientButton';
 import { fetchTrips } from '../api/trips.api';
 import { usd, formatDateRange } from '../utils/format';
 import { tripFlag } from '../utils/tripFlag';
-import { dark, radius, spacing } from '../theme';
+import { dark, radius, spacing, useStyles, useTheme } from '../theme';
 
+// Bright for the dark hero cards; where one is text, theme.ink() deepens it
+// on the light theme.
 const STATUS = {
   ongoing: { label: 'Happening now', color: '#17E695' },
   upcoming: { label: 'Upcoming', color: '#4A8CFF' },
   unscheduled: { label: 'No dates yet', color: '#F5B342' },
-  past: { label: 'Completed', color: dark.textMuted },
+  past: { label: 'Completed', color: '#8A97A6' },
 };
 
 const FILTERS = [
@@ -81,17 +83,23 @@ const readinessOf = (trip) => {
 // you are, or how ready you are for it.
 const progressOf = (trip) => {
   if (trip.status === 'ongoing') return { value: trip.dayNumber / trip.totalDays, color: STATUS.ongoing.color };
-  if (trip.status === 'past') return { value: 1, color: dark.textMuted };
+  if (trip.status === 'past') return { value: 1, color: STATUS.past.color };
   return { value: readinessOf(trip).score / 100, color: STATUS.upcoming.color };
 };
 
-const ProgressBar = ({ value, color, track = 'rgba(255,255,255,0.10)' }) => (
-  <View style={[styles.track, { backgroundColor: track }]}>
-    <View style={[styles.fill, { width: `${Math.max(4, Math.min(100, value * 100))}%`, backgroundColor: color }]} />
-  </View>
-);
+const ProgressBar = ({ value, color, track }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={[styles.track, { backgroundColor: track ?? theme.overlay }]}>
+      <View style={[styles.fill, { width: `${Math.max(4, Math.min(100, value * 100))}%`, backgroundColor: color }]} />
+    </View>
+  );
+};
 
 const TripsScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [data, setData] = useState(null);
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -147,7 +155,7 @@ const TripsScreen = ({ navigation }) => {
     return (
       <DarkScreen edges={TOP_ONLY}>
         <View style={styles.center}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       </DarkScreen>
     );
@@ -210,7 +218,7 @@ const TripsScreen = ({ navigation }) => {
               {isLive ? `${Math.round(bar.value * 100)}%` : `${readiness.score}%`}
             </Text>
           </View>
-          <ProgressBar value={bar.value} color={bar.color} />
+          <ProgressBar value={bar.value} color={bar.color} track={dark.overlay} />
 
           {/* What is done and what is still missing, each a shortcut to fix it. */}
           {!isLive && (
@@ -225,7 +233,7 @@ const TripsScreen = ({ navigation }) => {
                   <Ionicons
                     name={check.done ? 'checkmark-circle' : 'ellipse-outline'}
                     size={13}
-                    color={check.done ? '#17E695' : dark.textMuted}
+                    color={check.done ? theme.success : theme.textMuted}
                   />
                   <Text style={[styles.checkText, check.done && styles.checkTextDone]} numberOfLines={1}>
                     {check.label}
@@ -263,7 +271,7 @@ const TripsScreen = ({ navigation }) => {
                 <Text style={styles.nextTaskLabel}>Next up  </Text>
                 {trip.nextTask.title}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color={dark.textMuted} />
+              <Ionicons name="chevron-forward" size={14} color={theme.textMuted} />
             </TouchableOpacity>
           )}
 
@@ -275,7 +283,7 @@ const TripsScreen = ({ navigation }) => {
                 activeOpacity={0.8}
                 onPress={() => openTrip(trip, link.tab)}
               >
-                <Ionicons name={link.icon} size={17} color={dark.text} />
+                <Ionicons name={link.icon} size={17} color={theme.text} />
                 <Text style={styles.quickText}>{link.label}</Text>
               </TouchableOpacity>
             ))}
@@ -305,7 +313,7 @@ const TripsScreen = ({ navigation }) => {
             </Text>
           </View>
           <View style={[styles.pill, { backgroundColor: `${look.color}22` }]}>
-            <Text style={[styles.pillText, { color: look.color }]}>{timingLabel(trip).toUpperCase()}</Text>
+            <Text style={[styles.pillText, { color: theme.ink(look.color) }]}>{timingLabel(trip).toUpperCase()}</Text>
           </View>
         </View>
 
@@ -314,25 +322,25 @@ const TripsScreen = ({ navigation }) => {
         <View style={styles.cardFooter}>
           <View style={styles.metaGroup}>
             <View style={styles.meta}>
-              <Ionicons name="people-outline" size={13} color={dark.textMuted} />
+              <Ionicons name="people-outline" size={13} color={theme.textMuted} />
               <Text style={styles.metaText}>{trip.members.length}</Text>
             </View>
             <View style={styles.meta}>
-              <Ionicons name="map-outline" size={13} color={dark.textMuted} />
+              <Ionicons name="map-outline" size={13} color={theme.textMuted} />
               <Text style={styles.metaText}>{trip.counts.itineraryDays}</Text>
             </View>
             <View style={styles.meta}>
-              <Ionicons name="bed-outline" size={13} color={dark.textMuted} />
+              <Ionicons name="bed-outline" size={13} color={theme.textMuted} />
               <Text style={styles.metaText}>{trip.counts.stays}</Text>
             </View>
             <View style={styles.meta}>
-              <Ionicons name="checkbox-outline" size={13} color={dark.textMuted} />
+              <Ionicons name="checkbox-outline" size={13} color={theme.textMuted} />
               <Text style={styles.metaText}>
                 {trip.tasks.done}/{trip.tasks.total}
               </Text>
             </View>
             <View style={styles.meta}>
-              <Ionicons name="images-outline" size={13} color={dark.textMuted} />
+              <Ionicons name="images-outline" size={13} color={theme.textMuted} />
               <Text style={styles.metaText}>{trip.counts.photos}</Text>
             </View>
           </View>
@@ -354,7 +362,7 @@ const TripsScreen = ({ navigation }) => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dark.accentGreen} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accentGreen} />
         }
       >
         <View style={styles.header}>
@@ -375,7 +383,7 @@ const TripsScreen = ({ navigation }) => {
 
         {error && !trips.length ? (
           <View style={styles.empty}>
-            <Ionicons name="cloud-offline-outline" size={30} color={dark.textMuted} />
+            <Ionicons name="cloud-offline-outline" size={30} color={theme.textMuted} />
             <Text style={styles.emptyTitle}>Could not load your trips</Text>
             <Text style={styles.emptyBody}>{error}</Text>
             <TouchableOpacity style={styles.retry} onPress={load} activeOpacity={0.85}>
@@ -384,7 +392,7 @@ const TripsScreen = ({ navigation }) => {
           </View>
         ) : !trips.length ? (
           <View style={styles.empty}>
-            <LinearGradient colors={dark.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyIcon}>
+            <LinearGradient colors={theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyIcon}>
               <Ionicons name="airplane" size={30} color="#04121C" />
             </LinearGradient>
             <Text style={styles.emptyTitle}>Your first trip starts here</Text>
@@ -406,7 +414,7 @@ const TripsScreen = ({ navigation }) => {
                 { icon: 'wallet-outline', value: usd(stats.totalSpent).replace(/\.00$/, ''), label: 'Spent' },
               ].map((stat) => (
                 <View key={stat.label} style={styles.stat}>
-                  <Ionicons name={stat.icon} size={15} color={dark.accentGreen} />
+                  <Ionicons name={stat.icon} size={15} color={theme.accentGreen} />
                   <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                     {stat.value}
                   </Text>
@@ -450,24 +458,25 @@ const TripsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl + spacing.lg },
 
   header: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
   headerBody: { flex: 1 },
-  heading: { color: dark.text, fontSize: 30, fontWeight: '800' },
-  subheading: { color: dark.textMuted, fontSize: 13, marginTop: 2 },
+  heading: { color: theme.text, fontSize: 30, fontWeight: '800' },
+  subheading: { color: theme.textMuted, fontSize: 13, marginTop: 2 },
   addButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: dark.button,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // ---- hero
+  // ---- hero: a deep gradient card in both themes, so its text and tints
+  // come from the dark palette rather than the active one.
   hero: {
     borderRadius: radius.lg + 10,
     borderWidth: 1,
@@ -562,15 +571,15 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingVertical: spacing.sm + 4,
     paddingHorizontal: 4,
   },
-  statValue: { color: dark.text, fontSize: 17, fontWeight: '800', marginTop: 5 },
-  statLabel: { color: dark.textMuted, fontSize: 10.5, marginTop: 1 },
+  statValue: { color: theme.text, fontSize: 17, fontWeight: '800', marginTop: 5 },
+  statLabel: { color: theme.textMuted, fontSize: 10.5, marginTop: 1 },
 
   // ---- filters
   filters: { marginTop: spacing.lg, marginBottom: spacing.sm + 4, flexGrow: 0 },
@@ -578,24 +587,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 18,
     paddingHorizontal: spacing.md - 2,
     paddingVertical: 7,
     marginRight: spacing.sm,
   },
-  filterActive: { borderColor: dark.accentGreen, backgroundColor: 'rgba(0,196,208,0.10)' },
-  filterText: { color: dark.textMuted, fontSize: 13, fontWeight: '600' },
-  filterCount: { color: dark.textMuted, fontSize: 11, fontWeight: '800' },
-  filterTextActive: { color: dark.accentGreen },
+  filterActive: { borderColor: theme.accentFill, backgroundColor: 'rgba(0,196,208,0.10)' },
+  filterText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
+  filterCount: { color: theme.textMuted, fontSize: 11, fontWeight: '800' },
+  filterTextActive: { color: theme.accentGreen },
 
   // ---- list cards
   card: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     padding: spacing.md,
     marginBottom: spacing.sm + 4,
@@ -606,29 +615,29 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   flag: { fontSize: 23 },
   cardBody: { flex: 1 },
-  cardName: { color: dark.text, fontSize: 16, fontWeight: '700' },
-  cardMeta: { color: dark.textMuted, fontSize: 12, marginTop: 2 },
+  cardName: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  cardMeta: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   metaGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 4 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { color: dark.textMuted, fontSize: 12, fontWeight: '600' },
+  metaText: { color: theme.textMuted, fontSize: 12, fontWeight: '600' },
   cardSpend: { alignItems: 'flex-end' },
-  cardSpendValue: { color: dark.text, fontSize: 14, fontWeight: '800' },
-  cardSpendLabel: { color: dark.textMuted, fontSize: 10 },
-  noneText: { color: dark.textMuted, fontSize: 13, textAlign: 'center', paddingVertical: spacing.lg },
+  cardSpendValue: { color: theme.text, fontSize: 14, fontWeight: '800' },
+  cardSpendLabel: { color: theme.textMuted, fontSize: 10 },
+  noneText: { color: theme.textMuted, fontSize: 13, textAlign: 'center', paddingVertical: spacing.lg },
 
   // ---- empty / error
   empty: { alignItems: 'center', paddingTop: spacing.xl * 2, paddingHorizontal: spacing.md },
   emptyIcon: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { color: dark.text, fontSize: 19, fontWeight: '800', marginTop: spacing.lg, textAlign: 'center' },
+  emptyTitle: { color: theme.text, fontSize: 19, fontWeight: '800', marginTop: spacing.lg, textAlign: 'center' },
   emptyBody: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
@@ -637,13 +646,13 @@ const styles = StyleSheet.create({
   emptyButton: { alignSelf: 'stretch', marginTop: spacing.lg },
   retry: {
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
     marginTop: spacing.md,
   },
-  retryText: { color: dark.text, fontSize: 13, fontWeight: '700' },
+  retryText: { color: theme.text, fontSize: 13, fontWeight: '700' },
 });
 
 export default TripsScreen;

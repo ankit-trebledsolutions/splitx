@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StreamCall, useCallStateHooks } from '@stream-io/video-react-native-sdk';
 import { useStreamClient } from '../context/StreamVideoProvider';
 import { useActiveCall } from '../context/ActiveCallProvider';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const HANGUP_RED = '#EF4444';
 
@@ -29,6 +29,8 @@ const useLiveDuration = () => {
 
 // Shown to group members who are NOT in the call.
 const JoinBanner = ({ onJoin }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { useCallSession } = useCallStateHooks();
   const session = useCallSession();
   const count = session?.participants?.length ?? 0;
@@ -38,7 +40,7 @@ const JoinBanner = ({ onJoin }) => {
 
   return (
     <View style={styles.joinBanner}>
-      <Ionicons name="videocam" size={16} color={dark.accentGreen} />
+      <Ionicons name="videocam" size={16} color={theme.accentGreen} />
       <Text style={styles.joinText} numberOfLines={1}>
         Group call · {count} in call · {formatDuration(seconds)}
       </Text>
@@ -51,6 +53,8 @@ const JoinBanner = ({ onJoin }) => {
 
 // Shown to the member who IS in the call, while they browse the chat.
 const MiniBar = ({ onReturn, onHangup }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { useMicrophoneState } = useCallStateHooks();
   const { microphone, isMute } = useMicrophoneState();
   const seconds = useLiveDuration();
@@ -67,7 +71,7 @@ const MiniBar = ({ onReturn, onHangup }) => {
           onPress={() => microphone.toggle()}
           activeOpacity={0.8}
         >
-          <Ionicons name={isMute ? 'mic-off' : 'mic'} size={17} color={dark.text} />
+          <Ionicons name={isMute ? 'mic-off' : 'mic'} size={17} color={theme.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.miniIcon, styles.hangup]}
@@ -141,22 +145,22 @@ const CallBanner = ({ groupId, groupName, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   joinBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
   },
-  joinText: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '600', marginLeft: spacing.sm },
+  joinText: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600', marginLeft: spacing.sm },
   joinBtn: {
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderRadius: radius.sm,
     paddingVertical: 6,
     paddingHorizontal: spacing.md,
@@ -165,15 +169,15 @@ const styles = StyleSheet.create({
   miniBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B3D2E',
+    backgroundColor: theme.successTint,
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
   },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: dark.accentGreen },
-  miniText: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '700', marginLeft: spacing.sm },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.accentFill },
+  miniText: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '700', marginLeft: spacing.sm },
   miniControls: { flexDirection: 'row', alignItems: 'center' },
   miniIcon: {
     width: 34,
@@ -181,7 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: theme.overlayStrong,
     marginLeft: spacing.sm,
   },
   hangup: { backgroundColor: HANGUP_RED },

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing, StyleSheet } from 'react-native';
 import AiWorkingCloud from './AiWorkingCloud';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles } from '../theme';
 
 const CAPTIONS = [
   'Reading your trip details',
@@ -20,6 +20,7 @@ const SLOTS = [0, 1];
  *   title: the same line the banner shows ("AI is planning your itinerary").
  */
 const AiWorkingView = ({ title }) => {
+  const styles = useStyles(makeStyles);
   // Two stacked lines take turns. The hidden one is handed the next caption,
   // then the pair cross-fades: `mix` is 0 while the first shows, 1 for the second.
   const mix = useRef(new Animated.Value(0)).current;
@@ -65,7 +66,7 @@ const AiWorkingView = ({ title }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrap: {
     flex: 1,
     alignItems: 'center',
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   title: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
@@ -86,13 +87,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
   },
   subtext: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',

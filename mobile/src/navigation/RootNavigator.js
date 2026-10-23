@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import usePushNotifications from '../hooks/usePushNotifications';
 import useReminderAlarms from '../hooks/useReminderAlarms';
 import useIncomingCalls from '../hooks/useIncomingCalls';
-import { colors } from '../theme';
+import { useTheme } from '../theme';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -47,6 +47,7 @@ const Stack = createNativeStackNavigator();
 const MIN_SPLASH_MS = 1500;
 
 const RootNavigator = () => {
+  const theme = useTheme();
   const { user, isLoading } = useAuth();
   const [splashDone, setSplashDone] = useState(false);
 
@@ -68,10 +69,10 @@ const RootNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerTintColor: colors.text,
+        headerTintColor: theme.text,
         headerTitleStyle: { fontWeight: '600' },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: theme.background },
       }}
     >
       {/* `=== false`, not falsy: a user saved on the phone before the server

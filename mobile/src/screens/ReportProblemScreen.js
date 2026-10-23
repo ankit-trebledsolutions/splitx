@@ -19,7 +19,7 @@ import AppAlert from '../components/AppAlert';
 import { createReport, deviceInfo } from '../api/support.api';
 import { MAX_ATTACHMENT_BYTES } from '../utils/attachments';
 import { MAX_SCREENSHOTS, REPORT_CATEGORIES } from '../data/support';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const TILE = 84;
 
@@ -38,6 +38,8 @@ const deviceLine = () => {
  * screenshots. The phone's own details go along without being asked for.
  */
 const ReportProblemScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const [category, setCategory] = useState(null);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -133,7 +135,7 @@ const ReportProblemScreen = ({ navigation }) => {
             onPress={navigation.goBack}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-back" size={18} color={dark.text} />
+            <Ionicons name="chevron-back" size={18} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Report a Problem</Text>
           <TouchableOpacity
@@ -142,7 +144,7 @@ const ReportProblemScreen = ({ navigation }) => {
             activeOpacity={0.7}
             accessibilityLabel="My reports"
           >
-            <Ionicons name="time-outline" size={18} color={dark.text} />
+            <Ionicons name="time-outline" size={18} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -217,7 +219,7 @@ const ReportProblemScreen = ({ navigation }) => {
                 onPress={pickScreenshots}
                 activeOpacity={0.8}
               >
-                <Ionicons name="image-outline" size={22} color={dark.accentGreen} />
+                <Ionicons name="image-outline" size={22} color={theme.accentGreen} />
                 <Text style={styles.tileAddText}>Add</Text>
               </TouchableOpacity>
             )}
@@ -227,7 +229,7 @@ const ReportProblemScreen = ({ navigation }) => {
           </Text>
 
           <View style={styles.deviceRow}>
-            <Ionicons name="phone-portrait-outline" size={14} color={dark.textMuted} />
+            <Ionicons name="phone-portrait-outline" size={14} color={theme.textMuted} />
             <Text style={styles.deviceText}>
               Sent with {deviceLine()}, so we can try it on the same build.
             </Text>
@@ -245,7 +247,7 @@ const ReportProblemScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -257,22 +259,22 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 20,
     fontWeight: '800',
   },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   intro: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: spacing.sm,
@@ -280,13 +282,13 @@ const styles = StyleSheet.create({
   },
 
   sectionLabel: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     fontWeight: '700',
     marginBottom: spacing.sm,
   },
   sectionGap: { marginTop: spacing.md },
-  error: { color: '#F97362', fontSize: 12, marginTop: spacing.sm },
+  error: { color: theme.coral, fontSize: 12, marginTop: spacing.sm },
   messageInput: { minHeight: 130, paddingTop: spacing.md - 2 },
 
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm + 2 },
@@ -295,9 +297,9 @@ const styles = StyleSheet.create({
     height: TILE,
     borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
   },
   tileImage: { width: '100%', height: '100%' },
   tileRemove: {
@@ -307,7 +309,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -319,8 +321,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  tileAddText: { color: dark.accentGreen, fontSize: 12, fontWeight: '700' },
-  hint: { color: dark.textMuted, fontSize: 12, marginTop: spacing.sm },
+  tileAddText: { color: theme.accentGreen, fontSize: 12, fontWeight: '700' },
+  hint: { color: theme.textMuted, fontSize: 12, marginTop: spacing.sm },
 
   deviceRow: {
     flexDirection: 'row',
@@ -329,7 +331,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
-  deviceText: { flex: 1, color: dark.textMuted, fontSize: 12, lineHeight: 17 },
+  deviceText: { flex: 1, color: theme.textMuted, fontSize: 12, lineHeight: 17 },
   sendButton: { marginTop: spacing.xs },
 });
 

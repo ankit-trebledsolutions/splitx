@@ -16,35 +16,43 @@ import { fetchReport } from '../api/support.api';
 import { categoryLabel, statusOf } from '../data/support';
 import { absoluteUrl } from '../utils/attachments';
 import { formatDateTime } from '../utils/format';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { StatusPill } from './MyReportsScreen';
 
 const TILE = 84;
 
 // A status change, as one quiet line in the updates.
-const StatusLine = ({ event }) => (
-  <View style={styles.statusLine}>
-    <Ionicons name="swap-horizontal-outline" size={14} color={dark.textMuted} />
-    <Text style={styles.statusLineText}>
-      Marked as <Text style={styles.statusLineStrong}>{statusOf(event.status).label}</Text>
-    </Text>
-    <Text style={styles.statusLineTime}>{formatDateTime(event.createdAt)}</Text>
-  </View>
-);
+const StatusLine = ({ event }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.statusLine}>
+      <Ionicons name="swap-horizontal-outline" size={14} color={theme.textMuted} />
+      <Text style={styles.statusLineText}>
+        Marked as <Text style={styles.statusLineStrong}>{statusOf(event.status).label}</Text>
+      </Text>
+      <Text style={styles.statusLineTime}>{formatDateTime(event.createdAt)}</Text>
+    </View>
+  );
+};
 
 // What the team wrote back.
-const ReplyCard = ({ event }) => (
-  <View style={styles.reply}>
-    <View style={styles.replyTop}>
-      <View style={styles.replyAvatar}>
-        <Ionicons name="headset-outline" size={14} color={dark.accentGreen} />
+const ReplyCard = ({ event }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.reply}>
+      <View style={styles.replyTop}>
+        <View style={styles.replyAvatar}>
+          <Ionicons name="headset-outline" size={14} color={theme.accentGreen} />
+        </View>
+        <Text style={styles.replyName}>Splix Support</Text>
+        <Text style={styles.replyTime}>{formatDateTime(event.createdAt)}</Text>
       </View>
-      <Text style={styles.replyName}>Splix Support</Text>
-      <Text style={styles.replyTime}>{formatDateTime(event.createdAt)}</Text>
+      <Text style={styles.replyBody}>{event.body}</Text>
     </View>
-    <Text style={styles.replyBody}>{event.body}</Text>
-  </View>
-);
+  );
+};
 
 /**
  * One of the person's reports: what they sent, where it stands, and every
@@ -52,6 +60,8 @@ const ReplyCard = ({ event }) => (
  * notification an admin's reply raises (which brings only the id).
  */
 const ReportDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { reportId, report: initial = null } = route.params;
   const [report, setReport] = useState(initial);
   const [loading, setLoading] = useState(!initial);
@@ -89,7 +99,7 @@ const ReportDetailScreen = ({ route, navigation }) => {
           onPress={navigation.goBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Report</Text>
         <View style={styles.headerGhost} />
@@ -97,7 +107,7 @@ const ReportDetailScreen = ({ route, navigation }) => {
 
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       ) : gone || !report ? (
         <View style={styles.loading}>
@@ -139,8 +149,8 @@ const ReportDetailScreen = ({ route, navigation }) => {
           </View>
 
           <View style={[styles.hintRow, { borderColor: `${status.tint}55` }]}>
-            <Ionicons name="information-circle-outline" size={16} color={status.tint} />
-            <Text style={[styles.hintText, { color: status.tint }]}>{status.hint}</Text>
+            <Ionicons name="information-circle-outline" size={16} color={theme.ink(status.tint)} />
+            <Text style={[styles.hintText, { color: theme.ink(status.tint) }]}>{status.hint}</Text>
           </View>
 
           <Text style={styles.sectionLabel}>Updates</Text>
@@ -179,7 +189,7 @@ const ReportDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -190,9 +200,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -200,14 +210,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 20,
     fontWeight: '800',
   },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  goneTitle: { color: dark.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  goneText: { color: dark.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xs },
+  goneTitle: { color: theme.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  goneText: { color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xs },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   topRow: {
@@ -217,29 +227,29 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   category: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  subject: { color: dark.text, fontSize: 20, fontWeight: '800', marginTop: spacing.sm },
-  sent: { color: dark.textMuted, fontSize: 12, marginTop: 4, marginBottom: spacing.md },
+  subject: { color: theme.text, fontSize: 20, fontWeight: '800', marginTop: spacing.sm },
+  sent: { color: theme.textMuted, fontSize: 12, marginTop: 4, marginBottom: spacing.md },
 
   card: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  message: { color: dark.text, fontSize: 14, lineHeight: 21 },
+  message: { color: theme.text, fontSize: 14, lineHeight: 21 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm + 2, marginTop: spacing.md },
   tile: {
     width: TILE,
     height: TILE,
     borderRadius: radius.md,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
   },
 
   hintRow: {
@@ -255,13 +265,13 @@ const styles = StyleSheet.create({
   hintText: { flex: 1, fontSize: 13, fontWeight: '600' },
 
   sectionLabel: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     fontWeight: '700',
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  noUpdates: { color: dark.textMuted, fontSize: 13, lineHeight: 19 },
+  noUpdates: { color: theme.textMuted, fontSize: 13, lineHeight: 19 },
 
   statusLine: {
     flexDirection: 'row',
@@ -269,9 +279,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
   },
-  statusLineText: { flex: 1, color: dark.textMuted, fontSize: 12 },
-  statusLineStrong: { color: dark.text, fontWeight: '700' },
-  statusLineTime: { color: dark.textMuted, fontSize: 11 },
+  statusLineText: { flex: 1, color: theme.textMuted, fontSize: 12 },
+  statusLineStrong: { color: theme.text, fontWeight: '700' },
+  statusLineTime: { color: theme.textMuted, fontSize: 11 },
 
   reply: {
     backgroundColor: 'rgba(0,196,208,0.06)',
@@ -290,17 +300,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  replyName: { flex: 1, color: dark.text, fontSize: 13, fontWeight: '700' },
-  replyTime: { color: dark.textMuted, fontSize: 11 },
-  replyBody: { color: dark.text, fontSize: 14, lineHeight: 20 },
+  replyName: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '700' },
+  replyTime: { color: theme.textMuted, fontSize: 11 },
+  replyBody: { color: theme.text, fontSize: 14, lineHeight: 20 },
 
   finished: {
     marginTop: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: dark.border,
+    borderTopColor: theme.border,
     paddingTop: spacing.md,
   },
-  finishedText: { color: dark.textMuted, fontSize: 13, lineHeight: 19 },
+  finishedText: { color: theme.textMuted, fontSize: 13, lineHeight: 19 },
   finishedButton: { marginTop: spacing.md },
 });
 

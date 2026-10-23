@@ -3,12 +3,14 @@ import { View, Text, SectionList, TouchableOpacity, ActivityIndicator, StyleShee
 import { Ionicons } from '@expo/vector-icons';
 import MemberAvatars from '../../components/MemberAvatars';
 import StatTile from '../../components/StatTile';
-import { dark, radius, spacing } from '../../theme';
+import { radius, spacing, useStyles, useTheme } from '../../theme';
 import { formatDateTime, isToday } from '../../utils/format';
 
 const PRIORITY_COLOR = { high: '#F87171', med: '#F5B342', low: '#17E695' };
 
 const TasksTab = ({ tasks, loading, onToggle, onOpenTask }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { sections, stats } = useMemo(() => {
     const open = tasks.filter((t) => t.status === 'open');
     const done = tasks.filter((t) => t.status === 'done');
@@ -17,8 +19,8 @@ const TasksTab = ({ tasks, loading, onToggle, onOpenTask }) => {
 
     const built = [];
     if (today.length) built.push({ title: 'Today', accent: '#F5B342', data: today });
-    if (upcoming.length) built.push({ title: 'Upcoming', accent: dark.accentBlue, data: upcoming });
-    if (done.length) built.push({ title: 'Completed', accent: dark.accentGreen, data: done });
+    if (upcoming.length) built.push({ title: 'Upcoming', accent: theme.accentBlue, data: upcoming });
+    if (done.length) built.push({ title: 'Completed', accent: theme.accentGreen, data: done });
 
     return {
       sections: built,
@@ -29,7 +31,7 @@ const TasksTab = ({ tasks, loading, onToggle, onOpenTask }) => {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={dark.accentGreen} />
+        <ActivityIndicator color={theme.accentGreen} />
       </View>
     );
   }
@@ -87,9 +89,9 @@ const TasksTab = ({ tasks, loading, onToggle, onOpenTask }) => {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <View style={styles.statRow}>
-          <StatTile value={stats.open} label="Open" color={dark.accentBlue} />
+          <StatTile value={stats.open} label="Open" color={theme.accentBlue} />
           <StatTile value={stats.today} label="Today" color="#F5B342" />
-          <StatTile value={stats.done} label="Done" color={dark.accentGreen} />
+          <StatTile value={stats.done} label="Done" color={theme.accentGreen} />
         </View>
       }
       renderSectionHeader={({ section }) => (
@@ -111,13 +113,13 @@ const TasksTab = ({ tasks, loading, onToggle, onOpenTask }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
   list: { paddingHorizontal: spacing.md, paddingBottom: 100 },
   statRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   empty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -133,21 +135,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionDot: { width: 6, height: 6, borderRadius: 3 },
-  sectionTitle: { color: dark.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
+  sectionTitle: { color: theme.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
   sectionCount: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: theme.overlay,
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
-  sectionCountText: { color: dark.textMuted, fontSize: 9, fontWeight: '700' },
+  sectionCountText: { color: theme.textMuted, fontSize: 9, fontWeight: '700' },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -157,17 +159,17 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: dark.textMuted,
+    borderColor: theme.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
-  checkboxDone: { backgroundColor: dark.accentGreen, borderColor: dark.accentGreen },
+  checkboxDone: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
   cardBody: { flex: 1 },
-  title: { color: dark.text, fontSize: 14, fontWeight: '600' },
-  titleDone: { color: dark.textMuted, textDecorationLine: 'line-through' },
-  meta: { color: dark.textMuted, fontSize: 11, marginTop: 3 },
-  source: { color: dark.textMuted, fontSize: 10, fontStyle: 'italic', marginTop: 2 },
+  title: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  titleDone: { color: theme.textMuted, textDecorationLine: 'line-through' },
+  meta: { color: theme.textMuted, fontSize: 11, marginTop: 3 },
+  source: { color: theme.textMuted, fontSize: 10, fontStyle: 'italic', marginTop: 2 },
   cardRight: { alignItems: 'flex-end', gap: 6 },
   priorityDot: { width: 8, height: 8, borderRadius: 4 },
 });

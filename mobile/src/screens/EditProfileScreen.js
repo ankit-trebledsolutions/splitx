@@ -23,10 +23,11 @@ import {
   nameError,
   bioError,
 } from '../utils/profileValidation';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles } from '../theme';
 import AppAlert from '../components/AppAlert';
 
 const EditProfileScreen = ({ navigation }) => {
+  const styles = useStyles(makeStyles);
   const { user, updateProfile } = useAuth();
   // The real saved values only: the design placeholders in data/profile must
   // never be saved over someone's profile.
@@ -167,7 +168,7 @@ const EditProfileScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   avatarWrap: { alignSelf: 'center', marginTop: spacing.md },
@@ -178,14 +179,14 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: dark.accentGreen,
+    backgroundColor: theme.accentFill,
     borderWidth: 3,
-    borderColor: '#0A0A0A',
+    borderColor: theme.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   changePhoto: {
-    color: dark.accentGreen,
+    color: theme.accentGreen,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',

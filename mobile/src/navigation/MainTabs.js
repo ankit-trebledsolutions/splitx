@@ -11,7 +11,7 @@ import ExpensesScreen from '../screens/ExpensesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useTour } from '../tour/TourProvider';
 import useTourTarget from '../tour/useTourTarget';
-import { dark } from '../theme';
+import { useTheme } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -36,6 +36,7 @@ const BAR_BASE_PADDING = 8;
 // not where the person is looking, so the tour waits for it to come back.
 // `to` is the web-only link the navigator passes along; a native Pressable has no use for it.
 const TabButton = ({ tourName, tabsFocused, onPress, style, children, to: _to, ...rest }) => {
+  const theme = useTheme();
   const { notifyTap } = useTour();
   const ref = useTourTarget(tourName, { enabled: tabsFocused });
   return (
@@ -43,7 +44,7 @@ const TabButton = ({ tourName, tabsFocused, onPress, style, children, to: _to, .
       ref={ref}
       {...rest}
       style={({ pressed }) => [style, Platform.OS !== 'android' && pressed && { opacity: 0.6 }]}
-      android_ripple={{ color: 'rgba(255,255,255,0.12)', borderless: true }}
+      android_ripple={{ color: theme.ripple, borderless: true }}
       onPress={(e) => {
         if (tourName) notifyTap(tourName);
         onPress?.(e);
@@ -55,6 +56,7 @@ const TabButton = ({ tourName, tabsFocused, onPress, style, children, to: _to, .
 };
 
 const MainTabs = () => {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const tabsFocused = useIsFocused();
   // The app renders edge-to-edge, so the window extends under the system
@@ -68,11 +70,11 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: dark.tabActive,
-        tabBarInactiveTintColor: dark.textMuted,
+        tabBarActiveTintColor: theme.tabActive,
+        tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
-          backgroundColor: '#0E1014',
-          borderTopColor: dark.border,
+          backgroundColor: theme.card,
+          borderTopColor: theme.border,
           borderTopWidth: 1,
           height: BAR_CONTENT_HEIGHT + bottomInset,
           paddingTop: 6,

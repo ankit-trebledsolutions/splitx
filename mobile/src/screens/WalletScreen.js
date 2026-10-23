@@ -17,11 +17,9 @@ import useWallet from '../hooks/useWallet';
 import { getWalletTransactions } from '../api/wallet.api';
 import { MORE_CREDITS_SUBJECT, creditsLabel, isPaid, transactionLabel } from '../data/wallet';
 import { formatDateTime } from '../utils/format';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 
 const PAGE_SIZE = 20;
-const PLUS = '#17E695';
-const MINUS = '#F87171';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -52,6 +50,8 @@ const appendRows = (list, rows) => {
  * Credits cannot be bought yet: getting more means asking the team.
  */
 const WalletScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   // The history a page at a time; null until the first page has come.
   const [rows, setRows] = useState(null);
   const [page, setPage] = useState(0);
@@ -115,7 +115,7 @@ const WalletScreen = ({ navigation }) => {
   const header = (
     <View style={styles.header}>
       <TouchableOpacity style={styles.headerButton} onPress={navigation.goBack} activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={18} color={dark.text} />
+        <Ionicons name="chevron-back" size={18} color={theme.text} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>Wallet</Text>
       <View style={styles.headerSpacer} />
@@ -132,7 +132,7 @@ const WalletScreen = ({ navigation }) => {
         {error ? (
           <View style={styles.center}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="wallet-outline" size={26} color={dark.accentGreen} />
+              <Ionicons name="wallet-outline" size={26} color={theme.accentGreen} />
             </View>
             <Text style={styles.emptyTitle}>
               {missing ? 'Wallet is not ready yet' : 'Could not load your wallet'}
@@ -153,7 +153,7 @@ const WalletScreen = ({ navigation }) => {
           </View>
         ) : (
           <View style={styles.center}>
-            <ActivityIndicator color={dark.accentGreen} />
+            <ActivityIndicator color={theme.accentGreen} />
           </View>
         )}
       </DarkScreen>
@@ -212,7 +212,7 @@ const WalletScreen = ({ navigation }) => {
         <View style={styles.statRow}>
           <View style={styles.stat}>
             <View style={styles.statIcon}>
-              <Ionicons name="calendar" size={15} color={dark.accentGreen} />
+              <Ionicons name="calendar" size={15} color={theme.accentGreen} />
             </View>
             <View>
               <Text style={styles.statLabel}>FREE THIS MONTH</Text>
@@ -222,7 +222,7 @@ const WalletScreen = ({ navigation }) => {
           <View style={styles.statDivider} />
           <View style={styles.stat}>
             <View style={styles.statIcon}>
-              <Ionicons name="wallet" size={15} color={dark.accentGreen} />
+              <Ionicons name="wallet" size={15} color={theme.accentGreen} />
             </View>
             <View>
               <Text style={styles.statLabel}>YOUR OWN</Text>
@@ -238,7 +238,7 @@ const WalletScreen = ({ navigation }) => {
         {priceRows.map((row, index) => (
           <View key={row.key} style={[styles.cardRow, index > 0 && styles.cardDivider]}>
             <View style={styles.rowIcon}>
-              <Ionicons name={row.icon} size={17} color={dark.button} />
+              <Ionicons name={row.icon} size={17} color={theme.accentGreen} />
             </View>
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>{row.title}</Text>
@@ -251,7 +251,7 @@ const WalletScreen = ({ navigation }) => {
 
       <TouchableOpacity style={[styles.card, styles.cardRow, styles.more]} activeOpacity={0.7} onPress={askForCredits}>
         <View style={styles.rowIcon}>
-          <Ionicons name="chatbubbles" size={17} color={dark.button} />
+          <Ionicons name="chatbubbles" size={17} color={theme.accentGreen} />
         </View>
         <View style={styles.rowBody}>
           <Text style={styles.rowTitle}>Need more credits?</Text>
@@ -259,7 +259,7 @@ const WalletScreen = ({ navigation }) => {
             Credits can’t be bought in the app yet. Ask the Splix team.
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
       </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>History</Text>
@@ -275,7 +275,7 @@ const WalletScreen = ({ navigation }) => {
     return (
       <View style={styles.txRow}>
         <View style={styles.rowIcon}>
-          <Ionicons name={label.icon} size={17} color={dark.button} />
+          <Ionicons name={label.icon} size={17} color={theme.accentGreen} />
         </View>
         <View style={styles.rowBody}>
           <Text style={styles.rowTitle} numberOfLines={1}>
@@ -286,7 +286,7 @@ const WalletScreen = ({ navigation }) => {
           </Text>
         </View>
         <View style={styles.txRight}>
-          <Text style={[styles.txAmount, { color: item.amount < 0 ? MINUS : PLUS }]}>
+          <Text style={[styles.txAmount, { color: item.amount < 0 ? theme.danger : theme.success }]}>
             {signed(item.amount)}
           </Text>
           <Text style={styles.txAfter}>Balance {formatNumber(item.balanceAfter)}</Text>
@@ -311,13 +311,13 @@ const WalletScreen = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={dark.accentGreen}
-            colors={[dark.accentGreen]}
+            tintColor={theme.accentGreen}
+            colors={[theme.accentGreen]}
           />
         }
         ListFooterComponent={
           loadingMore || rows === null ? (
-            <ActivityIndicator color={dark.accentGreen} style={styles.footer} />
+            <ActivityIndicator color={theme.accentGreen} style={styles.footer} />
           ) : null
         }
         ListEmptyComponent={
@@ -334,7 +334,7 @@ const WalletScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   // My Reports' header.
   header: {
     flexDirection: 'row',
@@ -346,9 +346,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    color: dark.text,
+    color: theme.text,
     fontSize: 20,
     fontWeight: '800',
   },
@@ -371,9 +371,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  emptyTitle: { color: dark.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  emptyTitle: { color: theme.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   emptyText: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
   },
   note: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     lineHeight: 17,
     textAlign: 'center',
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
 
   // Profile's section labels and settings cards.
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -446,9 +446,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   card: {
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  cardDivider: { borderTopWidth: 1, borderTopColor: dark.border },
+  cardDivider: { borderTopWidth: 1, borderTopColor: theme.border },
   more: { marginTop: spacing.sm + 2 },
   rowIcon: {
     width: 34,
@@ -470,17 +470,17 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   rowBody: { flex: 1 },
-  rowTitle: { color: dark.text, fontSize: 14, fontWeight: '600' },
-  rowDetail: { color: dark.textMuted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  price: { color: dark.text, fontSize: 13, fontWeight: '700', marginLeft: spacing.sm },
-  priceFree: { color: PLUS },
+  rowTitle: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  rowDetail: { color: theme.textMuted, fontSize: 11, lineHeight: 15, marginTop: 2 },
+  price: { color: theme.text, fontSize: 13, fontWeight: '700', marginLeft: spacing.sm },
+  priceFree: { color: theme.success },
 
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md - 4,
@@ -488,11 +488,11 @@ const styles = StyleSheet.create({
   },
   txRight: { alignItems: 'flex-end', marginLeft: spacing.sm },
   txAmount: { fontSize: 15, fontWeight: '800' },
-  txAfter: { color: dark.textMuted, fontSize: 10, marginTop: 2 },
+  txAfter: { color: theme.textMuted, fontSize: 10, marginTop: 2 },
 
-  historyError: { color: MINUS, fontSize: 12, marginBottom: spacing.sm },
+  historyError: { color: theme.danger, fontSize: 12, marginBottom: spacing.sm },
   historyEmpty: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',

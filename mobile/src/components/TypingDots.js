@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, Easing, StyleSheet } from 'react-native';
-import { dark, spacing } from '../theme';
+import { spacing, useStyles, useTheme } from '../theme';
 
 const DOTS = [0, 1, 2];
 const STEP_MS = 160; // delay between one dot lighting up and the next
@@ -12,6 +12,8 @@ const PULSE_MS = 420;
  *          in a one-to-one chat where it can only be the other person.
  */
 const TypingDots = ({ label, labelColor, style }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const values = useRef(DOTS.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
@@ -40,7 +42,7 @@ const TypingDots = ({ label, labelColor, style }) => {
   return (
     <View style={[styles.wrap, style]}>
       {label ? (
-        <Text style={[styles.label, labelColor && { color: labelColor }]} numberOfLines={1}>
+        <Text style={[styles.label, labelColor && { color: theme.ink(labelColor) }]} numberOfLines={1}>
           {label}
         </Text>
       ) : null}
@@ -64,10 +66,10 @@ const TypingDots = ({ label, labelColor, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   wrap: { alignSelf: 'flex-start' },
   label: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 4,
@@ -78,14 +80,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: 18,
     paddingHorizontal: spacing.md - 2,
     paddingVertical: spacing.sm + 4,
   },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: dark.accentGreen },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.accentFill },
 });
 
 export default TypingDots;

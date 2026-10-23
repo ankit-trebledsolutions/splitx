@@ -18,7 +18,7 @@ import Avatar from '../components/Avatar';
 import { fetchGroup, leaveGroup, deleteGroup, setGroupMuted } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketProvider';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import { presenceFrom } from '../utils/presence';
 import { syncReminderAlarms } from '../utils/reminderAlarms';
 import { useGroupPresence } from '../hooks/useGroupPresence';
@@ -26,6 +26,8 @@ import AppAlert from '../components/AppAlert';
 
 // "Group Info" screen, opened by tapping the group name in the chat header.
 const GroupDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { groupId } = route.params;
   const { user } = useAuth();
   const currentUserId = user?._id;
@@ -105,7 +107,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     return (
       <DarkScreen>
         <View style={styles.loading}>
-          <ActivityIndicator color={dark.accentGreen} />
+          <ActivityIndicator color={theme.accentGreen} />
         </View>
       </DarkScreen>
     );
@@ -199,7 +201,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
     <DarkScreen>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={18} color={dark.text} />
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group Info</Text>
         {/* Everything in the menu is admin-only, so other members get a spacer
@@ -210,7 +212,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
             activeOpacity={0.7}
             onPress={() => setMenuOpen(true)}
           >
-            <Ionicons name="ellipsis-vertical" size={15} color={dark.text} />
+            <Ionicons name="ellipsis-vertical" size={15} color={theme.text} />
           </TouchableOpacity>
         ) : (
           <View style={styles.headerIconGhost} />
@@ -268,7 +270,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
                   <View
                     style={[
                       styles.presenceDot,
-                      { backgroundColor: presence.online ? '#22C55E' : dark.textMuted },
+                      { backgroundColor: presence.online ? '#22C55E' : theme.textMuted },
                     ]}
                   />
                 </View>
@@ -295,13 +297,13 @@ const GroupDetailScreen = ({ route, navigation }) => {
         <View style={styles.card}>
           <View style={styles.prefRow}>
             <View style={styles.prefIcon}>
-              <Ionicons name="notifications-off-outline" size={16} color={dark.textMuted} />
+              <Ionicons name="notifications-off-outline" size={16} color={theme.textMuted} />
             </View>
             <Text style={styles.prefText}>Mute notifications</Text>
             <Switch
               value={muted}
               onValueChange={toggleMuted}
-              trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#22C55E' }}
+              trackColor={{ false: theme.overlayStrong, true: '#22C55E' }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -312,10 +314,10 @@ const GroupDetailScreen = ({ route, navigation }) => {
             onPress={() => navigation.navigate('Contributions', { groupId, segment: 'Expenses' })}
           >
             <View style={styles.prefIcon}>
-              <Ionicons name="card-outline" size={16} color={dark.textMuted} />
+              <Ionicons name="card-outline" size={16} color={theme.textMuted} />
             </View>
             <Text style={styles.prefText}>Shared expenses</Text>
-            <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -389,7 +391,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
               ['images-outline', 'Every photo in the gallery'],
             ].map(([icon, label]) => (
               <View key={icon} style={styles.lossRow}>
-                <Ionicons name={icon} size={15} color={dark.textMuted} />
+                <Ionicons name={icon} size={15} color={theme.textMuted} />
                 <Text style={styles.lossText}>{label}</Text>
               </View>
             ))}
@@ -455,7 +457,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
                     <Ionicons
                       name={selected ? 'radio-button-on' : 'radio-button-off'}
                       size={20}
-                      color={selected ? dark.accentGreen : dark.textMuted}
+                      color={selected ? theme.accentGreen : theme.textMuted}
                     />
                   </TouchableOpacity>
                 );
@@ -491,7 +493,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
@@ -505,13 +507,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
   headerIconGhost: { width: 36, height: 36 },
 
   // Drops down from the "⋮" button in the header's top-right corner.
@@ -520,9 +522,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.md,
     minWidth: 190,
-    backgroundColor: dark.card2,
+    backgroundColor: theme.card2,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     paddingVertical: spacing.xs,
   },
@@ -533,7 +535,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 6,
   },
-  menuItemDanger: { color: '#F97362', fontSize: 14, fontWeight: '700' },
+  menuItemDanger: { color: theme.coral, fontSize: 14, fontWeight: '700' },
 
   dangerBadge: {
     width: 48,
@@ -545,17 +547,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   lossRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, marginTop: spacing.sm },
-  lossText: { flex: 1, color: dark.text, fontSize: 13, lineHeight: 18 },
-  dangerNote: { color: '#F97362', fontSize: 13, fontWeight: '700', marginTop: spacing.md },
+  lossText: { flex: 1, color: theme.text, fontSize: 13, lineHeight: 18 },
+  dangerNote: { color: theme.coral, fontSize: 13, fontWeight: '700', marginTop: spacing.md },
 
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
   hero: { alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.lg },
-  groupName: { color: dark.text, fontSize: 24, fontWeight: '800', marginTop: spacing.md },
+  groupName: { color: theme.text, fontSize: 24, fontWeight: '800', marginTop: spacing.md },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
-  metaMuted: { color: dark.textMuted, fontSize: 13 },
-  metaDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: dark.textMuted },
-  metaAccent: { color: dark.accentGreen, fontSize: 13, fontWeight: '600' },
+  metaMuted: { color: theme.textMuted, fontSize: 13 },
+  metaDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: theme.textMuted },
+  metaAccent: { color: theme.accentGreen, fontSize: 13, fontWeight: '600' },
 
   sectionRow: {
     flexDirection: 'row',
@@ -564,22 +566,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionLabel: {
-    color: dark.textMuted,
+    color: theme.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.9,
   },
-  addFriend: { color: dark.accentGreen, fontSize: 13, fontWeight: '700' },
+  addFriend: { color: theme.accentGreen, fontSize: 13, fontWeight: '700' },
 
   card: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg + 4,
     padding: spacing.md,
   },
   contribButton: {
-    backgroundColor: dark.button,
+    backgroundColor: theme.accentFill,
     borderRadius: 22,
     paddingVertical: spacing.sm + 5,
     alignItems: 'center',
@@ -592,7 +594,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm + 4,
   },
-  memberRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
+  memberRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
   presenceDot: {
     position: 'absolute',
     right: -1,
@@ -601,11 +603,11 @@ const styles = StyleSheet.create({
     height: 11,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: dark.card,
+    borderColor: theme.card,
   },
   memberBody: { flex: 1, marginLeft: spacing.sm + 4 },
-  memberName: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  memberMeta: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  memberName: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  memberMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
   adminBadge: {
     backgroundColor: 'rgba(0,196,208,0.14)',
     borderWidth: 1,
@@ -614,8 +616,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 3,
   },
-  adminBadgeText: { color: dark.accentGreen, fontSize: 11, fontWeight: '700' },
-  memberRole: { color: dark.textMuted, fontSize: 12 },
+  adminBadgeText: { color: theme.accentGreen, fontSize: 11, fontWeight: '700' },
+  memberRole: { color: theme.textMuted, fontSize: 12 },
 
   prefsLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
   prefRow: {
@@ -623,32 +625,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm + 4,
   },
-  prefRowBorder: { borderTopWidth: 1, borderTopColor: dark.border },
+  prefRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
   prefIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.overlayFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   leaveIcon: { backgroundColor: 'rgba(249,115,98,0.12)' },
-  prefText: { flex: 1, color: dark.text, fontSize: 14, fontWeight: '600', marginLeft: spacing.sm + 4 },
-  leaveText: { color: '#F97362' },
+  prefText: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600', marginLeft: spacing.sm + 4 },
+  leaveText: { color: theme.coral },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#0C1418',
+    backgroundColor: theme.sheet,
     borderTopLeftRadius: radius.lg + 8,
     borderTopRightRadius: radius.lg + 8,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  sheetTitle: { color: dark.text, fontSize: 17, fontWeight: '800' },
-  sheetHint: { color: dark.textMuted, fontSize: 13, marginTop: 4, marginBottom: spacing.sm },
+  sheetTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
+  sheetHint: { color: theme.textMuted, fontSize: 13, marginTop: 4, marginBottom: spacing.sm },
   sheetList: { maxHeight: 300 },
   sheetMemberName: { flex: 1, marginLeft: spacing.sm + 4 },
   sheetActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
@@ -659,8 +661,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetCancel: { backgroundColor: dark.surface, borderWidth: 1, borderColor: dark.border },
-  sheetCancelText: { color: dark.text, fontSize: 14, fontWeight: '700' },
+  sheetCancel: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
+  sheetCancelText: { color: theme.text, fontSize: 14, fontWeight: '700' },
   sheetLeave: { backgroundColor: '#F97362' },
   sheetLeaveDisabled: { opacity: 0.4 },
   sheetLeaveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },

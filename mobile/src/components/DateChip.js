@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { sheetStyles } from './FormSheet';
-import { dark } from '../theme';
+import { makeSheetStyles } from './FormSheet';
+import { useStyles, useTheme } from '../theme';
 
 const defaultLabel = (date) =>
   date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -15,6 +15,8 @@ const defaultLabel = (date) =>
  *   <DateChip value={date} onChange={setDate} open={open} onToggle={() => setOpen(o => !o)} />
  */
 const DateChip = ({ value, onChange, open, onToggle, label = defaultLabel, style }) => {
+  const theme = useTheme();
+  const sheetStyles = useStyles(makeSheetStyles);
   const shift = (days) => {
     const next = new Date(value);
     next.setDate(next.getDate() + days);
@@ -24,20 +26,20 @@ const DateChip = ({ value, onChange, open, onToggle, label = defaultLabel, style
   return (
     <View style={[sheetStyles.stepper, style, open && styles.open]}>
       <TouchableOpacity onPress={() => shift(-1)} style={sheetStyles.stepButton}>
-        <Ionicons name="chevron-back" size={16} color={dark.textMuted} />
+        <Ionicons name="chevron-back" size={16} color={theme.textMuted} />
       </TouchableOpacity>
       <TouchableOpacity style={sheetStyles.stepValue} onPress={onToggle} activeOpacity={0.7}>
-        <Ionicons name="calendar-outline" size={14} color={dark.accentGreen} />
+        <Ionicons name="calendar-outline" size={14} color={theme.accentGreen} />
         <Text style={sheetStyles.stepText}>{label(value)}</Text>
         <Ionicons
           name={open ? 'chevron-up' : 'chevron-down'}
           size={12}
-          color={dark.textMuted}
+          color={theme.textMuted}
           style={styles.caret}
         />
       </TouchableOpacity>
       <TouchableOpacity onPress={() => shift(1)} style={sheetStyles.stepButton}>
-        <Ionicons name="chevron-forward" size={16} color={dark.textMuted} />
+        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
       </TouchableOpacity>
     </View>
   );

@@ -15,7 +15,7 @@ import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import { useAuth } from '../context/AuthContext';
 import { sendSupportMessage } from '../api/support.api';
-import { dark, radius, spacing } from '../theme';
+import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
 
 // The address Splix's own emails name as the one to write to.
@@ -55,6 +55,8 @@ const CHANNELS = [
  * Route params (optional): { subject }, to start the message ("More credits" from the wallet).
  */
 const ContactUsScreen = ({ navigation, route }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { user } = useAuth();
   const [subject, setSubject] = useState(route.params?.subject ?? '');
   const [message, setMessage] = useState('');
@@ -108,7 +110,7 @@ const ContactUsScreen = ({ navigation, route }) => {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={navigation.goBack} activeOpacity={0.7} hitSlop={styles.hitSlop}>
-            <Ionicons name="arrow-back" size={22} color={dark.text} />
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Contact Us</Text>
         </View>
@@ -128,13 +130,13 @@ const ContactUsScreen = ({ navigation, route }) => {
                 onPress={() => open(channel)}
               >
                 <View style={styles.channelIcon}>
-                  <Ionicons name={channel.icon} size={17} color={dark.accentGreen} />
+                  <Ionicons name={channel.icon} size={17} color={theme.accentGreen} />
                 </View>
                 <View style={styles.channelBody}>
                   <Text style={styles.channelTitle}>{channel.title}</Text>
                   <Text style={styles.channelSubtitle}>{channel.subtitle}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={15} color={dark.textMuted} />
+                <Ionicons name="chevron-forward" size={15} color={theme.textMuted} />
               </TouchableOpacity>
             ))}
           </View>
@@ -187,7 +189,7 @@ const ContactUsScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
   hitSlop: { top: 10, bottom: 10, left: 10, right: 10 },
   header: {
@@ -197,11 +199,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  headerTitle: { color: dark.text, fontSize: 20, fontWeight: '800' },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: '800' },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
   sectionLabel: {
-    color: dark.text,
+    color: theme.text,
     fontSize: 14,
     fontWeight: '700',
     marginTop: spacing.md,
@@ -209,9 +211,9 @@ const styles = StyleSheet.create({
   },
 
   channelCard: {
-    backgroundColor: dark.card,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: dark.border,
+    borderColor: theme.border,
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
@@ -221,7 +223,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  channelDivider: { borderTopWidth: 1, borderTopColor: dark.border },
+  channelDivider: { borderTopWidth: 1, borderTopColor: theme.border },
   channelIcon: {
     width: 34,
     height: 34,
@@ -232,12 +234,12 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   channelBody: { flex: 1 },
-  channelTitle: { color: dark.text, fontSize: 14, fontWeight: '700' },
-  channelSubtitle: { color: dark.textMuted, fontSize: 11, marginTop: 2 },
+  channelTitle: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  channelSubtitle: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
 
-  fieldLabel: { color: dark.textMuted, fontSize: 12, fontWeight: '600', marginBottom: spacing.sm },
+  fieldLabel: { color: theme.textMuted, fontSize: 12, fontWeight: '600', marginBottom: spacing.sm },
   messageInput: { minHeight: 110, paddingTop: spacing.md - 2 },
-  note: { color: dark.textMuted, fontSize: 12, lineHeight: 17, marginBottom: spacing.md },
+  note: { color: theme.textMuted, fontSize: 12, lineHeight: 17, marginBottom: spacing.md },
   sendButton: { marginTop: spacing.xs },
 });
 
