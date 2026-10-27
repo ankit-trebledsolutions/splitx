@@ -30,6 +30,7 @@ import EditItineraryDayScreen from '../screens/EditItineraryDayScreen';
 import AddActivityScreen from '../screens/AddActivityScreen';
 import AiItineraryPrefsScreen from '../screens/AiItineraryPrefsScreen';
 import UploadPhotosScreen from '../screens/UploadPhotosScreen';
+import FaceScanScreen from '../screens/FaceScanScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import ContributionsScreen from '../screens/ContributionsScreen';
@@ -170,6 +171,11 @@ const RootNavigator = () => {
           <Stack.Screen
             name="UploadPhotos"
             component={UploadPhotosScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="FaceScan"
+            component={FaceScanScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

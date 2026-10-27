@@ -938,6 +938,34 @@ Same rule as the single delete, applied per photo: only the caller's own uploads
 
 Response: `{ "data": { "deletedIds": [ ... ] } }` — the photos that were actually deleted.
 
+### `POST /groups/:groupId/face-scan`
+
+Face Scan: find the photos a person is in. `multipart/form-data` with a single image field named **`photo`** (same rules as the photo upload: `image/*`, max 10 MB): a selfie, or a picture of anyone. Members only; **30 scans per 15 minutes** per user (`429`, code `FACE_SCAN_RATE_LIMITED`). The picture is sent to the face service and forgotten; it is never stored.
+
+Response: `{ "data": { "width", "height", "faces": [ ... ], "pending", "threshold" } }`
+
+| Field | Meaning |
+| --- | --- |
+| `width`, `height` | the picture's size, turned the right way up |
+| `faces[]` | every face found in the picture, largest first (up to 6): its `box` (`[x1, y1, x2, y2]` as fractions of width/height) and its `matches[]` |
+| `faces[].matches[]` | this group's photos showing the same person, best first (up to 300): `{ photo, similarity }`, the photo as `GET /groups/:groupId/photos` lists it and `similarity` 0..1 |
+| `pending` | photos of the group the worker has not scanned yet (see below). The app polls the status and scans again once it reaches 0 |
+| `threshold` | the similarity a match needed (`FACE_MATCH_THRESHOLD`) |
+
+Errors: `422` `FACE_NOT_FOUND` (nobody in the picture), `422` `FACE_SCAN_UNREADABLE` (the service could not read the file), `503` `FACE_SCAN_UNAVAILABLE` (no face service configured, or it cannot be reached).
+
+### `GET /groups/:groupId/face-scan`
+
+Members only. `{ "data": { "enabled", "pending" } }`: whether Face Scan is on for this server, and how many of the group's photos still wait to be scanned.
+
+#### How Face Scan works
+
+Every uploaded image goes once, in the background, through the face service (`face-service/` at the project root, a container next to the API): each face it finds gets a fingerprint, a unit vector of 128 numbers from the `sface-2021dec` model, kept in the `faces` collection with the photo and group ids and the face's box. No crop of any face is stored, only the numbers, and they go when the photo, the group or the uploader's account goes. The photo's `faceScan.status` tracks the work: `pending` → `running` → `done` (`faceScan.faces` is the count; 0 is a photo with nobody in it) or `failed` (after three tries; `faceScan.error` says why). Videos, emoji tiles and rows with no stored file are `skipped`.
+
+A scan fingerprints the one picture sent and compares it with the group's stored fingerprints, a dot product each; a photo matches when its best face is at or above the threshold. Nothing outside the group is ever searched, and only the group's members may search it.
+
+The worker is a loop in the API process (one copy, like the reminder sweep) that runs only when `FACE_SERVICE_URL` is set; `FACE_SCAN_WORKER=off` keeps scans working but scans no uploads. Photos from before the feature are adopted at start-up and scanned after anything newer, so a burst of uploads only delays the tagging, never the API. Without Python, `node scripts/fake-face.js` stands in for the service in development (see the script).
+
 ---
 
 ## Attractions

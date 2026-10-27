@@ -143,6 +143,14 @@ const remove = async (key) => {
   await Promise.all([drop(client, bucket, key), drop(client, bucket, `${key}${THUMB_SUFFIX}`)]);
 };
 
+// The file itself, fetched from the bucket (the Face Scan worker reads each
+// uploaded photo back once).
+const read = async (key) => {
+  const { client, bucket } = connection();
+  const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  return Buffer.from(await response.Body.transformToByteArray());
+};
+
 // A link straight to the file in the private bucket, valid for an hour.
 // Made on this machine from the keys: no call to Cloudflare.
 const signedUrl = (key) => {
@@ -152,4 +160,4 @@ const signedUrl = (key) => {
   });
 };
 
-module.exports = { upload, remove, signedUrl, clientFor, outside, THUMB_SUFFIX, SIGNED_URL_SECONDS };
+module.exports = { upload, remove, read, signedUrl, clientFor, outside, THUMB_SUFFIX, SIGNED_URL_SECONDS };

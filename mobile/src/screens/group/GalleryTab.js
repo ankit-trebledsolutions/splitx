@@ -81,13 +81,15 @@ const alertSavePermission = (err) =>
  *
  * Videos play straight away when tapped (their download is in the player).
  * `focusId` is a photo or video a chat card asked to show: it opens, and
- * `onFocusDone` lets the parent forget the request.
+ * `onFocusDone` lets the parent forget the request. `onFaceScan` opens the
+ * Face Scan screen (find the photos a person is in).
  */
 const GalleryTab = ({
   photos,
   loading,
   currentUserId,
   onAddPhoto,
+  onFaceScan,
   onDeletePhotos,
   focusId,
   onFocusDone,
@@ -463,13 +465,7 @@ const GalleryTab = ({
         <View>
           {!selecting && (
             <View style={styles.toolbar}>
-              <TouchableOpacity
-                style={styles.faceScan}
-                activeOpacity={0.8}
-                onPress={() =>
-                  AppAlert.alert('Face Scan', 'Find photos you appear in — coming soon.')
-                }
-              >
+              <TouchableOpacity style={styles.faceScan} activeOpacity={0.8} onPress={onFaceScan}>
                 <Ionicons name="scan-outline" size={15} color="#B79CFF" />
                 <Text style={styles.faceScanText}>Face Scan</Text>
               </TouchableOpacity>

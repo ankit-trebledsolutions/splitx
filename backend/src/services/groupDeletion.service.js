@@ -6,6 +6,7 @@ const Message = require('../models/Message');
 const ItineraryDay = require('../models/ItineraryDay');
 const ItineraryJob = require('../models/ItineraryJob');
 const Photo = require('../models/Photo');
+const Face = require('../models/Face');
 const Attraction = require('../models/Attraction');
 const Stay = require('../models/Stay');
 const Notification = require('../models/Notification');
@@ -26,6 +27,8 @@ const CHILD_MODELS = [
   ItineraryDay,
   ItineraryJob,
   Photo,
+  // The fingerprints of the faces in those photos.
+  Face,
   Attraction,
   Stay,
   // Rows about the group would otherwise deep-link into a group that is gone.

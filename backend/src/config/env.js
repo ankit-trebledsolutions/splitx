@@ -57,6 +57,10 @@ const intEnv = (key, fallback) => {
   const value = parseInt(process.env[key], 10);
   return Number.isNaN(value) ? fallback : value;
 };
+const floatEnv = (key, fallback) => {
+  const value = parseFloat(process.env[key]);
+  return Number.isNaN(value) ? fallback : value;
+};
 const openai = {
   apiKey: process.env.OPENAI_API_KEY || '',
   model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
@@ -96,6 +100,33 @@ const geoapify = {
 };
 if (!geoapify.apiKey && isProduction) {
   console.warn('[places] GEOAPIFY_API_KEY is not set: stay and attraction suggestions are off');
+}
+
+// Face Scan in the gallery (face-service/ at the project root). The face
+// service is a container next to the API that finds the faces in a photo and
+// fingerprints each; the API calls it once per uploaded photo and once per
+// scan. Optional like the others: with no URL, the gallery's Face Scan answers
+// "not available" and no photo is ever scanned. docker-compose.yml sets the URL.
+const faceScan = {
+  serviceUrl: (process.env.FACE_SERVICE_URL || '').trim().replace(/\/+$/, ''),
+  // Per photo. A group photo at the detector's larger size takes a second or two on a small CPU.
+  timeoutMs: intEnv('FACE_SERVICE_TIMEOUT_MS', 30000),
+  // Two faces are the same person at or above this similarity (0..1). Lower
+  // finds more photos and more wrong ones; tune on real trip photos. OpenCV
+  // suggests 0.363 for the SFace model; on clean portraits the same person
+  // scores about 0.7 to 0.8 and different people under 0.3.
+  matchThreshold: floatEnv('FACE_MATCH_THRESHOLD', 0.4),
+  // The detector's working size: uploads (group photos with small faces) and
+  // the scanned picture (one face, close up). Bigger finds smaller faces, slower.
+  indexDetSize: intEnv('FACE_INDEX_DET_SIZE', 960),
+  queryDetSize: intEnv('FACE_QUERY_DET_SIZE', 640),
+  // The upload scanner is a loop in this process (one copy only, like the
+  // reminder sweep). FACE_SCAN_WORKER=off leaves scans working but scans no
+  // uploads, for a second API process or a machine pointed at a shared database.
+  worker: (process.env.FACE_SCAN_WORKER || 'on') !== 'off',
+};
+if (!faceScan.serviceUrl && isProduction) {
+  console.warn('[face-scan] FACE_SERVICE_URL is not set: the gallery\'s Face Scan is off');
 }
 
 // Admin panel > Third-Party APIs. Keys saved there are encrypted with this
@@ -142,6 +173,7 @@ module.exports = {
   email,
   openai,
   geoapify,
+  faceScan,
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/splity'),

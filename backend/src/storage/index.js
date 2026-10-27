@@ -16,6 +16,7 @@ const localStorage = require('./local.storage');
  *       thumbUrl small square for grids (may equal url if no square was made)
  *       key      whatever the provider needs later to delete the file
  *   remove(key)               -> void   (must not throw if already gone)
+ *   read(key)                 -> Buffer (the file's bytes; throws if gone)
  *
  * Each photo and message records which provider stored its file, so files
  * uploaded before a switch can still be found and deleted afterwards. Files
@@ -49,6 +50,14 @@ const remove = async (key, providerName) => {
   }
 };
 
+// The file's bytes, for the server's own use (the Face Scan worker). Rows
+// still marked "cloudinary" have no provider here and throw.
+const read = async (key, providerName) => {
+  const provider = providers[providerName];
+  if (!provider || !key) throw new Error(`No readable file for ${providerName || 'unknown'}:${key || ''}`);
+  return provider.read(key);
+};
+
 // For GET /media/<key>: a short-lived link to the file in the private bucket,
 // or null when there is no bucket to ask.
 const linkTo = async (key) => (integrations.r2() ? r2Storage.signedUrl(key) : null);
@@ -56,6 +65,7 @@ const linkTo = async (key) => (integrations.r2() ? r2Storage.signedUrl(key) : nu
 module.exports = {
   upload,
   remove,
+  read,
   linkTo,
   get activeProvider() {
     return activeName();

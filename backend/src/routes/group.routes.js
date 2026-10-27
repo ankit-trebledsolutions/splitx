@@ -5,6 +5,7 @@ const { protect } = require('../middleware/auth');
 const { photoUpload, chatUpload, videoUpload } = require('../middleware/upload');
 const aiLimiter = require('../middleware/aiLimiter');
 const placesLimiter = require('../middleware/placesLimiter');
+const faceScanLimiter = require('../middleware/faceScanLimiter');
 const { TIME_12H } = require('../utils/itineraryTime');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
@@ -311,6 +312,16 @@ router.post(
   ]),
   photoController.uploadVideo
 );
+// Face Scan: the picture to look for (same field and limits as a photo
+// upload, but it is not stored), and how many photos still wait to be scanned.
+router.post(
+  '/:groupId/face-scan',
+  faceScanLimiter,
+  validate(groupParams),
+  photoUpload.single('photo'),
+  photoController.faceScan
+);
+router.get('/:groupId/face-scan', validate(groupParams), photoController.faceScanStatus);
 
 router.get('/:groupId/attractions', validate(groupParams), attractionController.listAttractions);
 router.post('/:groupId/attractions', validate(createAttractionSchema), attractionController.createAttraction);

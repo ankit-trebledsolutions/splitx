@@ -4,6 +4,8 @@ const groupService = require('./group.service');
 const messageService = require('./message.service');
 const notificationService = require('./notification.service');
 const storedFileService = require('./storedFile.service');
+const faceScanService = require('./faceScan.service');
+const faceScanWorker = require('./faceScan.worker');
 
 const USER_FIELDS = 'name email';
 const POPULATE = [
@@ -57,7 +59,10 @@ const addPhoto = async (userId, groupId, payload) => {
     durationMs: payload.durationMs,
     taggedMembers,
     uploadedBy: userId,
+    // Only an image with a stored file can be scanned for faces (see the model).
+    faceScan: { status: faceScanService.isIndexable(payload) ? 'pending' : 'skipped' },
   });
+  faceScanWorker.kick();
 
   await photo.populate(POPULATE);
 
@@ -107,6 +112,7 @@ const deletePhoto = async (photoId, userId) => {
   // storageKey is hidden from normal reads, so fetch it just for the clean-up.
   const stored = await Photo.findById(photoId).select('+storageKey storageProvider');
   await photo.deleteOne();
+  await faceScanService.removeForPhotos([photo._id]);
   await messageService.dropFromGalleryCards([photo._id]);
   await storedFileService.removeIfUnused(fileOf(photo.imageUrl, stored));
 };
@@ -136,6 +142,7 @@ const deletePhotos = async (photoIds, userId) => {
 
   const deletable = photos.filter((p) => memberOf.has(p.group.toString()));
   await Photo.deleteMany({ _id: { $in: deletable.map((p) => p._id) } });
+  await faceScanService.removeForPhotos(deletable.map((p) => p._id));
   await messageService.dropFromGalleryCards(deletable.map((p) => p._id));
   await Promise.all(deletable.map((p) => storedFileService.removeIfUnused(fileOf(p.imageUrl, p))));
   return deletable.map((p) => p._id);

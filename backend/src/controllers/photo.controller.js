@@ -1,6 +1,7 @@
 const fs = require('fs');
 const asyncHandler = require('../utils/asyncHandler');
 const photoService = require('../services/photo.service');
+const faceScanService = require('../services/faceScan.service');
 const groupService = require('../services/group.service');
 const storage = require('../storage');
 const { MAX_POSTER_BYTES } = require('../middleware/upload');
@@ -122,4 +123,32 @@ const deletePhotos = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { deletedIds } });
 });
 
-module.exports = { listPhotos, addPhoto, uploadPhoto, uploadVideo, deletePhoto, deletePhotos };
+// Face Scan: the picture is held in memory by multer, sent to the face
+// service and forgotten; only the matches come back.
+const faceScan = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ success: false, message: 'No image file received' });
+    return;
+  }
+  const result = await faceScanService.search(req.params.groupId, req.user._id, {
+    buffer: req.file.buffer,
+    mimeType: req.file.mimetype,
+  });
+  res.json({ success: true, data: result });
+});
+
+const faceScanStatus = asyncHandler(async (req, res) => {
+  const status = await faceScanService.status(req.params.groupId, req.user._id);
+  res.json({ success: true, data: status });
+});
+
+module.exports = {
+  listPhotos,
+  addPhoto,
+  uploadPhoto,
+  uploadVideo,
+  deletePhoto,
+  deletePhotos,
+  faceScan,
+  faceScanStatus,
+};

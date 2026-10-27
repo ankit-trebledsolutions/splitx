@@ -34,4 +34,6 @@ const remove = async (key) => {
   ]);
 };
 
-module.exports = { upload, remove };
+const read = (key) => fs.promises.readFile(path.join(UPLOAD_DIR, path.basename(key)));
+
+module.exports = { upload, remove, read, UPLOAD_DIR };

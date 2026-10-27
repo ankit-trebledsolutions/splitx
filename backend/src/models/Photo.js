@@ -31,11 +31,30 @@ const photoSchema = new mongoose.Schema(
     // the Face Scan filter.
     taggedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // Face Scan (services/faceScan.worker.js). Every image waits for the
+    // worker as `pending`, is `running` while in hand, then `done` with its
+    // faces fingerprinted (`faces` says how many; 0 is a photo with nobody in
+    // it). `skipped`: a video, an emoji tile or a row with no stored file.
+    // `failed`: given up after the worker's attempts (`error` says why).
+    faceScan: {
+      status: {
+        type: String,
+        enum: ['pending', 'running', 'done', 'skipped', 'failed'],
+        default: 'pending',
+      },
+      faces: { type: Number, default: 0 },
+      attempts: { type: Number, default: 0 },
+      startedAt: { type: Date, default: null },
+      scannedAt: { type: Date, default: null },
+      error: { type: String, default: null, maxlength: 200 },
+    },
   },
   { timestamps: true }
 );
 
 photoSchema.index({ group: 1, createdAt: -1 });
+// The worker's queue: the newest pending photo first.
+photoSchema.index({ 'faceScan.status': 1, createdAt: -1 });
 
 // `select: false` only hides storageKey on reads; a just-created document still
 // carries it, so strip it from anything that is sent to a client.

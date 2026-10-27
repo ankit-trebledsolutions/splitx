@@ -879,6 +879,10 @@ const GroupChatScreen = ({ route, navigation }) => {
     navigation.navigate('UploadPhotos', { groupId, groupName: group?.name, media: 'video' });
   };
 
+  const openFaceScan = () => {
+    navigation.navigate('FaceScan', { groupId, groupName: group?.name });
+  };
+
   const openTaskDetail = (task) => {
     if (task?._id) navigation.navigate('TaskDetail', { taskId: task._id });
   };
@@ -1542,6 +1546,7 @@ const GroupChatScreen = ({ route, navigation }) => {
           loading={loading}
           currentUserId={currentUserId}
           onAddPhoto={openUploadPhotos}
+          onFaceScan={openFaceScan}
           onDeletePhotos={handleDeletePhotos}
           focusId={focusIdFor('gallery')}
           onFocusDone={clearFocus}

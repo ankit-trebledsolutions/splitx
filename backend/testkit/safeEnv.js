@@ -54,6 +54,11 @@ Object.assign(process.env, {
   GEOAPIFY_API_KEY: 'fake-ok',
   GEOAPIFY_BASE_URL: 'http://127.0.0.1:9',
   GEOAPIFY_TIMEOUT_MS: '1500',
+  // No face service: Face Scan answers "not available" unless a test points
+  // env.faceScan.serviceUrl at its own fake (scripts/fake-face.js).
+  FACE_SERVICE_URL: '',
+  FACE_SERVICE_TIMEOUT_MS: '1500',
+  FACE_SCAN_WORKER: 'off',
 });
 
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
@@ -79,6 +84,11 @@ const assertSafe = (env) => {
   }
   if (!isLocal(env.geoapify.baseUrl)) {
     throw new Error('safeEnv: GEOAPIFY_BASE_URL does not point at this machine. Refusing to run.');
+  }
+  // Optional like the service itself; a test may point it at a local fake.
+  const faceServiceUrl = env.faceScan?.serviceUrl;
+  if (faceServiceUrl && !isLocal(faceServiceUrl)) {
+    throw new Error('safeEnv: FACE_SERVICE_URL does not point at this machine. Refusing to run.');
   }
 };
 

@@ -3,6 +3,7 @@ const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const Task = require('../models/Task');
 const Photo = require('../models/Photo');
+const Face = require('../models/Face');
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const DirectMessage = require('../models/DirectMessage');
@@ -194,6 +195,8 @@ const deleteUser = async (userId) => {
     }
   }
   await Photo.deleteMany({ uploadedBy: userId });
+  // The faces fingerprinted in those photos go with them.
+  await Face.deleteMany({ photo: { $in: photos.map((photo) => photo._id) } });
 
   // Direct conversations exist only between their participants, so they go with
   // the person, along with the messages inside them.

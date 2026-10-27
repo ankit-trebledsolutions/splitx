@@ -55,4 +55,8 @@ test('assertSafe refuses anything that is not this machine', () => {
   assert.throws(() => assertSafe({ ...local, mongoUri: 'mongodb://127.0.0.1:27017,db.example.com:27017/splix' }), /MONGODB_URI/);
   assert.throws(() => assertSafe({ ...local, openai: { baseUrl: 'https://api.openai.com/v1' } }), /OPENAI_BASE_URL/);
   assert.throws(() => assertSafe({ ...local, geoapify: { baseUrl: 'https://api.geoapify.com' } }), /GEOAPIFY_BASE_URL/);
+  // The face service is optional: none, or a local one, is fine.
+  assert.doesNotThrow(() => assertSafe({ ...local, faceScan: { serviceUrl: '' } }));
+  assert.doesNotThrow(() => assertSafe({ ...local, faceScan: { serviceUrl: 'http://127.0.0.1:4020' } }));
+  assert.throws(() => assertSafe({ ...local, faceScan: { serviceUrl: 'http://face:8000' } }), /FACE_SERVICE_URL/);
 });

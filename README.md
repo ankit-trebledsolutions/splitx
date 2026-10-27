@@ -113,7 +113,8 @@ Scan the QR code with Expo Go, or press `a` / `i` for an emulator/simulator.
   time from slide wheels, like a phone's alarm clock. All of mine are listed on the
   Reminders screen (alarm icon on Home)
 - **Itinerary** — days with timed activities
-- **Gallery** — photo upload (multipart, 15 MB max) or emoji/colour tiles
+- **Gallery** — photo upload (multipart, 15 MB max) or emoji/colour tiles;
+  Face Scan finds the photos a person is in (see "Face Scan" below)
 - **Attractions & Stays** — shortlists with bookmarks, stay status tracking
 - **Group Info screen** — tap the group name in the chat header: members with
   presence, view contributions, add friends, preferences (mute/leave)
@@ -202,6 +203,36 @@ to be deployed for anything to ring.
 Checks: `npm test` in `backend/` (`test/callRing.test.js`), and the same
 `gradlew :splix-alarm:testDebugUnitTest` for reading the push and deciding what
 a ring does (`CallTest.kt`).
+
+## Face Scan
+
+The gallery's **Face Scan** finds the photos a person is in: take a selfie or
+pick a picture of anyone in the group, and the group's photos showing the same
+person come back, best match first. Three pieces:
+
+- `face-service/` — a small Python container (OpenCV's YuNet and SFace models,
+  MIT and Apache licensed) that finds the faces in a photo and gives each one a
+  fingerprint. It keeps nothing. See its README.
+- `backend/` — every uploaded image goes through the service once, in the
+  background, and its faces' fingerprints are kept next to the photo (the
+  `faces` collection; no face crops, only numbers). A scan fingerprints the one
+  picture sent and compares it with the group's stored fingerprints; nothing
+  outside the group is ever searched. `API.md` has the endpoints, the photo's
+  `faceScan` status fields and the tuning variables (`FACE_*` in `.env.example`).
+- `mobile/` — the Face Scan button on the Gallery tab opens
+  `screens/FaceScanScreen.js`. No new native module: the camera comes through
+  expo-image-picker, which the app already ships.
+
+Running it locally: the real service (`face-service/README.md`) or, without
+Python, `node scripts/fake-face.js` in `backend/`; then
+`FACE_SERVICE_URL=http://127.0.0.1:8000` (`:4020` for the fake) in the
+environment of `npm run dev:local`. Deploying: `docker compose up -d --build`
+builds the `face` container too (the first build downloads 37 MB of models and
+takes a few minutes); `docker-compose.yml` already points the API at it. Photos
+uploaded before the feature are scanned on the first start, newest first.
+
+Checks: `npm test` in `backend/` (`test/faceScan.test.js`, which needs a local
+MongoDB and is skipped without one).
 
 ## API
 

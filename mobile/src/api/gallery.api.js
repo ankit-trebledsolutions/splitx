@@ -21,6 +21,35 @@ export const deletePhotos = async (photoIds) => {
   return data.data.deletedIds;
 };
 
+/**
+ * Face Scan: the faces in a picture (a selfie, or a photo picked from the
+ * phone) and, for each, this group's photos showing the same person, best
+ * first. `file` is { uri, name, type } from expo-image-picker; the picture is
+ * not kept by the server. Resolves to
+ *   { width, height, faces: [{ box, matches: [{ photo, similarity }] }], pending, threshold }
+ * where `box` is x1, y1, x2, y2 as fractions of the picture and `pending` is
+ * how many of the group's photos the server has not scanned yet.
+ * Fails with code FACE_NOT_FOUND (nobody in the picture), FACE_SCAN_UNREADABLE,
+ * FACE_SCAN_UNAVAILABLE (the service is off or down) or FACE_SCAN_RATE_LIMITED.
+ */
+export const scanFaces = async (groupId, file) => {
+  const form = new FormData();
+  form.append('photo', file);
+  const { data } = await client.post(`/groups/${groupId}/face-scan`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    // The upload, then a detector pass and a fingerprint per face on the server.
+    timeout: 90000,
+  });
+  return data.data;
+};
+
+// { enabled, pending }: whether Face Scan is on, and how many of the group's
+// photos still wait to be scanned.
+export const fetchFaceScanStatus = async (groupId) => {
+  const { data } = await client.get(`/groups/${groupId}/face-scan`);
+  return data.data;
+};
+
 // Files picked together share a batch key, so the chat shows them as one card;
 // `batchCount` is how many there are, for the wording of the notification.
 const appendBatch = (form, { batch, batchCount } = {}) => {

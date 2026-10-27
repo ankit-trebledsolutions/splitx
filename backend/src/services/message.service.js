@@ -4,6 +4,7 @@ const Reminder = require('../models/Reminder');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const storedFileService = require('./storedFile.service');
+const faceScanWorker = require('./faceScan.worker');
 // Called as realtime.emitToGroup(...), never destructured, so tests can swap the function.
 const realtime = require('../realtime/socket');
 
@@ -158,6 +159,8 @@ const sendAttachment = async (userId, groupId, { attachment, text = '', replyToI
         caption: text.slice(0, 200),
         uploadedBy: userId,
       });
+      // A new gallery image waits for the Face Scan worker (the model's default).
+      faceScanWorker.kick();
     } catch (err) {
       // The message is sent either way; a missing gallery tile is not worth failing it.
       console.error('[chat] could not add photo to gallery:', err.message);

@@ -5,6 +5,7 @@ const realtime = require('./realtime/socket');
 const aiItineraryService = require('./services/aiItinerary.service');
 const reminderSweep = require('./services/reminderSweep.service');
 const walletSweep = require('./services/walletSweep.service');
+const faceScanWorker = require('./services/faceScan.worker');
 const integrations = require('./integrations/store');
 
 // How long a shutdown waits for AI jobs to be closed before carrying on regardless.
@@ -38,11 +39,16 @@ const start = async () => {
     console.log(`[reminders] backup sweep is ${env.reminderSweep ? 'on' : 'off'}`);
     // Wallet repair and call billing (see walletSweep.service). Always on.
     walletSweep.start();
+    // Gallery photos through the face service, one at a time (see
+    // faceScan.worker.service). Only with a face service to send them to.
+    await faceScanWorker.start();
+    console.log(`[face-scan] upload scanner is ${faceScanWorker.enabled() ? 'on' : 'off'}`);
 
     const shutdown = async (signal) => {
       console.log(`${signal} received, shutting down`);
       reminderSweep.stop();
       walletSweep.stop();
+      faceScanWorker.stop();
       // Before the sockets close, so requesters still get the "failed" event
       // instead of watching the planning animation until it times out.
       await Promise.race([
