@@ -8,6 +8,9 @@ const integrations = require('../controllers/integration.controller');
 const support = require('../controllers/adminSupport.controller');
 const wallet = require('../controllers/adminWallet.controller');
 const appRelease = require('../controllers/appRelease.controller');
+const branding = require('../controllers/branding.controller');
+const { logoUpload } = require('../middleware/upload');
+const { NAME_MIN: BRAND_NAME_MIN, NAME_MAX: BRAND_NAME_MAX } = require('../models/Branding');
 const { TYPES: TRANSACTION_TYPES, FEATURES: PAID_FEATURES } = require('../models/CreditTransaction');
 const { INTEGRATION_KEYS } = require('../integrations/definitions');
 const { TEMPLATE_KEYS } = require('../emails/defaults');
@@ -183,6 +186,17 @@ const platformReleaseSchema = z
 const appReleaseSchema = z.object({
   android: platformReleaseSchema,
   ios: platformReleaseSchema,
+});
+
+// The app's name. One line of ordinary text: it is drawn as the wordmark, put
+// in notification titles and written into invite messages.
+const brandingSchema = z.object({
+  appName: z
+    .string({ required_error: 'Enter the app name' })
+    .trim()
+    .min(BRAND_NAME_MIN, `The app name needs at least ${BRAND_NAME_MIN} characters`)
+    .max(BRAND_NAME_MAX, `The app name can be at most ${BRAND_NAME_MAX} characters`)
+    .regex(/^[^\r\n\t]+$/, 'The app name must be a single line'),
 });
 
 // Whole credits only. The ceilings are sanity limits, not business rules: the
@@ -438,6 +452,25 @@ router.put(
   validate({ body: appReleaseSchema }),
   appRelease.updateSettings
 );
+
+// --- Branding ----------------------------------------------------------------
+// The app's name and logo, shown on every phone and on this panel. Owners
+// only, like the rest of General Settings.
+router.get('/branding', adminReadLimiter, requireSuperAdmin, branding.getSettings);
+
+router.put(
+  '/branding',
+  adminWriteLimiter,
+  requireSuperAdmin,
+  validate({ body: brandingSchema }),
+  branding.updateSettings
+);
+
+// multipart, one `logo` image field. multer refuses anything but PNG, JPEG
+// or WebP, and anything over 2 MB, before the handler runs.
+router.post('/branding/logo', adminWriteLimiter, requireSuperAdmin, logoUpload.single('logo'), branding.uploadLogo);
+
+router.delete('/branding/logo', adminWriteLimiter, requireSuperAdmin, branding.removeLogo);
 
 // --- Support ----------------------------------------------------------------
 // Reports people send from the app. A module of its own in the permission

@@ -19,6 +19,7 @@ import Avatar from '../components/Avatar';
 import AppAlert from '../components/AppAlert';
 import GradientButton from '../components/GradientButton';
 import { useAuth } from '../context/AuthContext';
+import { useBranding } from '../branding/BrandingProvider';
 import { fetchInviteCode } from '../api/auth.api';
 import {
   appInviteMessage,
@@ -67,9 +68,12 @@ const InviteFriendsScreen = ({ route, navigation }) => {
   const styles = useStyles(makeStyles);
   const { group, isNew = false } = route.params ?? {};
   const { user } = useAuth();
+  const branding = useBranding();
   const inviterName = user?.name?.split(' ')[0];
-  // What the code card shows and copies: the group's join link, or the personal code.
-  const [code, setCode] = useState(group ? groupInviteLink(group.inviteCode) : null);
+  // What the code card shows and copies: the group's join link, or the personal
+  // code. The link follows the branding, which may arrive after the first draw.
+  const [personalCode, setPersonalCode] = useState(null);
+  const code = group ? groupInviteLink(group.inviteCode, branding) : personalCode;
   const [copied, setCopied] = useState(false);
   const [query, setQuery] = useState('');
   const [contacts, setContacts] = useState([]);
@@ -83,7 +87,7 @@ const InviteFriendsScreen = ({ route, navigation }) => {
     let active = true;
     if (!group) {
       fetchInviteCode()
-        .then((value) => active && setCode(value))
+        .then((value) => active && setPersonalCode(value))
         .catch((err) => active && AppAlert.alert('Could not load your invite code', err.message));
     }
     AsyncStorage.getItem(sentKey)
@@ -126,8 +130,12 @@ const InviteFriendsScreen = ({ route, navigation }) => {
 
   // The pre-written invite: into this group, or to Splix in general.
   const messageFor = (firstName) =>
-    group ? inviteMessage({ group, inviterName, firstName }) : appInviteMessage({ code, firstName });
-  const emailSubject = group ? `Join "${group.name}" on Splix` : 'Join me on Splix';
+    group
+      ? inviteMessage({ group, inviterName, firstName, branding })
+      : appInviteMessage({ code, firstName, branding });
+  const emailSubject = group
+    ? `Join "${group.name}" on ${branding.appName}`
+    : `Join me on ${branding.appName}`;
 
   // No particular person: the chosen app asks who to send it to.
   const shareVia = async (channel) => {
@@ -137,7 +145,7 @@ const InviteFriendsScreen = ({ route, navigation }) => {
       if (channel === 'whatsapp') await inviteViaWhatsApp(message);
       else if (channel === 'sms') await inviteViaSms(message);
       else if (channel === 'email') await inviteViaEmail(emailSubject, message);
-      else await inviteViaTwitter(group ? groupInviteTweet({ group }) : appInviteTweet({ code }));
+      else await inviteViaTwitter(group ? groupInviteTweet({ group, branding }) : appInviteTweet({ code, branding }));
     } catch {
       // Nothing on this phone handles that channel: the share sheet always works.
       inviteViaShareSheet(message);
@@ -317,9 +325,9 @@ const InviteFriendsScreen = ({ route, navigation }) => {
               </Text>
               <Text style={styles.stateBody}>
                 {contactsStatus === CONTACTS_STATUS.UNAVAILABLE
-                  ? 'Install the latest build of Splix to invite people from your contacts.'
+                  ? `Install the latest build of ${branding.appName} to invite people from your contacts.`
                   : contactsStatus === CONTACTS_STATUS.BLOCKED
-                    ? 'Contacts access is turned off for Splix. Turn it on in Settings to pick friends here.'
+                    ? `Contacts access is turned off for ${branding.appName}. Turn it on in Settings to pick friends here.`
                     : 'Tap Sync Contacts to pick friends from your phone. Your contacts stay on your device.'}
               </Text>
               {contactsStatus !== CONTACTS_STATUS.UNAVAILABLE && (

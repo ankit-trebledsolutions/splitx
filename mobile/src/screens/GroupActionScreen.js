@@ -5,6 +5,7 @@ import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import { joinGroup } from '../api/groups.api';
+import { inviteCodeFromUrl } from '../invites/inviteLinks';
 import { radius, spacing, useStyles, useTheme } from '../theme';
 
 // Entry point of the group flow: create a brand new group, or join an
@@ -16,8 +17,9 @@ const GroupActionScreen = ({ navigation }) => {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
 
-  // Accepts a raw code ("A1B2C3D4") or a full link ("splix.app/join/A1B2C3D4").
-  const extractCode = (value) => value.trim().replace(/^.*[/@]/, '').toUpperCase();
+  // Accepts a raw code ("A1B2C3D4") or a full invite link (".../join/A1B2C3D4").
+  const extractCode = (value) =>
+    inviteCodeFromUrl(value) ?? value.trim().replace(/^.*[/@]/, '').toUpperCase();
 
   const handleJoin = async () => {
     const code = extractCode(invite);

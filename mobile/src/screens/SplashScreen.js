@@ -2,9 +2,9 @@ import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import SplixLogo from '../components/SplixLogo';
+import BrandWordmark from '../components/BrandWordmark';
 import SplashGlow from '../assets/splash-glow.svg';
 import SplashChevrons from '../assets/splash-chevrons.svg';
-import Wordmark from '../assets/wordmark.svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,9 +26,11 @@ const SplashScreen = () => (
       height={width * CHEVRON_RATIO}
       style={styles.chevrons}
     />
+    {/* The logo and name as set in the admin panel; the Splix mark and
+        wordmark until an owner changes them (see BrandWordmark). */}
     <View style={styles.brandRow}>
       <SplixLogo size={88} />
-      <Wordmark width={141} height={56} />
+      <BrandWordmark height={56} />
     </View>
   </View>
 );

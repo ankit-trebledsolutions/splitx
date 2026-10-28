@@ -40,6 +40,11 @@ const joinGroupSchema = {
   }),
 };
 
+// The code from an invite link (https://<host>/join/<code>), as typed or tapped.
+const invitePreviewSchema = {
+  params: z.object({ code: z.string().trim().min(4, 'Invite code is required').max(16) }),
+};
+
 const groupParams = { params: z.object({ groupId: objectId }) };
 
 const leaveGroupSchema = {
@@ -258,6 +263,8 @@ const destinationSchema = {
 router.post('/', validate(createGroupSchema), groupController.createGroup);
 router.get('/', groupController.listGroups);
 router.post('/join', validate(joinGroupSchema), groupController.joinGroup);
+// Ahead of /:groupId so "invites" is never read as a group id.
+router.get('/invites/:code', validate(invitePreviewSchema), groupController.previewInvite);
 router.get('/:groupId', validate(groupParams), groupController.getGroup);
 router.delete('/:groupId', validate(groupParams), groupController.deleteGroup);
 router.post('/:groupId/leave', validate(leaveGroupSchema), groupController.leaveGroup);

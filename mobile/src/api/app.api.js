@@ -10,3 +10,11 @@ export const fetchAppRelease = async () => {
   const { data } = await client.get('/app/release');
   return data.data.release;
 };
+
+// The app's name and logo as set in the admin panel, and where invite links
+// point: { appName, logoUrl, inviteBaseUrl, updatedAt }. No auth. A server
+// from before branding existed answers 404, and the app stays Splix.
+export const fetchBranding = async () => {
+  const { data } = await client.get('/app/branding');
+  return data.data.branding;
+};

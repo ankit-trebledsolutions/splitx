@@ -20,6 +20,16 @@ export const joinGroup = async (inviteCode) => {
   return data.data.group;
 };
 
+// What an invite link leads to, for the Join screen, without joining:
+// { code, group: { _id, name, description, groupType, location, startDate,
+//   totalDays, memberCount, members: [{ _id, name, avatar }] },
+//   invitedBy: { _id, name } | null, alreadyMember }
+// An unknown code is a 404 with code INVITE_NOT_FOUND.
+export const fetchInvitePreview = async (inviteCode) => {
+  const { data } = await client.get(`/groups/invites/${encodeURIComponent(inviteCode)}`);
+  return data.data.invite;
+};
+
 // newAdminId is only needed when the admin leaves a group of three or more.
 export const leaveGroup = async (groupId, newAdminId) => {
   await client.post(`/groups/${groupId}/leave`, newAdminId ? { newAdminId } : {});

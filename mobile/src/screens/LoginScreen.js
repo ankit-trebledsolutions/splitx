@@ -6,6 +6,7 @@ import AuthLayout from '../components/AuthLayout';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import AuthFooter from '../components/AuthFooter';
+import InviteNotice from '../components/InviteNotice';
 import GoogleIcon from '../assets/google.svg';
 import { radius, spacing, useStyles, useTheme } from '../theme';
 import AppAlert from '../components/AppAlert';
@@ -78,6 +79,7 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to access your splix">
+      <InviteNotice action="Sign in" />
       <TextField
         label="Email"
         value={email}

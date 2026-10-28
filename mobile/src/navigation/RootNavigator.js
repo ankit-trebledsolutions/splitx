@@ -17,6 +17,7 @@ import MainTabs from './MainTabs';
 import GroupActionScreen from '../screens/GroupActionScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import InviteFriendsScreen from '../screens/InviteFriendsScreen';
+import JoinGroupScreen from '../screens/JoinGroupScreen';
 import GroupChatScreen from '../screens/GroupChatScreen';
 import DirectChatScreen from '../screens/DirectChatScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
@@ -106,6 +107,12 @@ const RootNavigator = () => {
           <Stack.Screen
             name="InviteFriends"
             component={InviteFriendsScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Where an invite link lands. Opened by MainTabs (see src/invites). */}
+          <Stack.Screen
+            name="JoinGroup"
+            component={JoinGroupScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

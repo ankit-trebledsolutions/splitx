@@ -12,7 +12,9 @@ server {
   return 301 https://$host$request_uri;
 }
 
-# API and socket.io (chat, calls)
+# API and socket.io (chat, calls). Everything on this name goes to the API,
+# including the group invite links (/join/<code>) and the file Android reads
+# to open them in the app (/.well-known/assetlinks.json).
 server {
   listen 443 ssl;
   http2 on;

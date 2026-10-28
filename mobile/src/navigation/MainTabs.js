@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, Pressable } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
@@ -11,6 +11,7 @@ import ExpensesScreen from '../screens/ExpensesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { useTour } from '../tour/TourProvider';
 import useTourTarget from '../tour/useTourTarget';
+import { useInviteLinks } from '../invites/InviteLinkProvider';
 import { useTheme } from '../theme';
 
 const Tab = createBottomTabNavigator();
@@ -59,6 +60,17 @@ const MainTabs = () => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const tabsFocused = useIsFocused();
+
+  // An invite link that is waiting (tapped before sign-in, or just now) opens
+  // the Join screen over the tabs. Done here because this is the first screen
+  // that exists in every signed-in state the link can arrive in.
+  const stack = useNavigation();
+  const { pendingCode, consume } = useInviteLinks();
+  useEffect(() => {
+    if (!pendingCode) return;
+    consume();
+    stack.navigate('JoinGroup', { code: pendingCode });
+  }, [pendingCode, consume, stack]);
   // The app renders edge-to-edge, so the window extends under the system
   // navigation bar. Android 3-button navigation has a ~48dp bar, gesture
   // navigation ~16-24dp, and iOS the home indicator. A fixed height put the

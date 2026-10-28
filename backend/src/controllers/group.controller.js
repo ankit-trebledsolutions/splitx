@@ -22,6 +22,12 @@ const joinGroup = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { group } });
 });
 
+// What an invite link leads to, for the Join screen, without joining.
+const previewInvite = asyncHandler(async (req, res) => {
+  const invite = await groupService.previewInvite(req.params.code, req.user._id);
+  res.json({ success: true, data: { invite } });
+});
+
 const leaveGroup = asyncHandler(async (req, res) => {
   await groupService.leaveGroup(req.params.groupId, req.user._id, req.body);
   res.json({ success: true, message: 'Left group' });
@@ -63,6 +69,7 @@ module.exports = {
   listGroups,
   getGroup,
   joinGroup,
+  previewInvite,
   leaveGroup,
   deleteGroup,
   removeMember,

@@ -73,6 +73,45 @@ const assertTripGroup = (group, message) => {
   if (group.groupType !== 'trip') throw new ApiError(400, message, { code: 'TRIP_ONLY' });
 };
 
+// How many members an invite preview names; the rest are a count.
+const INVITE_PREVIEW_MEMBERS = 6;
+
+/**
+ * What an invite link shows before anyone joins: the group, who runs it and
+ * who is in it. Nothing in it is private to members (the invite message
+ * already names the group), and nothing changes. `userId` may be null (the
+ * public page a link opens in a browser), in which case `alreadyMember` is
+ * simply false.
+ */
+const previewInvite = async (inviteCode, userId) => {
+  const group = await Group.findOne({ inviteCode: String(inviteCode).trim().toUpperCase() })
+    .populate('members', 'name avatar')
+    .populate('createdBy', 'name')
+    .populate('admin', 'name')
+    .lean();
+  if (!group) throw new ApiError(404, 'This invite link is not valid', { code: 'INVITE_NOT_FOUND' });
+  const admin = group.admin ?? group.createdBy;
+  const members = group.members ?? [];
+  return {
+    code: group.inviteCode,
+    group: {
+      _id: group._id,
+      name: group.name,
+      description: group.description ?? '',
+      groupType: group.groupType,
+      location: group.location ?? '',
+      startDate: group.startDate ?? null,
+      totalDays: group.totalDays ?? null,
+      memberCount: members.length,
+      members: members
+        .slice(0, INVITE_PREVIEW_MEMBERS)
+        .map((m) => ({ _id: m._id, name: m.name, avatar: m.avatar ?? null })),
+    },
+    invitedBy: admin ? { _id: admin._id, name: admin.name } : null,
+    alreadyMember: Boolean(userId) && members.some((m) => sameId(m._id, userId)),
+  };
+};
+
 const joinGroupByCode = async (userId, inviteCode) => {
   const group = await Group.findOne({ inviteCode: inviteCode.toUpperCase() });
   if (!group) throw ApiError.notFound('No group found for that invite code');
@@ -438,6 +477,7 @@ module.exports = {
   listGroupsForUser,
   getGroupForMember,
   assertTripGroup,
+  previewInvite,
   joinGroupByCode,
   leaveGroup,
   removeMember,

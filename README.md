@@ -95,7 +95,8 @@ Scan the QR code with Expo Go, or press `a` / `i` for an emulator/simulator.
 ## App features
 
 - **Auth** — register/login (JWT), forgot-password with OTP reset flow
-- **Groups** — create (trip/home/couple/event), join via invite code,
+- **Groups** — create (trip/home/couple/event), join via invite code or
+  invite link (opens the app on a Join screen; see "Invite links" below),
   member list with admin (creator) badge
 - **Group chat** — messages with polling, smart task detection from chat,
   activity entries for expenses/tasks/reminders
@@ -265,6 +266,74 @@ forced: they have to be replaced by hand first.
 Checks: `npm test` in `backend/` (`test/appRelease.test.js`). On a phone: set
 Lowest allowed build above the installed build's number, open the app.
 
+## Invite links
+
+A group's invite link is `https://<api host>/join/<code>` (the Invite Friends
+screen shows and shares it). Tapped on a phone with Splix installed, Android
+opens the app straight on a **Join** screen: the group, who invited them, who
+is in it, one button. Signed out, the code is kept while they sign in or
+register, and the Join screen opens as soon as they are in (and their profile
+is complete). On a phone without the app, or on a laptop, the link opens a
+page served by the API with the same preview, an **Open in Splix** button and
+the APK link from App Updates. Splix is not on the Play Store yet; when it is,
+the page's fallback becomes the store listing (`TODO(store launch)` in
+`backend/src/views/joinPage.js`) and nothing else changes.
+
+Pieces: `backend/src/routes/join.routes.js` (the page and
+`/.well-known/assetlinks.json`), `GET /groups/invites/:code` (the preview),
+`mobile/src/invites` (catching the link, remembering it across sign-in),
+`mobile/src/screens/JoinGroupScreen.js`, and `scheme` + `intentFilters` in
+`mobile/app.json`. The Nginx in front passes `/join/` and `/.well-known/` to
+the API (`deploy/nginx`).
+
+Two things to know when building and deploying:
+
+1. **The intent filter is native.** Builds from before it ignore the links;
+   a new APK (`npx expo prebuild --clean`, then Gradle) is needed, and the
+   host in `intentFilters` must be the API's public host (today the VPS's
+   Hostinger name, in `mobile/src/api/client.js` too).
+2. **App Links are verified against the signing key.** Android fetches
+   `https://<host>/.well-known/assetlinks.json` and only opens the app
+   directly if the installed APK is signed with a certificate listed there.
+   The server lists `ANDROID_CERT_SHA256` from `backend/.env`; unset, it lists
+   the stock Android debug keystore (`mobile/android/app/debug.keystore`,
+   `SHA256 FA:C6:17:45:…:3B:9C`), which is what local Gradle builds sign with.
+   An EAS-built or release-signed APK has a different fingerprint: read it
+   with `keytool -list -v -keystore <keystore> | grep SHA256` and set it
+   (several, comma-separated, are fine). If verification fails the link
+   still works, through the page's Open button.
+
+Checks: `npm test` in `backend/` (`test/inviteLinks.test.js`). On a phone with
+the new build: open `https://<api host>/join/<code>` from a chat; `adb shell
+pm get-app-links com.splity.app` shows whether the host verified.
+
+## App name and logo
+
+Owners set the app's name and upload its logo in the admin panel under
+General Settings → Branding. Phones pick the change up the next time the app
+opens (it reads `GET /app/branding` on start and keeps a copy for offline
+starts); the admin panel's sidebar, loader and sign-in page redraw at once.
+
+The name keeps the wordmark's look. The Splix wordmark
+(`mobile/src/assets/wordmark.svg`) is not text in a font: it is Poppins
+ExtraBold lettering exported as paths, with the "x" replaced by the logo's
+mark, two chevron halves facing each other across a thin seam, standing at the
+height of the lowercase letters. An admin-set name is set in the same
+lettering (Poppins ExtraBold, bundled through `@expo-google-fonts/poppins`),
+and every `x` or `X` in it is drawn as that same mark, from the very paths in
+the SVG. "Splix" itself is still the original SVG. See
+`mobile/src/components/BrandWordmark.js`; the admin page shows a live preview
+(`wordmark-preview.jsx`) drawn by the same rules.
+
+The logo is stored like any other upload (R2, or `/uploads` locally),
+re-encoded as a PNG of at most 512 px; PNG, JPEG or WebP up to 2 MB, SVG
+refused. Removing it returns to the built-in Splix mark. Not covered, because
+they are part of the installed build: the name under the app icon
+(`expo.name` in `mobile/app.json`) and the icon itself.
+
+Checks: `npm test` in `backend/` (`test/branding.test.js`); `npm run build` in
+`admin/`.
+
 ## API
 
 Full endpoint documentation lives in **[API.md](API.md)**.
@@ -275,7 +344,7 @@ Base URL: `http://localhost:4000/api/v1` — all non-auth routes require
 | Area | Endpoints |
 | --- | --- |
 | Auth | `/auth/register`, `/auth/login`, `/auth/me`, `/auth/forgot-password`, `/auth/verify-otp`, `/auth/reset-password` |
-| Groups | `/groups`, `/groups/join`, `/groups/:id`, `/groups/:id/leave`, `/groups/:id/balances`, `/groups/:id/contributions` |
+| Groups | `/groups`, `/groups/join`, `/groups/invites/:code`, `/groups/:id`, `/groups/:id/leave`, `/groups/:id/balances`, `/groups/:id/contributions` |
 | Per-group resources | `/groups/:id/expenses`, `/messages`, `/tasks`, `/reminders`, `/itinerary`, `/photos` (+ `/photos/upload`), `/attractions`, `/stays` |
 | Items | `/expenses/:id` (+ `/settle`), `/tasks/:id`, `/reminders/:id`, `/itinerary-days/:id` (+ `/activities`), `/photos/:id`, `/attractions/:id` (+ `/toggle-save`), `/stays/:id` |
-| Other | `/notifications` (read/clear), `/support/reports` (Report a Problem, My Reports), `/support/contact`, `/health` |
+| Other | `/notifications` (read/clear), `/support/reports` (Report a Problem, My Reports), `/support/contact`, `/app/release`, `/app/branding`, `/health` |

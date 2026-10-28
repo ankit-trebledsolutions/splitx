@@ -14,6 +14,7 @@ import supportReducer from '@/features/support/supportSlice';
 import { walletApi } from '@/features/wallet/walletApi';
 import walletReducer from '@/features/wallet/walletSlice';
 import { appReleaseApi } from '@/features/app-release/appReleaseApi';
+import { brandingApi } from '@/features/branding/brandingApi';
 
 // Only the modules that are wired to the ported API are registered. The slices
 // for the not-yet-ported modules (category, carousels, the rest of general
@@ -37,6 +38,7 @@ export const store = configureStore({
     [supportApi.reducerPath]: supportApi.reducer,
     [walletApi.reducerPath]: walletApi.reducer,
     [appReleaseApi.reducerPath]: appReleaseApi.reducer,
+    [brandingApi.reducerPath]: brandingApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -49,5 +51,6 @@ export const store = configureStore({
       supportApi.middleware,
       walletApi.middleware,
       appReleaseApi.middleware,
+      brandingApi.middleware,
     ),
 });

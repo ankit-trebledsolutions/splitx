@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { useLocation } from 'react-router';
 import { Link } from 'react-router-dom';
-import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
+import { useBranding, useBrandingFavicon } from '@/hooks/use-branding';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useScrollPosition } from '@/hooks/use-scroll-position';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,9 @@ export function Header() {
 
   const { pathname } = useLocation();
   const mobileMode = useIsMobile();
+  const { appName, logoUrl } = useBranding();
+  // The header is on every signed-in page: one place to keep the tab icon right.
+  useBrandingFavicon();
 
   const scrollPosition = useScrollPosition();
   const headerSticky = scrollPosition > 0;
@@ -50,13 +53,9 @@ export function Header() {
         {/* HeaderLogo: below lg the sidebar is a sheet, so the logo lives here */}
         <div className="flex lg:hidden items-center gap-2.5">
           <Link to="/" className="flex shrink-0 items-center gap-2">
-            <img
-              src={toAbsoluteUrl('/media/app/splix-logo.svg')}
-              className="size-7"
-              alt=""
-            />
+            <img src={logoUrl} className="size-7 object-contain" alt="" />
             <span className="text-base font-semibold tracking-tight">
-              Splix
+              {appName}
             </span>
           </Link>
           {mobileMode && (

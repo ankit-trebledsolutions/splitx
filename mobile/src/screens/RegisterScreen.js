@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
+import InviteNotice from '../components/InviteNotice';
+import { useBranding } from '../branding/BrandingProvider';
 import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
 import TermsCheckbox from '../components/TermsCheckbox';
@@ -15,6 +17,7 @@ const RegisterScreen = ({ navigation }) => {
   const theme = useTheme();
   const styles = useStyles(makeStyles);
   const { register, loginWithGoogle } = useAuth();
+  const { appName } = useBranding();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -81,7 +84,8 @@ const RegisterScreen = ({ navigation }) => {
   const busy = loading || googleLoading;
 
   return (
-    <AuthLayout title="Create account" subtitle="Sign up to start splitting with Splix">
+    <AuthLayout title="Create account" subtitle={`Sign up to start splitting with ${appName}`}>
+      <InviteNotice action="Create your account" />
       <TextField
         label="Name"
         value={name}

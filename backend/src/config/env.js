@@ -167,6 +167,36 @@ const adminOrigins = (process.env.ADMIN_ORIGINS || 'http://localhost:5173')
 // none, so a bare `node src/server.js` cannot be handed a fake caller address.
 const trustProxy = intEnv('TRUST_PROXY', 0);
 
+// The address people see this server at, for the links it hands out: group
+// invite links (https://<host>/join/<code>) and the public logo address. No
+// trailing slash. Empty means the origin each request came in on, which is
+// right as long as the app and the browser reach the API by the same name.
+const publicUrl = (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+
+// Android App Links. For an invite link to open the app straight away, Android
+// fetches https://<host>/.well-known/assetlinks.json and checks that the
+// installed app is signed with one of the certificates listed there. The
+// fingerprint of the keystore the APK is signed with goes in
+// ANDROID_CERT_SHA256 (several, comma-separated, are fine):
+//   keytool -list -v -keystore <keystore> | grep SHA256
+// The default is the stock Android debug keystore that `expo prebuild` writes
+// to mobile/android/app/debug.keystore, which every local Gradle build signs
+// with today. A release or EAS keystore has a different fingerprint and must
+// be set here, or the links fall back to the browser page (which still works,
+// through its "Open in Splix" button).
+const DEBUG_KEYSTORE_SHA256 =
+  'FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C';
+const android = {
+  package: (process.env.ANDROID_PACKAGE || 'com.splity.app').trim(),
+  certFingerprints: (process.env.ANDROID_CERT_SHA256 || DEBUG_KEYSTORE_SHA256)
+    .split(',')
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean),
+};
+if (!process.env.ANDROID_CERT_SHA256 && isProduction) {
+  console.warn('[app-links] ANDROID_CERT_SHA256 is not set: assetlinks.json lists the stock debug keystore');
+}
+
 module.exports = {
   r2,
   mediaBaseUrl,
@@ -181,6 +211,8 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   adminOrigins,
   trustProxy,
+  publicUrl,
+  android,
   settingsKey,
   reminderSweep,
   // Admin sessions are shorter-lived than the mobile app's: a panel that can

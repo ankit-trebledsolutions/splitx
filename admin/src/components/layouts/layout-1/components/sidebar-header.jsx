@@ -1,12 +1,13 @@
 import { ChevronFirst } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
+import { useBranding } from '@/hooks/use-branding';
 import { Button } from '@/components/ui/button';
 import { useLayout } from './context';
 
 export function SidebarHeader() {
   const { sidebarCollapse, setSidebarCollapse } = useLayout();
+  const { appName, logoUrl } = useBranding();
 
   const handleToggleClick = () => {
     setSidebarCollapse(!sidebarCollapse);
@@ -14,17 +15,15 @@ export function SidebarHeader() {
 
   return (
     <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
-      {/* The mark stays when the sidebar is collapsed; the name carries
-          .default-logo, which the layout's CSS hides in that state. Text
-          rather than the wordmark image, so it follows the theme's colour. */}
+      {/* The logo and name as set under General Settings > Branding (the
+          Splix mark until an owner changes them). The mark stays when the
+          sidebar is collapsed; the name carries .default-logo, which the
+          layout's CSS hides in that state. Text rather than the wordmark
+          image, so it follows the theme's colour. */}
       <Link to="/" className="flex items-center gap-2.5">
-        <img
-          src={toAbsoluteUrl('/media/app/splix-logo.svg')}
-          className="size-7 max-w-none shrink-0"
-          alt=""
-        />
+        <img src={logoUrl} className="size-7 max-w-none shrink-0 object-contain" alt="" />
         <span className="default-logo text-lg font-semibold tracking-tight text-foreground">
-          Splix
+          {appName}
         </span>
       </Link>
       <Button

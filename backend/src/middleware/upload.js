@@ -46,11 +46,28 @@ const videoUpload = multer({
   },
 });
 
+// The app logo (admin panel > Branding). Raster images only: an SVG served
+// back from this origin could carry script, and the app's Image cannot draw
+// one anyway. Small, because it is re-encoded at 512px at most before it is
+// stored (services/branding.service.js).
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_LOGO_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (LOGO_TYPES.includes(file.mimetype)) cb(null, true);
+    else cb(ApiError.badRequest('The logo must be a PNG, JPEG or WebP image'));
+  },
+});
+
 module.exports = {
   photoUpload,
   chatUpload,
   videoUpload,
+  logoUpload,
   MAX_UPLOAD_BYTES,
   MAX_VIDEO_BYTES,
   MAX_POSTER_BYTES,
+  MAX_LOGO_BYTES,
 };

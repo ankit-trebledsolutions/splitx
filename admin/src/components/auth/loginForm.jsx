@@ -36,11 +36,14 @@ import { integrationsApi } from '@/features/integrations/integrationsApi';
 import { dashboardApi } from '@/features/dashboard/dashboardApi';
 import { useAppDispatch } from '@/app/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
+import { useBranding } from '@/hooks/use-branding';
 
 const LoginForm = () => {
   const [login, { error, isLoading }] = useLoginMutation();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  // The app's logo and name, as set under General Settings > Branding.
+  const { appName, logoUrl } = useBranding();
   const form = useForm({
     defaultValues: {
       email: '',
@@ -85,6 +88,10 @@ const LoginForm = () => {
       <Card className="w-full max-w-md p-2">
         <CardContent>
         <CardHeader className="text-center flex flex-col items-center gap-2 pb-4">
+          <div className="flex items-center gap-2.5 mb-1">
+            <img src={logoUrl} className="size-9 object-contain" alt="" />
+            <span className="text-xl font-semibold tracking-tight">{appName}</span>
+          </div>
           <p className="text-sm text-muted-foreground">Login to your account</p>
           <CardTitle className="mt-3 text-3xl">Log In</CardTitle>
           <CardDescription>

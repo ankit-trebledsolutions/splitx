@@ -2,6 +2,7 @@
   "expo": {
     "name": "Splix",
     "slug": "splity",
+    "scheme": "splix",
     "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -23,6 +24,23 @@
       "googleServicesFile": "./google-services.json",
       "blockedPermissions": [
         "android.permission.WRITE_CONTACTS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "srv2035255.hstgr.cloud",
+              "pathPrefix": "/join"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "extra": {

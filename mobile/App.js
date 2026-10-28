@@ -3,6 +3,8 @@ import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme';
+import { BrandingProvider } from './src/branding/BrandingProvider';
+import { InviteLinkProvider } from './src/invites/InviteLinkProvider';
 import { AuthProvider } from './src/context/AuthContext';
 import { SocketProvider } from './src/context/SocketProvider';
 import { StreamVideoProvider } from './src/context/StreamVideoProvider';
@@ -38,26 +40,33 @@ const AppShell = () => {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <TourProvider>
-          <SocketProvider>
-            <StreamVideoProvider>
-              <ActiveCallProvider>
-                <NavigationContainer theme={navigationTheme}>
-                  <StatusBar style={theme.statusBar} />
-                  <RootNavigator />
-                  {/* In here, not with the hosts below: its button opens Contact Us. */}
-                  <NoCreditsHost />
-                </NavigationContainer>
-              </ActiveCallProvider>
-            </StreamVideoProvider>
-          </SocketProvider>
-          {/* After the navigator, so the guided tour's spotlight draws over
-              every screen and the tab bar. Alerts and sheets below are Modals
-              and stay above it. */}
-          <TourOverlay />
-        </TourProvider>
-      </AuthProvider>
+      {/* Name and logo first: the splash screen, drawn while the session is
+          restored, already shows them. Invite links are caught from the very
+          start too, signed in or not (see src/invites). */}
+      <BrandingProvider>
+        <InviteLinkProvider>
+          <AuthProvider>
+            <TourProvider>
+              <SocketProvider>
+                <StreamVideoProvider>
+                  <ActiveCallProvider>
+                    <NavigationContainer theme={navigationTheme}>
+                      <StatusBar style={theme.statusBar} />
+                      <RootNavigator />
+                      {/* In here, not with the hosts below: its button opens Contact Us. */}
+                      <NoCreditsHost />
+                    </NavigationContainer>
+                  </ActiveCallProvider>
+                </StreamVideoProvider>
+              </SocketProvider>
+              {/* After the navigator, so the guided tour's spotlight draws over
+                  every screen and the tab bar. Alerts and sheets below are Modals
+                  and stay above it. */}
+              <TourOverlay />
+            </TourProvider>
+          </AuthProvider>
+        </InviteLinkProvider>
+      </BrandingProvider>
       <AlarmPermissionHost />
       <AppAlertHost />
       {/* Last, so it draws over everything: a build that is too old is held

@@ -38,7 +38,7 @@ Errors the app needs to branch on also carry a machine-readable `code`, and some
 
 ### Authentication
 
-All endpoints **except** `/health`, `/app/release` and the `/auth/*` routes require a JWT:
+All endpoints **except** `/health`, `/app/release`, `/app/branding` and the `/auth/*` routes require a JWT:
 
 ```
 Authorization: Bearer <token>
@@ -98,6 +98,35 @@ Under `/admin/app-release`, owners only.
 | --- | --- |
 | `GET /admin/app-release` | `{ "settings": { "android": { "minBuild", "latestBuild", "latestVersion", "downloadUrl", "notes" }, "ios": { ...the same }, "updatedAt" } }` |
 | `PUT /admin/app-release` | the same fields for both platforms. Whole numbers; `minBuild` ≤ `latestBuild`; `downloadUrl` is `https://` and required whenever `minBuild` > 0 |
+
+---
+
+## Branding
+
+The app's name and logo, set by owners in the admin panel under General Settings → Branding. One settings document (`backend/src/models/Branding.js`); with nothing saved the app is **Splix** with the Splix logo. The app reads it on every start and keeps a copy for offline starts; the admin panel draws it in its sidebar and on its sign-in page.
+
+The name keeps the wordmark's look: the Splix wordmark is Poppins ExtraBold lettering with the "x" drawn as the logo's two chevrons, and an admin-set name is drawn the same way, every `x`/`X` in it as that mark (`mobile/src/components/BrandWordmark.js`). Changing the name here does not change the app's name under its icon on the phone, which is in the installed build (`expo.name` in `mobile/app.json`).
+
+### `GET /app/branding`
+
+No auth, ahead of the force-update gate like `/app/release`.
+
+`{ "data": { "branding": { "appName", "logoUrl", "inviteBaseUrl", "updatedAt" } } }`
+
+`logoUrl` is a full address, or `null` for the built-in mark. `inviteBaseUrl` is where group invite links point (`https://<host>/join`; see **Invite links** under Groups). The settings are cached for up to a minute per server process after a change.
+
+### Admin panel
+
+Under `/admin/branding`, owners only.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/branding` | `{ "settings": { "appName", "logoUrl", "updatedAt" } }` |
+| `PUT /admin/branding` | body `{ "appName" }`: 2–20 characters, one line |
+| `POST /admin/branding/logo` | multipart, one `logo` field: PNG, JPEG or WebP up to 2 MB. Put the right way up, shrunk to at most 512 px on its longer side and stored as PNG through the usual file storage (R2, or `/uploads` locally). The previous file is deleted. Returns `settings` |
+| `DELETE /admin/branding/logo` | back to the built-in logo; the file is deleted. Returns `settings` |
+
+SVG is refused on purpose: served back from the API's origin it could carry script, and the app cannot draw one.
 
 ---
 
@@ -314,6 +343,33 @@ Only unsettled splits count, the same rule as the `balance` on `GET /home` and t
 | `inviteCode` | string | required, 4–16 chars |
 
 Adds the caller to the matching group and returns it.
+
+### `GET /groups/invites/:code` 🔒
+
+What an invite link leads to, for the app's Join screen, without joining:
+
+```json
+{ "data": { "invite": {
+  "code": "A1B2C3D4",
+  "group": { "_id", "name", "description", "groupType", "location", "startDate", "totalDays",
+             "memberCount", "members": [{ "_id", "name", "avatar" }] },
+  "invitedBy": { "_id", "name" },
+  "alreadyMember": false
+} } }
+```
+
+`members` holds at most six people; `memberCount` is the whole group. `invitedBy` is the group's admin. An unknown code is `404` with `"code": "INVITE_NOT_FOUND"`.
+
+### Invite links
+
+A group's invite link is `https://<host>/join/<code>`, where `<host>` is the API's public host (`PUBLIC_URL`, or the host the request came in on; the app learns the base from `GET /app/branding`). The server owns the format and serves two addresses outside `/api/v1` for it, which the Nginx in front passes through (`deploy/nginx`):
+
+| Address | Does |
+| --- | --- |
+| `GET /join/<code>` | An HTML page: the group, who invited them, how many are in, an **Open in Splix** button (an Android `intent://` link that opens the app on its Join screen when installed, and falls back to the APK link from App Updates otherwise) and the code to type into the app. `404` page for an unknown code. Rate limited per address. |
+| `GET /.well-known/assetlinks.json` | Android App Links: names the app's package and the SHA-256 of its signing certificate (`ANDROID_PACKAGE`, `ANDROID_CERT_SHA256`), so a phone with the app opens the link in the app without asking. |
+
+On a phone with the app installed, Android opens the link straight in the app (`mobile/app.json` `intentFilters`, `scheme: "splix"`); the app also accepts `splix://join/<code>`. Signed out, the code is kept until the person signs in or registers, and the Join screen opens then. Once the app is on the Play Store, the page's fallback becomes the store listing (`TODO(store launch)` in `backend/src/views/joinPage.js`).
 
 ### `GET /groups/:groupId`
 

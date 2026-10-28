@@ -74,6 +74,10 @@ export const MENU_SIDEBAR = [
         title: 'App Updates',
         path: '/general-settings/app-updates',
       },
+      {
+        title: 'Branding',
+        path: '/general-settings/branding',
+      },
     ],
   },
 ];
