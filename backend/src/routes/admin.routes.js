@@ -7,6 +7,7 @@ const emailTemplates = require('../controllers/emailTemplate.controller');
 const integrations = require('../controllers/integration.controller');
 const support = require('../controllers/adminSupport.controller');
 const wallet = require('../controllers/adminWallet.controller');
+const appRelease = require('../controllers/appRelease.controller');
 const { TYPES: TRANSACTION_TYPES, FEATURES: PAID_FEATURES } = require('../models/CreditTransaction');
 const { INTEGRATION_KEYS } = require('../integrations/definitions');
 const { TEMPLATE_KEYS } = require('../emails/defaults');
@@ -150,6 +151,39 @@ const supportQueueSchema = paginationSchema.omit({ role: true }).extend({
 });
 
 const reportParams = z.object({ id: objectId });
+
+// Which app builds are still let in (see models/AppRelease.js). Build numbers
+// are whole numbers that only ever go up; 0 means "nobody is forced".
+const buildNumber = z
+  .number({ invalid_type_error: 'Enter a whole number' })
+  .int('Enter a whole number')
+  .min(0)
+  .max(1000000000);
+
+const platformReleaseSchema = z
+  .object({
+    minBuild: buildNumber,
+    latestBuild: buildNumber,
+    latestVersion: z.string().trim().max(32, 'The version label is at most 32 characters'),
+    downloadUrl: z
+      .string()
+      .trim()
+      .max(500, 'The download link is at most 500 characters')
+      .refine((url) => url === '' || /^https:\/\/\S+$/i.test(url), 'The download link must start with https://'),
+    notes: z.string().trim().max(1000, "What's new is at most 1000 characters"),
+  })
+  .refine((v) => v.minBuild <= v.latestBuild, {
+    message: 'The lowest allowed build cannot be above the latest build',
+  })
+  // The wall's only way out is the link, so forcing without one would strand everyone.
+  .refine((v) => v.minBuild === 0 || v.downloadUrl !== '', {
+    message: 'Add a download link before requiring a build',
+  });
+
+const appReleaseSchema = z.object({
+  android: platformReleaseSchema,
+  ios: platformReleaseSchema,
+});
 
 // Whole credits only. The ceilings are sanity limits, not business rules: the
 // co-admin cap in the settings is the real brake on grants.
@@ -389,6 +423,20 @@ router.post(
   requireSuperAdmin,
   validate({ params: integrationKey, body: z.object({ password: passwordConfirmed }) }),
   integrations.reset
+);
+
+// --- App updates -------------------------------------------------------------
+// Which builds of the app are still allowed in, and where the newest one is.
+// Owners only: raising the lowest allowed build locks every older phone out
+// of the whole app at once (see middleware/appVersion.js).
+router.get('/app-release', adminReadLimiter, requireSuperAdmin, appRelease.getSettings);
+
+router.put(
+  '/app-release',
+  adminWriteLimiter,
+  requireSuperAdmin,
+  validate({ body: appReleaseSchema }),
+  appRelease.updateSettings
 );
 
 // --- Support ----------------------------------------------------------------

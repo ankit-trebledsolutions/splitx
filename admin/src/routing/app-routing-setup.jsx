@@ -21,6 +21,7 @@ import EmailTemplate from '@/pages/layout-1/manage-cms/email-template/email-temp
 import EmailPage from '@/pages/layout-1/manage-cms/email-template/email-page';
 import GeneralSettings from '@/pages/layout-1/general-settings/general-settings';
 import ThirdPartyApis from '@/pages/layout-1/general-settings/third-party-apis/third-party-apis';
+import AppUpdates from '@/pages/layout-1/general-settings/app-updates/app-updates';
 import Support from '@/pages/layout-1/support/support';
 import ReportPage from '@/pages/layout-1/support/report-page';
 import WalletPage from '@/pages/layout-1/wallet/wallet';
@@ -197,6 +198,7 @@ export function AppRoutingSetup() {
         >
           <Route index element={<Navigate to="third-party-apis" replace />} />
           <Route path="third-party-apis" element={<ThirdPartyApis />} />
+          <Route path="app-updates" element={<AppUpdates />} />
         </Route>
 
         <Route path="unauthorized" element={<Unauthorized />} />

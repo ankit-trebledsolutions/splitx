@@ -37,6 +37,12 @@ export const API_BASE_URL = `${API_ORIGIN}/api/v1`;
 
 export const TOKEN_KEY = 'splity.token';
 
+// This build's number (Android versionCode, iOS build number: see app.json)
+// and its label. The number is what the server compares against the lowest
+// build an owner still allows; the label is only ever shown to people.
+export const APP_BUILD = Number(Constants.nativeBuildVersion) || 0;
+export const APP_VERSION = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '';
+
 const client = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
@@ -45,6 +51,14 @@ const client = axios.create({
 client.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem(TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Who is asking, build-wise, so a build that is too old can be turned away
+  // (backend middleware/appVersion.js). Left off when the number is unknown:
+  // the server then has nothing to compare and lets the request through.
+  if (APP_BUILD) {
+    config.headers['X-App-Platform'] = Platform.OS;
+    config.headers['X-App-Build'] = String(APP_BUILD);
+    config.headers['X-App-Version'] = APP_VERSION;
+  }
   return config;
 });
 
@@ -59,6 +73,16 @@ export const ACCOUNT_SUSPENDED = 'ACCOUNT_SUSPENDED';
 let accountSuspendedHandler = null;
 export const setAccountSuspendedHandler = (handler) => {
   accountSuspendedHandler = handler;
+};
+
+// This build is older than the server still allows: every request is refused
+// with this code until a newer build is installed. Announced once from here,
+// for the same reason as above; UpdateWall shows the screen.
+export const APP_UPDATE_REQUIRED = 'APP_UPDATE_REQUIRED';
+
+let updateRequiredHandler = null;
+export const setUpdateRequiredHandler = (handler) => {
+  updateRequiredHandler = handler;
 };
 
 // The app can be opened with no connection: the person is let in on what was
@@ -93,6 +117,7 @@ client.interceptors.response.use(
     failure.details = body;
 
     if (failure.code === ACCOUNT_SUSPENDED) accountSuspendedHandler?.(message);
+    if (failure.code === APP_UPDATE_REQUIRED) updateRequiredHandler?.(body);
     // A refusal is an answer too. A timeout, or no connection, is not.
     if (error.response) serverAnswered();
 

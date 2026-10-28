@@ -70,6 +70,10 @@ export const MENU_SIDEBAR = [
         title: 'Third-Party APIs',
         path: '/general-settings/third-party-apis',
       },
+      {
+        title: 'App Updates',
+        path: '/general-settings/app-updates',
+      },
     ],
   },
 ];

@@ -13,6 +13,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { AppAlertHost } from './src/components/AppAlert';
 import { AlarmPermissionHost } from './src/components/AlarmPermissionSheet';
 import { NoCreditsHost } from './src/components/NoCreditsSheet';
+import { UpdateWallHost } from './src/components/UpdateWall';
 
 // Everything below the theme provider. The navigator's own colours follow the
 // palette too, so the frame behind a screen during a transition is never the
@@ -59,6 +60,9 @@ const AppShell = () => {
       </AuthProvider>
       <AlarmPermissionHost />
       <AppAlertHost />
+      {/* Last, so it draws over everything: a build that is too old is held
+          here, signed in or not, until a newer one is installed. */}
+      <UpdateWallHost />
     </SafeAreaProvider>
   );
 };

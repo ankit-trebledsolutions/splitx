@@ -31,13 +31,14 @@ Errors the app needs to branch on also carry a machine-readable `code`, and some
 | 403 | Authenticated but not allowed (e.g. not a group member) |
 | 404 | Resource or route not found |
 | 409 | Duplicate value (e.g. email already registered) |
+| 426 | This build of the app is too old and must be updated (`code: "APP_UPDATE_REQUIRED"`, see App updates). Every request answers this until a newer build is installed |
 | 429 | Rate limit exceeded (auth routes: 50 requests / 15 min per IP; AI itinerary planning: see Itinerary) |
 | 500 | Server error |
 | 503 | A feature that depends on an outside service is not set up or is switched off for now (AI itinerary planning) |
 
 ### Authentication
 
-All endpoints **except** `/health` and the `/auth/*` routes require a JWT:
+All endpoints **except** `/health`, `/app/release` and the `/auth/*` routes require a JWT:
 
 ```
 Authorization: Bearer <token>
@@ -58,6 +59,45 @@ The token is returned by `POST /auth/register` and `POST /auth/login`.
 ### `GET /health`
 
 No auth. Returns `{ "success": true, "status": "ok" }`.
+
+---
+
+## App updates
+
+Force update. Every build of the app has a number that goes up with each release (Android `versionCode`, iOS build number; both in `mobile/app.json`). The app sends it with every request:
+
+```
+X-App-Platform: android | ios
+X-App-Build: 7
+X-App-Version: 1.2.0
+```
+
+An owner sets, per platform in the admin panel, the lowest build still allowed in (`minBuild`), the newest build that exists (`latestBuild`), its label, where to get it (`downloadUrl`) and what is new. A request from a build below `minBuild` is answered **426** on every endpoint, whatever it asked for:
+
+```json
+{ "success": false, "message": "Please update Splix to continue.", "code": "APP_UPDATE_REQUIRED",
+  "platform": "android", "build": 2, "minBuild": 3, "latestBuild": 4, "latestVersion": "1.2.0",
+  "downloadUrl": "https://.../splix-1.2.0.apk", "notes": "..." }
+```
+
+The app shows a screen it cannot dismiss whose one button opens `downloadUrl`. A request that names no build (the admin panel, curl, builds from before the headers existed) is never refused, so builds older than the first one that sends the headers cannot be forced. Only `minBuild` forces anything; a build below `latestBuild` is told once that an update is available and carries on. The settings are cached for up to a minute per server process after a change.
+
+### `GET /app/release`
+
+No auth, and never refused. What the calling build is told, from its headers (`?platform=` for anyone else; `android` by default):
+
+`{ "data": { "release": { "platform", "build", "minBuild", "latestBuild", "latestVersion", "downloadUrl", "notes", "updateRequired", "updateAvailable" } } }`
+
+`build` is `null`, and both flags `false`, when no build was named.
+
+### Admin panel
+
+Under `/admin/app-release`, owners only.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/app-release` | `{ "settings": { "android": { "minBuild", "latestBuild", "latestVersion", "downloadUrl", "notes" }, "ios": { ...the same }, "updatedAt" } }` |
+| `PUT /admin/app-release` | the same fields for both platforms. Whole numbers; `minBuild` ≤ `latestBuild`; `downloadUrl` is `https://` and required whenever `minBuild` > 0 |
 
 ---
 

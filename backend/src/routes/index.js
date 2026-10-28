@@ -15,11 +15,20 @@ const homeRoutes = require('./home.routes');
 const directRoutes = require('./direct.routes');
 const tripRoutes = require('./trip.routes');
 const walletRoutes = require('./wallet.routes');
+const appRoutes = require('./app.routes');
 const adminRoutes = require('./admin.routes');
+const { appVersionGate } = require('../middleware/appVersion');
 
 const router = Router();
 
 router.get('/health', (_req, res) => res.json({ success: true, status: 'ok' }));
+// Where the newest app build is. Ahead of the gate below on purpose: a build
+// that is too old for everything else must still be able to ask.
+router.use('/app', appRoutes);
+// Force update: an app build below the lowest one an owner still allows is
+// answered 426 APP_UPDATE_REQUIRED from here on, whatever it asked for.
+// Requests that name no build (the admin panel, curl) are untouched.
+router.use(appVersionGate);
 router.use('/auth', authRoutes);
 router.use('/groups', groupRoutes);
 router.use('/expenses', expenseRoutes);

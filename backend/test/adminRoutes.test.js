@@ -100,6 +100,8 @@ test('every admin endpoint refuses an anonymous caller', async () => {
       ['GET', '/api/v1/admin/wallet/transactions'],
       ['GET', '/api/v1/admin/wallet/users/65a000000000000000000001'],
       ['POST', '/api/v1/admin/wallet/users/65a000000000000000000001/adjust'],
+      ['GET', '/api/v1/admin/app-release'],
+      ['PUT', '/api/v1/admin/app-release'],
     ];
 
     for (const [method, path] of attempts) {

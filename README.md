@@ -234,6 +234,37 @@ uploaded before the feature are scanned on the first start, newest first.
 Checks: `npm test` in `backend/` (`test/faceScan.test.js`, which needs a local
 MongoDB and is skipped without one).
 
+## Forcing an app update
+
+Every APK has a build number (`android.versionCode` in `mobile/app.json`), and
+the app sends it with every request (`X-App-Build`). An owner sets, in the
+admin panel under General Settings → App Updates, the lowest build still
+allowed in and where the newest one is. A phone on an older build is answered
+426 `APP_UPDATE_REQUIRED` to everything it asks and shows an update screen it
+cannot dismiss, whose one button opens the download link: an APK link for now,
+the Play Store page once Splix is listed, with nothing to rebuild for the
+switch. See `backend/src/middleware/appVersion.js` and
+`mobile/src/components/UpdateWall.js`.
+
+Releasing a new build:
+
+1. Raise `android.versionCode` (and `version`) in `mobile/app.json`, build the
+   APK, sign it with the same key as every build before it (Android refuses to
+   install over an app signed with a different key), and put it somewhere with
+   an `https://` link.
+2. In App Updates set **Latest build** to the new number, the version label and
+   the link. People on older builds are told once that an update is waiting
+   and can carry on.
+3. Only when the old app would no longer work against the server, raise
+   **Lowest allowed build** too. Everyone below it is locked out from their
+   very next tap; lowering it again lets them back in just as fast.
+
+Builds from before 1.1.0 (versionCode 2) send no build number and can never be
+forced: they have to be replaced by hand first.
+
+Checks: `npm test` in `backend/` (`test/appRelease.test.js`). On a phone: set
+Lowest allowed build above the installed build's number, open the app.
+
 ## API
 
 Full endpoint documentation lives in **[API.md](API.md)**.
