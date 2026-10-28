@@ -88,7 +88,7 @@ Before anything is sent, the address is checked: common typos get a suggestion (
 
 An email that is registered but **still unverified** can be registered again: the new name and password replace the old and a new code is sent, so an address can't be blocked by someone who doesn't own it. A verified email answers `409`.
 
-**Response `201`:** `{ "data": { "verificationRequired": true, "email", "sent": true, "retryAfter": 60 } }` and no token. `devOtp` is added only when the server has no email provider configured and is not in production.
+**Response `201`:** `{ "data": { "verificationRequired": true, "email", "sent": true, "retryAfter": 60 } }` and no token. `devOtp` is added only in test mode (the sender is Resend's `onboarding@resend.dev`, which can't reach other people's inboxes, so the code is not emailed and the app shows it instead), or when the server has no email provider configured and is not in production. Saving a sender on a verified domain ends test mode. Password reset codes are never returned this way.
 
 ### `POST /auth/verify-email`
 
