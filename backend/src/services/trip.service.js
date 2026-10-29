@@ -108,6 +108,7 @@ const listTrips = async (userId) => {
       name: g.name,
       description: g.description,
       location: g.location ?? '',
+      destination: g.destination ?? null,
       startDate,
       endDate,
       totalDays,

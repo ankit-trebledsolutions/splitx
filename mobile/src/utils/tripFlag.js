@@ -51,7 +51,14 @@ const toEmoji = (code) =>
 // Longest names first so "new zealand" wins over a shorter accidental match.
 const KEYS = Object.keys(PLACES).sort((a, b) => b.length - a.length);
 
-export const tripFlag = (location = '') => {
+// The flag of a country code, for a destination picked from the lists.
+export const flagOf = (countryCode = '') =>
+  /^[A-Za-z]{2}$/.test(countryCode) ? toEmoji(countryCode.toUpperCase()) : FALLBACK;
+
+// `countryCode` is the picked country when the trip has one; it beats
+// guessing from the text.
+export const tripFlag = (location = '', countryCode = '') => {
+  if (/^[A-Za-z]{2}$/.test(countryCode)) return toEmoji(countryCode.toUpperCase());
   const text = ` ${location.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ')} `;
   const key = KEYS.find((k) => text.includes(` ${k} `));
   return key ? toEmoji(PLACES[key]) : FALLBACK;

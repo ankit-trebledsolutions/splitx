@@ -18,9 +18,12 @@ const placeCacheSchema = new mongoose.Schema(
   {
     // `${type}|${normalized destination}`, see cacheKey() in the service.
     key: { type: String, required: true, unique: true },
-    type: { type: String, required: true, enum: ['stay', 'attraction', 'destination'] },
-    // The destination as a group typed it, for display.
+    type: { type: String, required: true, enum: ['stay', 'attraction', 'destination', 'region', 'search'] },
+    // The destination as a group typed or picked it, for display. For a
+    // 'search' row, the destination it was searched in.
     destination: { type: String, required: true, maxlength: 120 },
+    // 'search' rows only: the name that was looked for, normalised.
+    query: { type: String, default: '' },
     // What the geocoder made of it: { placeId, name, lat, lon }. Null for a
     // destination it did not recognise, kept briefly so it is not asked again
     // on every open.

@@ -12,4 +12,15 @@ const suggestions = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { suggestions };
+// GET /groups/:groupId/places/search?type=stay&q=taj
+const search = asyncHandler(async (req, res) => {
+  const data = await placeSuggestionService.search({
+    groupId: req.params.groupId,
+    userId: req.user._id,
+    type: req.query.type,
+    query: req.query.q,
+  });
+  res.json({ success: true, data });
+});
+
+module.exports = { suggestions, search };

@@ -43,8 +43,10 @@ export const deleteGroup = async (groupId) => {
 
 // Admin only, trips only: the destination the suggestions and the AI planner
 // plan around, for a trip created without one. Resolves to the updated group.
-export const setGroupDestination = async (groupId, location) => {
-  const { data } = await client.patch(`/groups/${groupId}/destination`, { location });
+// `payload` is { destination: { countryCode, stateCode } } for a destination
+// picked from the lists, or { location } for typed text.
+export const setGroupDestination = async (groupId, payload) => {
+  const { data } = await client.patch(`/groups/${groupId}/destination`, payload);
   return data.data.group;
 };
 

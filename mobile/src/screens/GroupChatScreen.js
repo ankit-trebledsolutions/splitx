@@ -16,6 +16,7 @@ import ReminderSheet from '../components/ReminderSheet';
 import NewAttractionSheet from '../components/NewAttractionSheet';
 import NewStaySheet from '../components/NewStaySheet';
 import PlaceSuggestions from '../components/PlaceSuggestions';
+import PlaceSearch from '../components/PlaceSearch';
 import SetDestinationSheet from '../components/SetDestinationSheet';
 import PlaceDetailSheet from '../components/PlaceDetailSheet';
 import ReviewStaySheet from '../components/ReviewStaySheet';
@@ -35,6 +36,7 @@ import useKeyboardVisible from '../hooks/useKeyboardVisible';
 import useAiItinerary from '../hooks/useAiItinerary';
 import useReminderActions from '../hooks/useReminderActions';
 import usePlaceSuggestions from '../hooks/usePlaceSuggestions';
+import usePlaceSearch from '../hooks/usePlaceSearch';
 import { fetchGroup, fetchExpensePage, appendExpenses, setGroupDestination } from '../api/groups.api';
 import { fetchMessages, sendMessage, sendAttachment, deleteMessage } from '../api/chat.api';
 import { fetchTasks, createTask, updateTask } from '../api/tasks.api';
@@ -1037,9 +1039,10 @@ const GroupChatScreen = ({ route, navigation }) => {
     setAttractionSheetOpen(true);
   };
 
-  const handleSetDestination = async (location) => {
+  // `payload` is what SetDestinationSheet built: the picked country and state.
+  const handleSetDestination = async (payload) => {
     try {
-      const updated = await setGroupDestination(groupId, location);
+      const updated = await setGroupDestination(groupId, payload);
       setGroup((prev) => ({ ...prev, ...updated }));
       setDestinationSheetOpen(false);
     } catch (err) {
@@ -1269,6 +1272,20 @@ const GroupChatScreen = ({ route, navigation }) => {
     destination,
   });
   const attractionSuggestions = usePlaceSuggestions({
+    groupId,
+    type: 'attraction',
+    enabled: isTrip && tab === 'attractions',
+    destination,
+  });
+  // The name search on the same two tabs, kept to the same destination. While
+  // a search is active its results stand in for the suggestions row.
+  const staySearch = usePlaceSearch({
+    groupId,
+    type: 'stay',
+    enabled: isTrip && tab === 'stays',
+    destination,
+  });
+  const attractionSearch = usePlaceSearch({
     groupId,
     type: 'attraction',
     enabled: isTrip && tab === 'attractions',
@@ -1556,15 +1573,30 @@ const GroupChatScreen = ({ route, navigation }) => {
       {tab === 'attractions' && !tripTabsHidden && (
         <AttractionsTab
           header={
-            <PlaceSuggestions
-              type="attraction"
-              suggestions={attractionSuggestions}
-              addedPlaceIds={attractionPlaceIds}
-              isAdmin={isAdmin}
-              onAdd={openSuggestedAttraction}
-              onOpen={(item) => setPlaceDetail({ type: 'attraction', item })}
-              onSetDestination={() => setDestinationSheetOpen(true)}
-            />
+            <>
+              <PlaceSearch
+                type="attraction"
+                search={attractionSearch}
+                suggestions={attractionSuggestions}
+                destination={destination}
+                addedPlaceIds={attractionPlaceIds}
+                isAdmin={isAdmin}
+                onAdd={openSuggestedAttraction}
+                onOpen={(item) => setPlaceDetail({ type: 'attraction', item })}
+                onSetDestination={() => setDestinationSheetOpen(true)}
+              />
+              {!attractionSearch.active && (
+                <PlaceSuggestions
+                  type="attraction"
+                  suggestions={attractionSuggestions}
+                  addedPlaceIds={attractionPlaceIds}
+                  isAdmin={isAdmin}
+                  onAdd={openSuggestedAttraction}
+                  onOpen={(item) => setPlaceDetail({ type: 'attraction', item })}
+                  onSetDestination={() => setDestinationSheetOpen(true)}
+                />
+              )}
+            </>
           }
           attractions={attractions}
           loading={loading}
@@ -1580,15 +1612,30 @@ const GroupChatScreen = ({ route, navigation }) => {
         <StaysTab
           header={
             isTrip ? (
-              <PlaceSuggestions
-                type="stay"
-                suggestions={staySuggestions}
-                addedPlaceIds={stayPlaceIds}
-                isAdmin={isAdmin}
-                onAdd={openSuggestedStay}
-                onOpen={(item) => setPlaceDetail({ type: 'stay', item })}
-                onSetDestination={() => setDestinationSheetOpen(true)}
-              />
+              <>
+                <PlaceSearch
+                  type="stay"
+                  search={staySearch}
+                  suggestions={staySuggestions}
+                  destination={destination}
+                  addedPlaceIds={stayPlaceIds}
+                  isAdmin={isAdmin}
+                  onAdd={openSuggestedStay}
+                  onOpen={(item) => setPlaceDetail({ type: 'stay', item })}
+                  onSetDestination={() => setDestinationSheetOpen(true)}
+                />
+                {!staySearch.active && (
+                  <PlaceSuggestions
+                    type="stay"
+                    suggestions={staySuggestions}
+                    addedPlaceIds={stayPlaceIds}
+                    isAdmin={isAdmin}
+                    onAdd={openSuggestedStay}
+                    onOpen={(item) => setPlaceDetail({ type: 'stay', item })}
+                    onSetDestination={() => setDestinationSheetOpen(true)}
+                  />
+                )}
+              </>
             ) : null
           }
           stays={stays}
@@ -1698,7 +1745,8 @@ const GroupChatScreen = ({ route, navigation }) => {
       />
       <SetDestinationSheet
         visible={destinationSheetOpen}
-        current={destination}
+        current={group?.destination ?? null}
+        currentText={destination}
         onClose={() => setDestinationSheetOpen(false)}
         onSubmit={handleSetDestination}
       />

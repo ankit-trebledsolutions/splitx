@@ -2,8 +2,8 @@ const integrations = require('../integrations/store');
 
 /**
  * The one file that talks to the places provider (Geoapify, OpenStreetMap
- * data). Two questions are asked of it: "where is this destination" and
- * "what hotels / sights are there". Everything it answers is turned into the
+ * data). Three questions are asked of it: "where is this destination",
+ * "what hotels / sights are there" and "which of them is called this". Everything it answers is turned into the
  * app's own shape here, so swapping the provider (for Google Places, say)
  * means rewriting this file and nothing above it.
  *
@@ -246,6 +246,26 @@ const request = async (path, params) => {
   throw new PlacesError('BAD_RESPONSE', { status: res.status });
 };
 
+// A geocoder hit as the app keeps it: an id (also the key to its boundary in
+// the Places API), a centre and, when known, a bounding box. Null for a hit
+// missing any of those.
+const toPlace = (hit, fallbackName) => {
+  if (!hit?.place_id || typeof hit.lat !== 'number' || typeof hit.lon !== 'number') return null;
+  const b = hit.bbox;
+  const bbox =
+    b && [b.lon1, b.lat1, b.lon2, b.lat2].every((value) => typeof value === 'number')
+      ? [b.lon1, b.lat1, b.lon2, b.lat2]
+      : null;
+  return {
+    placeId: String(hit.place_id),
+    name: String(hit.city || hit.name || hit.formatted || fallbackName).slice(0, 120),
+    formatted: String(hit.formatted || '').slice(0, 200),
+    lat: hit.lat,
+    lon: hit.lon,
+    bbox,
+  };
+};
+
 /**
  * Where a typed destination is. Resolves to { placeId, name, lat, lon } or
  * null when the geocoder has never heard of it. Tries a city first, which is
@@ -254,57 +274,67 @@ const request = async (path, params) => {
 const geocodeDestination = async (text) => {
   const ask = async (extra) => {
     const json = await request('/v1/geocode/search', { text, limit: '1', format: 'json', ...extra });
-    const hit = Array.isArray(json.results) ? json.results[0] : null;
-    if (!hit?.place_id || typeof hit.lat !== 'number' || typeof hit.lon !== 'number') return null;
-    const b = hit.bbox;
-    const bbox =
-      b && [b.lon1, b.lat1, b.lon2, b.lat2].every((value) => typeof value === 'number')
-        ? [b.lon1, b.lat1, b.lon2, b.lat2]
-        : null;
-    return {
-      placeId: String(hit.place_id),
-      name: String(hit.city || hit.name || hit.formatted || text).slice(0, 120),
-      formatted: String(hit.formatted || '').slice(0, 200),
-      lat: hit.lat,
-      lon: hit.lon,
-      bbox,
-    };
+    return toPlace(Array.isArray(json.results) ? json.results[0] : null, text);
   };
   return (await ask({ type: 'city', lang: 'en' })) ?? (await ask({ lang: 'en' }));
 };
 
-// Within the destination's bounding box, nearest the centre first. Not its
-// administrative boundary: for Jaipur that is a few kilometres across and
+/**
+ * Where a picked state or country is: the same shape plus `scope`, and an id
+ * that names the boundary the Places API can be kept to. Asked for by kind
+ * and within the country, so "Georgia, United States" is the state and not
+ * the country, and "Punjab, India" is not the Punjab across the border.
+ */
+const geocodeRegion = async ({ countryCode, countryName, stateName }) => {
+  const filter = `countrycode:${String(countryCode).toLowerCase()}`;
+  const ask = async (text, extra) => {
+    const json = await request('/v1/geocode/search', { text, limit: '1', format: 'json', lang: 'en', ...extra });
+    return toPlace(Array.isArray(json.results) ? json.results[0] : null, text);
+  };
+  if (stateName) {
+    const place =
+      (await ask(`${stateName}, ${countryName}`, { type: 'state', filter })) ?? (await ask(stateName, { filter }));
+    return place ? { ...place, name: String(stateName).slice(0, 120), scope: 'state' } : null;
+  }
+  const place = (await ask(countryName, { type: 'country' })) ?? (await ask(countryName, { filter }));
+  return place ? { ...place, name: String(countryName).slice(0, 120), scope: 'country' } : null;
+};
+
+// Where to look, in the order to try. A picked state or country (a place
+// with a `scope`) is its administrative boundary, by the id the geocoder
+// gave, with its bounding box as the fallback. A typed city is its bounding
+// box, not its boundary: for Jaipur that is a few kilometres across and
 // leaves Amber Fort and Jal Mahal outside, while the box the geocoder gives
-// reaches them. A destination with no box, or an empty box, gets a circle.
+// reaches them. A city with no box, or an empty box, gets a circle.
 const FALLBACK_RADIUS_M = 15000;
 const rectOf = (bbox) => `rect:${bbox.join(',')}`;
 const circleOf = (place) => `circle:${place.lon},${place.lat},${FALLBACK_RADIUS_M}`;
+const boundaryOf = (place) => `place:${place.placeId}`;
+const areasOf = (place) =>
+  (place.scope
+    ? [boundaryOf(place), place.bbox && rectOf(place.bbox)]
+    : [place.bbox && rectOf(place.bbox), circleOf(place)]
+  ).filter(Boolean);
 
-const searchPlaces = async (type, place) => {
-  const spec = TYPES[type];
-  if (!spec) throw new Error(`Unknown place type "${type}"`);
-  const base = {
-    categories: spec.categories.join(','),
-    conditions: 'named',
-    bias: `proximity:${place.lon},${place.lat}`,
-    limit: String(spec.fetch),
-    lang: 'en',
-  };
+// Nearest the centre first for a city. A state or a country has no centre
+// worth ranking by, so its results come as the provider orders them and
+// carry no distance.
+const biasFor = (place) => (place.scope ? {} : { bias: `proximity:${place.lon},${place.lat}` });
 
-  let features = [];
-  if (place.bbox) {
-    const json = await request('/v2/places', { ...base, filter: rectOf(place.bbox) });
-    features = Array.isArray(json.features) ? json.features : [];
+// The features inside the first of the areas that has any.
+const featuresIn = async (params, areas) => {
+  for (const filter of areas) {
+    const json = await request('/v2/places', { ...params, filter });
+    const features = Array.isArray(json.features) ? json.features : [];
+    if (features.length) return features;
   }
-  if (features.length === 0) {
-    const json = await request('/v2/places', { ...base, filter: circleOf(place) });
-    features = Array.isArray(json.features) ? json.features : [];
-  }
+  return [];
+};
 
-  // OpenStreetMap often holds one place twice (a point and a building
-  // outline, or two spellings) under two ids: the same name for the same
-  // kind of place in one destination is one place.
+// OpenStreetMap often holds one place twice (a point and a building
+// outline, or two spellings) under two ids: the same name for the same
+// kind of place in one destination is one place. Order is kept.
+const dedupe = (features) => {
   const seen = new Set();
   const items = [];
   for (const feature of features) {
@@ -316,7 +346,52 @@ const searchPlaces = async (type, place) => {
     seen.add(identity);
     items.push(item);
   }
-  return rank(items, spec.keep);
+  return items;
+};
+
+const specOf = (type) => {
+  const spec = TYPES[type];
+  if (!spec) throw new Error(`Unknown place type "${type}"`);
+  return spec;
+};
+
+const searchPlaces = async (type, place) => {
+  const spec = specOf(type);
+  const features = await featuresIn(
+    {
+      categories: spec.categories.join(','),
+      conditions: 'named',
+      ...biasFor(place),
+      limit: String(spec.fetch),
+      lang: 'en',
+    },
+    areasOf(place)
+  );
+  return rank(dedupe(features), spec.keep);
+};
+
+// How many matches a name search shows. Over-fetched a little for the duplicates.
+const SEARCH_KEEP = 10;
+
+/**
+ * Hotels or sights whose name matches what a member typed, within the place.
+ * Only the first area is asked: an empty answer means no such name there,
+ * not a boundary to fall back from. The provider's order is kept, since it
+ * ranks by how well the name matches; dedupe() drops the doubles.
+ */
+const searchByName = async (type, place, name) => {
+  const spec = specOf(type);
+  const [area] = areasOf(place);
+  const json = await request('/v2/places', {
+    categories: spec.categories.join(','),
+    name: String(name).trim(),
+    filter: area,
+    ...biasFor(place),
+    limit: String(SEARCH_KEEP * 2),
+    lang: 'en',
+  });
+  const items = dedupe(Array.isArray(json.features) ? json.features : []).slice(0, SEARCH_KEEP);
+  return items.map(({ weight, ...item }) => item);
 };
 
 const PROVIDER = {
@@ -333,7 +408,10 @@ module.exports = {
   isBreakerOpen,
   resetBreaker,
   geocodeDestination,
+  geocodeRegion,
   searchPlaces,
+  searchByName,
+  SEARCH_KEEP,
   // For tests.
   toItem,
   rank,

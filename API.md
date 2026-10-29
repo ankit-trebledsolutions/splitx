@@ -320,7 +320,8 @@ Create a group. The creator becomes `createdBy` (the group admin) and the first 
 | `groupType` | enum | `trip` \| `home` \| `couple` \| `event` \| `other` (default `trip`) |
 | `totalDays` | int | optional, 1–365 (trip length) |
 | `startDate` | date | optional, trip groups only — first day of the trip |
-| `location` | string | optional, ≤120 chars, trip groups only (e.g. `"Bali, Indonesia"`) |
+| `location` | string | optional, ≤120 chars, trip groups only (e.g. `"Bali, Indonesia"`). Typed text; older app builds send this |
+| `destination` | object | optional, trip groups only: `{ "countryCode": "IN", "stateCode": "RJ" }`, codes from `GET /places/countries` and `GET /places/countries/:code/states` (`stateCode` optional). Checked against the lists (`400 UNKNOWN_COUNTRY` / `UNKNOWN_STATE`); the group gets `destination` with the names filled in and `location` set to `"Rajasthan, India"`. Suggestions and the place search are then kept to that state (or country) |
 
 **Response `201`:** `{ "data": { "group": { "_id", "name", "groupType", "totalDays", "createdBy", "members": [{ "_id", "name", "email" }], "inviteCode", ... } } }`
 
@@ -399,13 +400,13 @@ Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller onl
 
 ### `PATCH /groups/:groupId/destination`
 
-Body: `{ "location": "Jaipur, Rajasthan" }` (2–120 characters). Fills in a trip's destination after the fact; the suggestions below and the AI planner plan around it. Admin only (`403 DESTINATION_FORBIDDEN`), trip groups only (`400 TRIP_ONLY`). Response: `{ "data": { "group": Group } }`.
+Body: `{ "destination": { "countryCode": "IN", "stateCode": "RJ" } }` (picked from the lists, `stateCode` optional) or `{ "location": "Jaipur, Rajasthan" }` (typed text, 2–120 characters; clears any picked destination). Sets or changes a trip's destination after the fact; the suggestions and the place search below, and the AI planner, work within it. Admin only (`403 DESTINATION_FORBIDDEN`), trip groups only (`400 TRIP_ONLY`). Response: `{ "data": { "group": Group } }`.
 
 ### `GET /groups/:groupId/suggestions/:type`
 
 Suggested places at the trip's destination for the Stays (`type=stay`, hotels and guest houses) and Attractions (`type=attraction`, sights ranked with heritage sites, forts and temples first) tabs. Data comes from a places provider (Geoapify, OpenStreetMap data); the key is set in the admin panel under Third-Party APIs or as `GEOAPIFY_API_KEY`. Members only, trip groups only (`400 TRIP_ONLY`).
 
-One destination is looked up once per `PLACES_CACHE_HOURS` (24) and shared by every group going there, so cost grows with destinations, not with people. `?refresh=1` asks the provider again when the cached copy is older than ten minutes.
+Where they look is the group's destination: a destination picked from the lists (`destination` on the group) is searched within that state's administrative boundary, or the country's when no state was picked, and its items carry no `distanceKm`; typed text (`location` only) is placed as a city and searched within its bounding box, nearest the centre first. One destination is looked up once per `PLACES_CACHE_HOURS` (24) and shared by every group going there, so cost grows with destinations, not with people. `?refresh=1` asks the provider again when the cached copy is older than ten minutes.
 
 ```json
 {
@@ -444,6 +445,22 @@ One destination is looked up once per `PLACES_CACHE_HOURS` (24) and shared by ev
 | `PLACES_UNAVAILABLE` | 503 | The provider refused the key, failed or timed out, or the server-wide `PLACES_GLOBAL_DAILY_CAP` (400) is reached | |
 
 Fresh lookups (cache misses and refreshes) are the only thing the caps count; reading a cached destination is free and unlimited.
+
+### `GET /groups/:groupId/places/search?type=stay|attraction&q=palace`
+
+Hotels (`type=stay`) or sights (`type=attraction`) whose name matches `q` (1–60 characters), within the trip's destination exactly as the suggestions above are. Same answer shape plus `query` (the name as typed); items come in the provider's order, best name match first, at most 10. Members only, trip groups only (`400 TRIP_ONLY`). A `q` of fewer than two letters is answered with an empty `items` and no provider call.
+
+Each new name in a destination is one provider call, cached for `PLACES_CACHE_HOURS` and shared by everyone searching for it there, under its own caps: `PLACES_SEARCH_USER_DAILY_CAP` (150) per account and `PLACES_SEARCH_GLOBAL_DAILY_CAP` (2000) server-wide, both also settable in the admin panel.
+
+| Code | HTTP | When | Extra |
+| --- | --- | --- | --- |
+| `PLACES_RATE_LIMITED` | 429 | More than 300 requests from one account in 15 minutes | |
+| `PLACES_SEARCH_LIMIT` | 429 | The caller searched more new names today than the per-account cap | `retryAfter` (seconds) |
+| `PLACES_BUSY` / `PLACES_UNAVAILABLE` | 503 | As for suggestions | |
+
+### `GET /places/countries` and `GET /places/countries/:code/states`
+
+The lists a trip's destination is picked from. `/places/countries` answers `{ "data": { "countries": [{ "code": "IN", "name": "India" }, …] } }`, every country by name with its ISO 3166-1 alpha-2 code. `/places/countries/IN/states` answers `{ "data": { "countryCode": "IN", "states": [{ "code": "RJ", "name": "Rajasthan" }, …] } }`, that country's states or provinces by name; `404` for a code not on the list. Both are served with `Cache-Control: private, max-age=86400`; the data ships with the server (the `country-region-data` package), so a change reaches every app build.
 
 ### `GET /groups/:groupId/balances`
 

@@ -5,6 +5,7 @@ import TextField from '../components/TextField';
 import SelectField from '../components/SelectField';
 import StepperField from '../components/StepperField';
 import DateField from '../components/DateField';
+import DestinationFields from '../components/DestinationFields';
 import GradientButton from '../components/GradientButton';
 import { createGroup } from '../api/groups.api';
 import { spacing } from '../theme';
@@ -24,7 +25,9 @@ const CreateGroupScreen = ({ navigation }) => {
   const [groupType, setGroupType] = useState('trip');
   const [totalDays, setTotalDays] = useState(2);
   const [startDate, setStartDate] = useState(null);
-  const [location, setLocation] = useState('');
+  // Where a trip is going, picked from the lists: suggestions and the place
+  // search on the trip's tabs are kept to it. Optional: it can be set later from those tabs.
+  const [destination, setDestination] = useState({ countryCode: '', stateCode: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -47,7 +50,11 @@ const CreateGroupScreen = ({ navigation }) => {
         description: description.trim(),
         groupType,
         ...(isTrip
-          ? { totalDays, startDate: startDate.toISOString(), location: location.trim() }
+          ? {
+              totalDays,
+              startDate: startDate.toISOString(),
+              ...(destination.countryCode ? { destination } : {}),
+            }
           : {}),
       });
       navigation.replace('GroupInvite', { group, isNew: true });
@@ -89,13 +96,7 @@ const CreateGroupScreen = ({ navigation }) => {
 
       {isTrip && (
         <>
-          <TextField
-            label="Location (optional)"
-            value={location}
-            onChangeText={setLocation}
-            placeholder="e.g. Bali, Indonesia"
-            maxLength={120}
-          />
+          <DestinationFields value={destination} onChange={setDestination} />
 
           <DateField
             label="Start Date"

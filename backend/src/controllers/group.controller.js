@@ -50,7 +50,7 @@ const setMuted = asyncHandler(async (req, res) => {
 });
 
 const setDestination = asyncHandler(async (req, res) => {
-  const group = await groupService.setDestination(req.params.groupId, req.user._id, req.body.location);
+  const group = await groupService.setDestination(req.params.groupId, req.user._id, req.body);
   res.json({ success: true, data: { group } });
 });
 

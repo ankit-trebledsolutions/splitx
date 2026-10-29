@@ -23,6 +23,14 @@ router.use(protect);
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
 
+// A trip's destination as picked from the country and state lists (GET
+// /places/countries). The codes are checked against the lists by the service;
+// `location` is the typed text older app builds send instead.
+const pickedDestination = z.object({
+  countryCode: z.string().trim().length(2, 'Pick a country'),
+  stateCode: z.string().trim().max(24).optional(),
+});
+
 const createGroupSchema = {
   body: z.object({
     name: z.string().min(2, 'Group name must be at least 2 characters').max(80),
@@ -31,6 +39,7 @@ const createGroupSchema = {
     totalDays: z.number().int().min(1).max(365).optional(),
     startDate: z.coerce.date().optional(),
     location: z.string().max(120).optional(),
+    destination: pickedDestination.optional(),
   }),
 };
 
@@ -254,10 +263,24 @@ const placeSuggestionsSchema = {
   query: z.object({ refresh: z.enum(['0', '1']).optional() }),
 };
 
-// The trip's destination, when it was left blank at creation. Admin only.
+// The trip's destination, set or changed after creation. Admin only.
 const destinationSchema = {
   params: groupParams.params,
-  body: z.object({ location: z.string().trim().min(2, 'Add a destination').max(120) }),
+  body: z
+    .object({
+      location: z.string().trim().min(2, 'Add a destination').max(120).optional(),
+      destination: pickedDestination.optional(),
+    })
+    .refine((body) => body.location || body.destination, { message: 'Add a destination' }),
+};
+
+// The name search on the Stays and Attractions tabs, within the trip's destination.
+const placeSearchSchema = {
+  params: groupParams.params,
+  query: z.object({
+    type: z.enum(['stay', 'attraction']),
+    q: z.string().trim().min(1, 'Type a name to search for').max(60),
+  }),
 };
 
 router.post('/', validate(createGroupSchema), groupController.createGroup);
@@ -334,6 +357,7 @@ router.get('/:groupId/attractions', validate(groupParams), attractionController.
 router.post('/:groupId/attractions', validate(createAttractionSchema), attractionController.createAttraction);
 
 router.get('/:groupId/suggestions/:type', placesLimiter, validate(placeSuggestionsSchema), placeController.suggestions);
+router.get('/:groupId/places/search', placesLimiter.search, validate(placeSearchSchema), placeController.search);
 router.patch('/:groupId/destination', validate(destinationSchema), groupController.setDestination);
 
 router.get('/:groupId/stays', validate(groupParams), stayController.listStays);

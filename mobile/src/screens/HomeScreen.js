@@ -318,7 +318,7 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.85}
               onPress={() => navigation.navigate('GroupChat', { groupId: trip._id, name: trip.name })}
             >
-              <Text style={styles.flag}>{tripFlag(trip.location)}</Text>
+              <Text style={styles.flag}>{tripFlag(trip.location, trip.destination?.countryCode)}</Text>
               <Text style={styles.tripName} numberOfLines={1}>
                 {trip.name}
               </Text>

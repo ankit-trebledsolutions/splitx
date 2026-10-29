@@ -227,3 +227,120 @@ test('an unknown type is a programming error, not a provider call', async () => 
   await assert.rejects(() => places.searchPlaces('restaurant', JAIPUR), /Unknown place type/);
   assert.equal(fake.requests.length, 0);
 });
+
+// ---- A picked state or country ---------------------------------------------------------
+
+const RAJASTHAN = { countryCode: 'IN', countryName: 'India', stateCode: 'RJ', stateName: 'Rajasthan' };
+const SINGAPORE = { countryCode: 'SG', countryName: 'Singapore', stateCode: '', stateName: '' };
+
+test('a picked state is asked for as a state within its country, and keeps its own name', async () => {
+  const place = await places.geocodeRegion(RAJASTHAN);
+  const { bbox } = fakeGeoapify.STATE;
+  assert.deepEqual(place, {
+    placeId: fakeGeoapify.STATE.place_id,
+    name: 'Rajasthan',
+    formatted: 'Rajasthan, India',
+    lat: fakeGeoapify.STATE.lat,
+    lon: fakeGeoapify.STATE.lon,
+    bbox: [bbox.lon1, bbox.lat1, bbox.lon2, bbox.lat2],
+    scope: 'state',
+  });
+  assert.equal(fake.requests.length, 1);
+  const { params } = fake.lastRequest();
+  assert.equal(params.text, 'Rajasthan, India');
+  assert.equal(params.type, 'state');
+  assert.equal(params.filter, 'countrycode:in');
+  assert.equal(params.lang, 'en');
+});
+
+test('a country alone is asked for as a country', async () => {
+  const place = await places.geocodeRegion(SINGAPORE);
+  assert.equal(place.placeId, fakeGeoapify.COUNTRY.place_id);
+  assert.equal(place.name, 'Singapore');
+  assert.equal(place.scope, 'country');
+  assert.equal(fake.lastRequest().params.type, 'country');
+  assert.equal(fake.lastRequest().params.filter, undefined);
+});
+
+test('a region the geocoder does not know is null, after a try by kind and one within the country', async () => {
+  env.geoapify.apiKey = 'fake-nocity';
+  assert.equal(await places.geocodeRegion(RAJASTHAN), null);
+  assert.equal(fake.requests.length, 2);
+  assert.equal(fake.requests[0].params.type, 'state');
+  assert.equal(fake.requests[1].params.type, undefined);
+  assert.equal(fake.requests[1].params.filter, 'countrycode:in');
+  assert.equal(fake.requests[1].params.text, 'Rajasthan');
+});
+
+const STATE_BOX = fakeGeoapify.STATE.bbox;
+const RAJASTHAN_PLACE = {
+  placeId: fakeGeoapify.STATE.place_id,
+  name: 'Rajasthan',
+  lat: fakeGeoapify.STATE.lat,
+  lon: fakeGeoapify.STATE.lon,
+  bbox: [STATE_BOX.lon1, STATE_BOX.lat1, STATE_BOX.lon2, STATE_BOX.lat2],
+  scope: 'state',
+};
+
+test('suggestions in a state are kept to its boundary, unranked by distance', async () => {
+  const items = await places.searchPlaces('stay', RAJASTHAN_PLACE);
+  assert.equal(fake.requests.length, 1);
+  const { params } = fake.lastRequest();
+  assert.equal(params.filter, `place:${fakeGeoapify.STATE.place_id}`);
+  assert.equal(params.bias, undefined);
+  assert.equal(params.conditions, 'named');
+  // No centre to be near: hotels keep the provider's order, kinds still rank.
+  assert.deepEqual(
+    items.map((item) => item.name),
+    ['Rambagh Palace', 'Hotel Pearl Palace', 'Pink City Guest House', 'Zostel Jaipur']
+  );
+  assert.ok(items.every((item) => item.distanceKm === null));
+});
+
+test('a boundary with nothing inside falls back to the state\'s box', async () => {
+  env.geoapify.apiKey = 'fake-noboundary';
+  const items = await places.searchPlaces('attraction', RAJASTHAN_PLACE);
+  assert.equal(items.length, 20);
+  assert.equal(fake.requests.length, 2);
+  assert.match(fake.requests[0].params.filter, /^place:/);
+  assert.equal(fake.requests[1].params.filter, `rect:${RAJASTHAN_PLACE.bbox.join(',')}`);
+});
+
+// ---- Which of them is called this ------------------------------------------------------
+
+test('a name search asks once, by name, within the boundary, and keeps the provider\'s order', async () => {
+  const items = await places.searchByName('stay', RAJASTHAN_PLACE, '  Palace ');
+  assert.equal(fake.requests.length, 1);
+  const { params } = fake.lastRequest();
+  assert.equal(params.name, 'Palace');
+  assert.equal(params.filter, `place:${fakeGeoapify.STATE.place_id}`);
+  assert.equal(params.bias, undefined);
+  assert.equal(params.limit, String(places.SEARCH_KEEP * 2));
+  assert.ok(params.categories.split(',').every((category) => category.startsWith('accommodation.')));
+  // As the provider listed them: no re-ranking by kind. The duplicate Pearl Palace is one.
+  assert.deepEqual(
+    items.map((item) => item.name),
+    ['Rambagh Palace', 'Hotel Pearl Palace']
+  );
+  assert.equal('weight' in items[0], false);
+  assert.equal(items[0].distanceKm, null);
+});
+
+test('a name search in a typed city uses its box and ranks by distance from the centre', async () => {
+  const items = await places.searchByName('attraction', JAIPUR, 'mahal');
+  const { params } = fake.lastRequest();
+  assert.equal(params.filter, `rect:${JAIPUR.bbox.join(',')}`);
+  assert.equal(params.bias, `proximity:${JAIPUR.lon},${JAIPUR.lat}`);
+  assert.deepEqual(items.map((item) => item.name), ['Hawa Mahal']);
+  assert.equal(items[0].distanceKm, 0.6);
+});
+
+test('a name nobody has is an empty list after one call, not a fallback search', async () => {
+  assert.deepEqual(await places.searchByName('stay', RAJASTHAN_PLACE, 'zzz'), []);
+  assert.equal(fake.requests.length, 1);
+});
+
+test('a name search caps what it shows', async () => {
+  const items = await places.searchByName('attraction', RAJASTHAN_PLACE, 'memorial');
+  assert.equal(items.length, places.SEARCH_KEEP);
+});

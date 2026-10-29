@@ -169,7 +169,7 @@ const INTEGRATIONS = [
       },
       {
         title: 'Paste the key here and set the limits',
-        body: 'The limits count only fresh lookups, when a destination is not already known from the last 24 hours. They keep one busy day well inside the free plan.',
+        body: 'The limits count only fresh lookups, when a destination is not already known from the last 24 hours. Name searches on the Stays and Attractions tabs have their own pair: each new name typed is one lookup. Together they keep one busy day well inside the free plan.',
       },
     ],
     fields: [
@@ -196,6 +196,22 @@ const INTEGRATIONS = [
         min: 0,
         max: 100000,
         fromEnv: () => env.geoapify.globalDailyCap,
+      },
+      {
+        key: 'searchUserDailyCap',
+        label: 'Name searches per person, per day',
+        type: 'number',
+        min: 0,
+        max: 5000,
+        fromEnv: () => env.geoapify.searchUserDailyCap,
+      },
+      {
+        key: 'searchGlobalDailyCap',
+        label: 'Name searches for everyone, per day',
+        type: 'number',
+        min: 0,
+        max: 200000,
+        fromEnv: () => env.geoapify.searchGlobalDailyCap,
       },
     ],
   },

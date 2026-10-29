@@ -63,7 +63,12 @@ const main = async () => {
 
   // ---- Fixtures ------------------------------------------------------------
 
-  const DEFAULT_CAPS = { userDailyCap: env.geoapify.userDailyCap, globalDailyCap: env.geoapify.globalDailyCap };
+  const DEFAULT_CAPS = {
+    userDailyCap: env.geoapify.userDailyCap,
+    globalDailyCap: env.geoapify.globalDailyCap,
+    searchUserDailyCap: env.geoapify.searchUserDailyCap,
+    searchGlobalDailyCap: env.geoapify.searchGlobalDailyCap,
+  };
 
   let userCount = 0;
   const makeUser = (name = 'Smoke Tester') => {
@@ -104,7 +109,9 @@ const main = async () => {
     return res.body.data;
   };
   const providerCalls = () => fake.requests.length;
-  const lookups = () => PlaceLookup.countDocuments({});
+  // Suggestion lookups only: name searches are counted under their own caps.
+  const SUGGESTION_LOOKUPS = { type: { $in: ['stay', 'attraction'] } };
+  const lookups = () => PlaceLookup.countDocuments(SUGGESTION_LOOKUPS);
 
   // ---- Runner --------------------------------------------------------------
 
@@ -319,6 +326,210 @@ const main = async () => {
     assert.equal(providerCalls(), 1);
   });
 
+  section('A destination picked from the lists');
+
+  const search = (user, group, type, q) =>
+    call(user, 'GET', `/groups/${group._id}/places/search?type=${type}&q=${encodeURIComponent(q)}`);
+
+  await check('the country and state lists are served, a day cacheable; an unknown country is a 404', async () => {
+    const countries = await call(admin, 'GET', '/places/countries');
+    assert.equal(countries.status, 200);
+    assert.ok(countries.body.data.countries.length > 200);
+    assert.ok(countries.body.data.countries.some((c) => c.code === 'IN' && c.name === 'India'));
+    const states = await call(admin, 'GET', '/places/countries/in/states');
+    assert.equal(states.status, 200);
+    assert.equal(states.body.data.countryCode, 'IN');
+    assert.ok(states.body.data.states.some((s) => s.code === 'RJ' && s.name === 'Rajasthan'));
+    assert.equal((await call(admin, 'GET', '/places/countries/XX/states')).status, 404);
+    assert.equal((await call(admin, 'GET', '/places/countries/IND/states')).status, 400);
+    assert.equal(providerCalls(), 0);
+  });
+
+  let rajasthan;
+  await check('creating a trip with a picked country and state: names filled in, the text written too', async () => {
+    const created = await call(admin, 'POST', '/groups', {
+      name: 'Rajasthan Trip',
+      groupType: 'trip',
+      totalDays: 3,
+      startDate: '2026-12-10T00:00:00.000Z',
+      destination: { countryCode: 'in', stateCode: 'rj' },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const { group } = created.body.data;
+    assert.deepEqual(group.destination, { countryCode: 'IN', countryName: 'India', stateCode: 'RJ', stateName: 'Rajasthan' });
+    assert.equal(group.location, 'Rajasthan, India');
+    // The member joins, for the checks below that ask as them.
+    rajasthan = await Group.findByIdAndUpdate(group._id, { $addToSet: { members: member._id } }, { new: true });
+
+    expectError(
+      await call(admin, 'POST', '/groups', { name: 'Nowhere', groupType: 'trip', destination: { countryCode: 'IN', stateCode: 'NOPE' } }),
+      400,
+      'UNKNOWN_STATE'
+    );
+    expectError(
+      await call(admin, 'POST', '/groups', { name: 'Nowhere', groupType: 'trip', destination: { countryCode: 'XX' } }),
+      400,
+      'UNKNOWN_COUNTRY'
+    );
+    // Not a trip: the destination is dropped, not refused.
+    const home = await call(admin, 'POST', '/groups', { name: 'Flat', groupType: 'home', destination: { countryCode: 'IN' } });
+    assert.equal(home.status, 201);
+    assert.equal(home.body.data.group.destination, null);
+    assert.equal(home.body.data.group.location, '');
+  });
+
+  await check('stays in the state: geocoded as a state within the country, searched within its boundary', async () => {
+    const data = expectOk(await suggest(admin, rajasthan, 'stay'));
+    assert.deepEqual(data.destination, { text: 'Rajasthan, India', resolved: 'Rajasthan, India' });
+    assert.equal(data.items.length, 4);
+    assert.ok(data.items.every((item) => item.distanceKm === null));
+    assert.equal(providerCalls(), 2);
+    const [geocode, places] = fake.requests;
+    assert.equal(geocode.path, '/v1/geocode/search');
+    assert.equal(geocode.params.type, 'state');
+    assert.equal(geocode.params.filter, 'countrycode:in');
+    assert.equal(geocode.params.text, 'Rajasthan, India');
+    assert.equal(places.path, '/v2/places');
+    assert.equal(places.params.filter, `place:${fakeGeoapify.STATE.place_id}`);
+    assert.equal(places.params.bias, undefined);
+    assert.ok(await PlaceCache.findOne({ key: 'region|in|rj', type: 'region' }));
+    assert.ok(await PlaceCache.findOne({ key: 'stay|region:in|rj', type: 'stay' }));
+  });
+
+  await check('another group picking the same state shares the cache', async () => {
+    const other = await makeGroup(member, {
+      location: 'Rajasthan, India',
+      destination: { countryCode: 'IN', countryName: 'India', stateCode: 'RJ', stateName: 'Rajasthan' },
+    });
+    const data = expectOk(await suggest(member, other, 'stay'));
+    assert.equal(data.items.length, 4);
+    assert.equal(providerCalls(), 0);
+  });
+
+  await check('a country alone is a destination: geocoded as a country', async () => {
+    const singapore = await makeGroup(admin, {
+      location: 'Singapore',
+      destination: { countryCode: 'SG', countryName: 'Singapore', stateCode: '', stateName: '' },
+    });
+    const data = expectOk(await suggest(admin, singapore, 'attraction'));
+    assert.equal(data.destination.text, 'Singapore');
+    assert.equal(fake.requests[0].params.type, 'country');
+    assert.equal(fake.requests[1].params.filter, `place:${fakeGeoapify.COUNTRY.place_id}`);
+    assert.equal(data.items.length, 20);
+  });
+
+  await check('changing the destination: a picked one, then typed text (which drops the picked one)', async () => {
+    const group = await makeGroup(admin, { location: '', members: [admin._id, member._id] });
+    const picked = await call(admin, 'PATCH', `/groups/${group._id}/destination`, {
+      destination: { countryCode: 'IN', stateCode: 'GA' },
+    });
+    assert.equal(picked.status, 200, JSON.stringify(picked.body));
+    assert.equal(picked.body.data.group.location, 'Goa, India');
+    assert.equal(picked.body.data.group.destination.stateName, 'Goa');
+
+    const typed = await call(admin, 'PATCH', `/groups/${group._id}/destination`, { location: 'Panaji' });
+    assert.equal(typed.status, 200);
+    assert.equal(typed.body.data.group.location, 'Panaji');
+    assert.equal(typed.body.data.group.destination, null);
+
+    assert.equal((await call(admin, 'PATCH', `/groups/${group._id}/destination`, {})).status, 400);
+    expectError(
+      await call(member, 'PATCH', `/groups/${group._id}/destination`, { destination: { countryCode: 'IN' } }),
+      403,
+      'DESTINATION_FORBIDDEN'
+    );
+  });
+
+  section('Searching by name');
+
+  await check('a name search: one provider call, by name, within the state; the same name again is free', async () => {
+    const data = expectOk(await search(admin, rajasthan, 'stay', ' palace '));
+    assert.equal(data.type, 'stay');
+    assert.equal(data.query, 'palace');
+    assert.equal(data.destination.text, 'Rajasthan, India');
+    assert.deepEqual(
+      data.items.map((item) => item.name),
+      ['Rambagh Palace', 'Hotel Pearl Palace']
+    );
+    assert.equal(providerCalls(), 1);
+    const { params } = fake.lastRequest();
+    assert.equal(params.name, 'palace');
+    assert.equal(params.filter, `place:${fakeGeoapify.STATE.place_id}`);
+    assert.equal(await PlaceLookup.countDocuments({ type: 'search' }), 1);
+
+    const again = expectOk(await search(member, rajasthan, 'stay', 'PALACE'));
+    assert.equal(again.items.length, 2);
+    assert.equal(providerCalls(), 1);
+    assert.equal(await PlaceLookup.countDocuments({ type: 'search' }), 1);
+    assert.ok(await PlaceCache.findOne({ key: 'search|stay|region:in|rj|palace', type: 'search' }));
+  });
+
+  await check('what the group already added is marked; attractions search too', async () => {
+    await call(admin, 'POST', `/groups/${rajasthan._id}/stays`, {
+      name: 'Rambagh Palace',
+      checkIn: '2026-12-10T06:30:00.000Z',
+      checkOut: '2026-12-12T06:30:00.000Z',
+      pricePerNight: 300,
+      placeId: 'h1',
+    });
+    const stays = expectOk(await search(admin, rajasthan, 'stay', 'palace'));
+    assert.deepEqual(stays.addedPlaceIds, ['h1']);
+
+    const sights = expectOk(await search(admin, rajasthan, 'attraction', 'fort'));
+    assert.deepEqual(sights.items.map((item) => item.name), ['Amber Fort']);
+    assert.equal(sights.items[0].category, 'UNESCO World Heritage');
+  });
+
+  await check('a single letter is answered empty without a call; a bad request is a 400', async () => {
+    const data = expectOk(await search(admin, rajasthan, 'stay', 'p'));
+    assert.deepEqual(data.items, []);
+    assert.equal(data.query, 'p');
+    assert.equal(providerCalls(), 0);
+    assert.equal((await search(admin, rajasthan, 'restaurant', 'palace')).status, 400);
+    assert.equal((await call(admin, 'GET', `/groups/${rajasthan._id}/places/search?type=stay`)).status, 400);
+    assert.equal((await search(stranger, rajasthan, 'stay', 'palace')).status, 403);
+  });
+
+  await check('no destination: NO_DESTINATION; a typed city searches within its box', async () => {
+    const bare = await makeGroup(admin, { location: '' });
+    const none = expectOk(await search(admin, bare, 'stay', 'palace'));
+    assert.equal(none.reason, 'NO_DESTINATION');
+    assert.equal(providerCalls(), 0);
+
+    const city = expectOk(await search(admin, jaipur, 'attraction', 'mahal'));
+    assert.deepEqual(city.items.map((item) => item.name), ['Hawa Mahal']);
+    assert.match(fake.lastRequest().params.filter, /^rect:/);
+    assert.equal(city.items[0].distanceKm, 0.6);
+  });
+
+  await check('the search caps are their own: PLACES_SEARCH_LIMIT, while suggestions still work', async () => {
+    env.geoapify.searchUserDailyCap = 1;
+    const user = await makeUser('Ford Prefect');
+    const group = await makeGroup(user, {
+      location: 'Rajasthan, India',
+      destination: { countryCode: 'IN', countryName: 'India', stateCode: 'RJ', stateName: 'Rajasthan' },
+    });
+    expectOk(await search(user, group, 'stay', 'zostel'));
+    const limited = await search(user, group, 'stay', 'pink city');
+    expectError(limited, 429, 'PLACES_SEARCH_LIMIT');
+    assert.ok(limited.body.retryAfter > 0);
+    // A name already answered is still free.
+    expectOk(await search(user, group, 'stay', 'zostel'));
+    // Suggestions count their own lookups.
+    env.geoapify.userDailyCap = 1;
+    expectOk(await suggest(user, group, 'attraction'));
+  });
+
+  await check('a provider failure while searching is PLACES_UNAVAILABLE; a refused key opens the breaker', async () => {
+    env.geoapify.apiKey = 'fake-500';
+    expectError(await search(admin, rajasthan, 'attraction', 'temple'), 503, 'PLACES_UNAVAILABLE');
+    env.geoapify.apiKey = 'fake-401';
+    expectError(await search(admin, rajasthan, 'attraction', 'temple'), 503, 'PLACES_UNAVAILABLE');
+    assert.equal(places.isBreakerOpen(), true);
+    env.geoapify.apiKey = 'fake-ok';
+    expectError(await search(admin, rajasthan, 'attraction', 'zoo'), 503, 'PLACES_UNAVAILABLE');
+  });
+
   section('Destinations the provider cannot help with');
 
   await check('an unknown destination: UNKNOWN_DESTINATION, remembered so it is not asked again at once', async () => {
@@ -373,7 +584,7 @@ const main = async () => {
   });
 
   await check('the per-person cap counts fresh lookups only, and answers with retryAfter', async () => {
-    const before = await PlaceLookup.countDocuments({ user: admin._id });
+    const before = await PlaceLookup.countDocuments({ user: admin._id, ...SUGGESTION_LOOKUPS });
     env.geoapify.userDailyCap = before;
     const fresh = await makeGroup(admin, { location: 'Mumbai' });
     const res = await suggest(admin, fresh, 'stay');

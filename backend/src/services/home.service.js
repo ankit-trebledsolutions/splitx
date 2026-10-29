@@ -51,6 +51,7 @@ const upcomingTrips = (groups, now) =>
         _id: g._id,
         name: g.name,
         location: g.location,
+        destination: g.destination ?? null,
         startDate: g.startDate,
         endDate,
         memberCount: g.members.length,
@@ -105,7 +106,7 @@ const recentTasks = (groupIds) =>
 
 const getHome = async (userId) => {
   const groups = await Group.find({ members: userId })
-    .select('name groupType totalDays startDate location members')
+    .select('name groupType totalDays startDate location destination members')
     .lean();
   const groupIds = groups.map((g) => g._id);
 

@@ -5,17 +5,33 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const notificationService = require('./notification.service');
 const reminderSync = require('./reminderSync.service');
+const regions = require('./regions.service');
 
 const MEMBER_FIELDS = 'name email lastSeenAt';
 
-const createGroup = async (userId, { name, description, groupType, totalDays, startDate, location }) => {
+/**
+ * What a trip's destination becomes on the group. Picked from the lists
+ * (`destination`: a country code and maybe a state code), it is checked
+ * against them, given its names, and written as text too, which is what every
+ * screen shows. Typed text alone (`location`, from older app builds and the
+ * AI planner) is kept as it is, with no picked destination.
+ */
+const destinationFields = ({ destination, location } = {}) => {
+  if (destination?.countryCode) {
+    const picked = regions.resolve(destination);
+    return { destination: picked, location: regions.labelOf(picked) };
+  }
+  return { destination: null, location: String(location ?? '').trim() };
+};
+
+const createGroup = async (userId, { name, description, groupType, totalDays, startDate, location, destination }) => {
   const group = await Group.create({
     name,
     description,
     groupType,
     totalDays: groupType === 'trip' ? totalDays : null,
     startDate: groupType === 'trip' ? startDate : null,
-    location: groupType === 'trip' ? location : '',
+    ...(groupType === 'trip' ? destinationFields({ destination, location }) : { destination: null, location: '' }),
     createdBy: userId,
     admin: userId,
     members: [userId],
@@ -278,12 +294,13 @@ const setMuted = async (groupId, userId, muted) => {
 };
 
 /**
- * Fills in a trip's destination after the fact, for a group created without
- * one. Admin only, like the other things that change a group for everyone;
- * trips only, because nothing else reads it. The AI planner writes the same
- * field on a successful plan (see savePlan in aiItinerary.service).
+ * Fills in or changes a trip's destination after the fact. Admin only, like
+ * the other things that change a group for everyone; trips only, because
+ * nothing else reads it. Takes what createGroup takes: a picked country and
+ * state, or typed text. The AI planner writes the text field on a successful
+ * plan (see savePlan in aiItinerary.service).
  */
-const setDestination = async (groupId, userId, location) => {
+const setDestination = async (groupId, userId, body) => {
   const group = await getGroupForMember(groupId, userId);
   assertTripGroup(group, 'Only trip groups have a destination.');
   if (!sameId(group.adminId, userId)) {
@@ -291,7 +308,7 @@ const setDestination = async (groupId, userId, location) => {
       code: 'DESTINATION_FORBIDDEN',
     });
   }
-  group.location = location;
+  Object.assign(group, destinationFields(body));
   // Not activity in the group: it must not jump to the top of the list.
   await group.save({ timestamps: false });
   return group;
@@ -483,6 +500,7 @@ module.exports = {
   removeMember,
   setMuted,
   setDestination,
+  destinationFields,
   getBalances,
   getContributions,
   outstandingShares,

@@ -10,7 +10,8 @@ const placeLookupSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     group: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
-    type: { type: String, required: true, enum: ['stay', 'attraction'] },
+    // 'search' is a name search on one of the tabs; it has its own caps.
+    type: { type: String, required: true, enum: ['stay', 'attraction', 'search'] },
     key: { type: String, required: true },
     at: { type: Date, required: true, default: Date.now },
   },

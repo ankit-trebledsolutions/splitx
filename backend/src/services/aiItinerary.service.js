@@ -545,7 +545,10 @@ const savePlan = async (job, snapshot, docs, billing) => {
   // orders the group list: planning is not activity in the group.
   if (Object.keys(job.writeBack ?? {}).length) {
     try {
-      await Group.updateOne({ _id: job.group }, { $set: job.writeBack }, { timestamps: false });
+      // A destination learned here is text; the picked country and state, if
+      // any, no longer describe it.
+      const fields = job.writeBack.location ? { ...job.writeBack, destination: null } : job.writeBack;
+      await Group.updateOne({ _id: job.group }, { $set: fields }, { timestamps: false });
     } catch (err) {
       console.error(`[ai] job ${job._id}: could not update the group's trip details:`, err.message);
     }

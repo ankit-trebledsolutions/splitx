@@ -12,7 +12,8 @@
  *
  * The "key" picks what the server plays back:
  *
- *   fake-ok          a city and a page of hotels / sights for any destination
+ *   fake-ok          a city (or, asked by type, a state / country) and a page of
+ *                    hotels / sights for any destination; `name` keeps the matches
  *   fake-slow        the same, after --slow-ms (past GEOAPIFY_TIMEOUT_MS it is a timeout)
  *   fake-nocity      the geocoder knows no such place (results: [])
  *   fake-nobbox      a city without a bounding box (the search uses a circle)
@@ -42,6 +43,33 @@ const CITY = {
   lat: 26.9154576,
   lon: 75.8189817,
   bbox: { lon1: 75.6589817, lat1: 26.7554576, lon2: 75.9789817, lat2: 27.0754576 },
+};
+
+// What the geocoder answers when asked for a state or a country by type:
+// the boundary ids the Places API is then kept to (filter=place:...).
+const STATE = {
+  place_id: '51e0a1b2c3d4e5f60759a0b1c2d3e4f5a6b7',
+  name: 'Rajasthan',
+  state: 'Rajasthan',
+  country: 'India',
+  country_code: 'in',
+  formatted: 'Rajasthan, India',
+  result_type: 'state',
+  lat: 26.5,
+  lon: 73.9,
+  bbox: { lon1: 69.48, lat1: 23.06, lon2: 78.26, lat2: 30.19 },
+};
+
+const COUNTRY = {
+  place_id: '51f0a1b2c3d4e5f60759a0b1c2d3e4f5a6b8',
+  name: 'India',
+  country: 'India',
+  country_code: 'in',
+  formatted: 'India',
+  result_type: 'country',
+  lat: 22.35,
+  lon: 78.67,
+  bbox: { lon1: 68.11, lat1: 6.55, lon2: 97.4, lat2: 35.67 },
 };
 
 const feature = (id, name, categories, extra = {}) => ({
@@ -100,6 +128,9 @@ const ATTRACTIONS = [
   ),
 ];
 
+// The filter the server sends for the city's bounding box.
+const CITY_RECT = `rect:${[CITY.bbox.lon1, CITY.bbox.lat1, CITY.bbox.lon2, CITY.bbox.lat2].join(',')}`;
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const start = async ({ port = 0, slowMs = DEFAULT_SLOW_MS } = {}) => {
@@ -128,18 +159,36 @@ const start = async ({ port = 0, slowMs = DEFAULT_SLOW_MS } = {}) => {
         const { bbox, ...withoutBox } = CITY;
         return send(200, { results: [withoutBox], query: { text: params.text } });
       }
-      // Only a city is ever asked for first; the fallback query has no type.
+      // A picked destination is asked for by kind; a typed one as a city first,
+      // then with no type.
+      if (params.type === 'state') return send(200, { results: [STATE], query: { text: params.text } });
+      if (params.type === 'country') return send(200, { results: [COUNTRY], query: { text: params.text } });
       return send(200, { results: [CITY], query: { text: params.text } });
     }
 
     if (url.pathname === '/v2/places') {
       if (scenario === 'fake-empty') return send(200, { type: 'FeatureCollection', features: [] });
-      if (scenario === 'fake-noboundary' && String(params.filter).startsWith('rect:')) {
+      // The first area asked for (a city's box, a state's boundary) is empty;
+      // the fallback (a circle, the state's box) answers.
+      if (scenario === 'fake-noboundary' && (String(params.filter).startsWith('place:') || params.filter === CITY_RECT)) {
         return send(200, { type: 'FeatureCollection', features: [] });
       }
       const isStay = String(params.categories).startsWith('accommodation');
       const limit = parseInt(params.limit, 10) || 20;
-      return send(200, { type: 'FeatureCollection', features: (isStay ? STAYS : ATTRACTIONS).slice(0, limit) });
+      let features = isStay ? STAYS : ATTRACTIONS;
+      // A name search: the real provider matches names loosely; a
+      // case-insensitive "contains" on the name (English where there is one) is close enough.
+      if (params.name) {
+        const wanted = String(params.name).toLowerCase();
+        features = features.filter((f) =>
+          String(f.properties.name_international?.en || f.properties.name).toLowerCase().includes(wanted)
+        );
+      }
+      // Like the real provider, a distance comes only with a proximity bias.
+      if (!params.bias) {
+        features = features.map(({ properties: { distance, ...properties }, ...rest }) => ({ ...rest, properties }));
+      }
+      return send(200, { type: 'FeatureCollection', features: features.slice(0, limit) });
     }
 
     return send(404, { statusCode: 404, error: 'Not Found' });
@@ -155,7 +204,7 @@ const start = async ({ port = 0, slowMs = DEFAULT_SLOW_MS } = {}) => {
   };
 };
 
-module.exports = { start, CITY, STAYS, ATTRACTIONS };
+module.exports = { start, CITY, STATE, COUNTRY, STAYS, ATTRACTIONS };
 
 if (require.main === module) {
   const flag = (name, fallback) => {

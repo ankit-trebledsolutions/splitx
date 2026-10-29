@@ -1,64 +1,75 @@
 import React, { useEffect, useState } from 'react';
-import { Text } from 'react-native';
-import FormSheet, { makeSheetStyles } from './FormSheet';
-import TextField from './TextField';
-import { useStyles } from '../theme';
+import { Text, StyleSheet } from 'react-native';
+import FormSheet from './FormSheet';
+import DestinationFields from './DestinationFields';
+import { spacing, useStyles } from '../theme';
 
-// Fills in a trip's destination after the fact (admin only, enforced by the
-// server too). Suggested stays and attractions need it.
-const SetDestinationSheet = ({ visible, current = '', onClose, onSubmit }) => {
-  const sheetStyles = useStyles(makeSheetStyles);
-  const [location, setLocation] = useState(current);
-  const [error, setError] = useState('');
+const EMPTY = { countryCode: '', stateCode: '' };
+
+// Sets or changes a trip's destination after the fact (admin only, enforced
+// by the server too): the country, then the state, picked from the lists.
+// Suggested stays and attractions, and the name search, are kept to it.
+//   current:     the group's picked destination ({ countryCode, stateCode }), or null
+//   currentText: the destination as text, for a group that only ever typed one
+//   onSubmit:    ({ destination: { countryCode, stateCode } }) => Promise
+const SetDestinationSheet = ({ visible, current = null, currentText = '', onClose, onSubmit }) => {
+  const styles = useStyles(makeStyles);
+  const [value, setValue] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
-    setLocation(current ?? '');
-    setError('');
+    setValue({ countryCode: current?.countryCode ?? '', stateCode: current?.stateCode ?? '' });
+    setErrors({});
     setSaving(false);
-  }, [visible, current]);
+    // The codes, not the object: a group refresh must not reset a half-made choice.
+  }, [visible, current?.countryCode, current?.stateCode]);
 
   const submit = async () => {
-    const trimmed = location.trim();
-    if (trimmed.length < 2) {
-      setError('Add a destination, for example Jaipur or Bali');
+    if (!value.countryCode) {
+      setErrors({ countryCode: 'Pick the country the trip is going to' });
       return;
     }
     setSaving(true);
     try {
-      await onSubmit(trimmed);
+      await onSubmit({ destination: { countryCode: value.countryCode, stateCode: value.stateCode || undefined } });
     } finally {
       setSaving(false);
     }
   };
 
+  const hasText = Boolean(currentText) && !current?.countryCode;
+
   return (
     <FormSheet
       visible={visible}
-      title={current ? 'Change destination' : 'Trip destination'}
-      subtitle="Where is this trip going? A city or a region works best."
+      title={current || currentText ? 'Change destination' : 'Trip destination'}
+      subtitle="Where is this trip going? Pick the country, then the state."
       submitLabel="Save"
       saving={saving}
       onClose={onClose}
       onSubmit={submit}
     >
-      <Text style={sheetStyles.label}>Destination</Text>
-      <TextField
-        value={location}
-        onChangeText={(text) => {
-          setLocation(text);
-          if (error) setError('');
+      {hasText ? (
+        <Text style={styles.note}>
+          Set as “{currentText}” so far. Pick it from the lists so suggestions and search stay within it.
+        </Text>
+      ) : null}
+      <DestinationFields
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          if (errors.countryCode) setErrors({});
         }}
-        placeholder="e.g. Jaipur, Rajasthan"
-        autoFocus
-        autoCapitalize="words"
-        returnKeyType="done"
-        onSubmitEditing={submit}
-        error={error || undefined}
+        errors={errors}
       />
     </FormSheet>
   );
 };
+
+const makeStyles = (theme) => StyleSheet.create({
+  note: { color: theme.textMuted, fontSize: 12, lineHeight: 17, marginBottom: spacing.md },
+});
 
 export default SetDestinationSheet;

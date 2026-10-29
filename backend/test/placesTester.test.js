@@ -52,7 +52,7 @@ test('Geoapify: a refused key, an exhausted key and an outage are all not saved'
   assert.equal((await testers.geoapify({ apiKey: '' })).ok, false);
 });
 
-test('the panel entry: a secret key, two caps, and values that come from env until saved', () => {
+test('the panel entry: a secret key, two pairs of caps, and values that come from env until saved', () => {
   const integration = BY_KEY.geoapify;
   assert.ok(integration);
   assert.deepEqual(
@@ -61,6 +61,8 @@ test('the panel entry: a secret key, two caps, and values that come from env unt
       ['apiKey', 'secret'],
       ['userDailyCap', 'number'],
       ['globalDailyCap', 'number'],
+      ['searchUserDailyCap', 'number'],
+      ['searchGlobalDailyCap', 'number'],
     ]
   );
   assert.ok(integration.fields[0].pattern.test(KEY));
@@ -71,6 +73,8 @@ test('the panel entry: a secret key, two caps, and values that come from env unt
   assert.equal(values.apiKey, 'fake-ok');
   assert.equal(values.userDailyCap, 30);
   assert.equal(values.globalDailyCap, 400);
+  assert.equal(values.searchUserDailyCap, 150);
+  assert.equal(values.searchGlobalDailyCap, 2000);
   // The server's own settings ride along, untouchable from the panel.
   assert.equal(values.baseUrl, env.geoapify.baseUrl);
   assert.equal(values.timeoutMs, 1500);

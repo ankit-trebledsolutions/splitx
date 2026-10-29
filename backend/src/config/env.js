@@ -97,6 +97,10 @@ const geoapify = {
   // Spend control, counted only when Geoapify is actually called (a cache miss).
   userDailyCap: intEnv('PLACES_USER_DAILY_CAP', 30),
   globalDailyCap: intEnv('PLACES_GLOBAL_DAILY_CAP', 400),
+  // The name search on the Stays and Attractions tabs: every new name typed is
+  // one call, so these run higher than the suggestion caps above.
+  searchUserDailyCap: intEnv('PLACES_SEARCH_USER_DAILY_CAP', 150),
+  searchGlobalDailyCap: intEnv('PLACES_SEARCH_GLOBAL_DAILY_CAP', 2000),
 };
 if (!geoapify.apiKey && isProduction) {
   console.warn('[places] GEOAPIFY_API_KEY is not set: stay and attraction suggestions are off');

@@ -184,7 +184,7 @@ const TripsScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.heroTitleRow}>
-            <Text style={styles.heroFlag}>{tripFlag(trip.location)}</Text>
+            <Text style={styles.heroFlag}>{tripFlag(trip.location, trip.destination?.countryCode)}</Text>
             <View style={styles.heroTitleBody}>
               <Text style={styles.heroName} numberOfLines={1}>
                 {trip.name}
@@ -300,7 +300,7 @@ const TripsScreen = ({ navigation }) => {
       <TouchableOpacity key={trip._id} style={styles.card} activeOpacity={0.88} onPress={() => openTrip(trip)}>
         <View style={styles.cardTop}>
           <View style={styles.flagTile}>
-            <Text style={styles.flag}>{tripFlag(trip.location)}</Text>
+            <Text style={styles.flag}>{tripFlag(trip.location, trip.destination?.countryCode)}</Text>
           </View>
           <View style={styles.cardBody}>
             <Text style={styles.cardName} numberOfLines={1}>

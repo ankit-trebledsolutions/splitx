@@ -52,3 +52,41 @@ test('the Geoapify block of config/env has the documented defaults', () => {
   assert.equal(env.geoapify.timeoutMs, 1500);
   assert.equal(env.geoapify.baseUrl, 'http://127.0.0.1:9');
 });
+
+const { scopeOf, scopeKeyOf, SEARCH_MIN_LENGTH } = require('../src/services/placeSuggestion.service');
+
+test('a picked destination scopes to its state, keyed by the codes, shown by its text', () => {
+  const picked = { countryCode: 'IN', countryName: 'India', stateCode: 'RJ', stateName: 'Rajasthan' };
+  const scope = scopeOf({ location: 'Rajasthan, India', destination: picked });
+  assert.equal(scope.kind, 'region');
+  assert.equal(scope.key, 'in|rj');
+  assert.equal(scope.text, 'Rajasthan, India');
+  assert.deepEqual(scope.region, picked);
+  assert.equal(scopeKeyOf(scope), 'region:in|rj');
+  // A country alone.
+  const country = scopeOf({ location: '', destination: { countryCode: 'SG', countryName: 'Singapore' } });
+  assert.equal(country.key, 'sg|');
+  assert.equal(country.text, 'Singapore');
+  assert.equal(country.region.stateCode, '');
+});
+
+test('typed text scopes as it always did, with the key it always had', () => {
+  const scope = scopeOf({ location: ' Jaipur, Rajasthan ', destination: null });
+  assert.equal(scope.kind, 'text');
+  assert.equal(scope.key, 'jaipur rajasthan');
+  assert.equal(scopeKeyOf(scope), 'jaipur rajasthan');
+  assert.equal(scope.text, 'Jaipur, Rajasthan');
+  assert.equal(scope.region, null);
+  // Typed text can never look like a region key: its separators become spaces.
+  assert.equal(scopeOf({ location: 'region:in|rj' }).key, 'region in rj');
+});
+
+test('a group with nothing usable has no scope', () => {
+  assert.equal(scopeOf({ location: '', destination: null }), null);
+  assert.equal(scopeOf({ location: 'x' }), null);
+  assert.equal(scopeOf({}), null);
+});
+
+test('a name search needs at least two letters', () => {
+  assert.equal(SEARCH_MIN_LENGTH, 2);
+});

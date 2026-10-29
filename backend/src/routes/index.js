@@ -16,6 +16,7 @@ const directRoutes = require('./direct.routes');
 const tripRoutes = require('./trip.routes');
 const walletRoutes = require('./wallet.routes');
 const appRoutes = require('./app.routes');
+const regionRoutes = require('./region.routes');
 const adminRoutes = require('./admin.routes');
 const { appVersionGate } = require('../middleware/appVersion');
 
@@ -45,6 +46,8 @@ router.use('/home', homeRoutes);
 router.use('/conversations', directRoutes);
 router.use('/trips', tripRoutes);
 router.use('/wallet', walletRoutes);
+// The country and state lists a trip's destination is picked from.
+router.use('/places', regionRoutes);
 // Admin panel. Guarded inside by adminProtect rather than `protect`: the panel
 // is a browser holding a cookie, the app is a client holding a Bearer token.
 router.use('/admin', adminRoutes);
