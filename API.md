@@ -1,0 +1,1298 @@
+# Splix API Documentation
+
+REST API for Splix — the expense-splitting and group trip-planning app.
+
+- **Base URL (local):** `http://localhost:4000/api/v1`
+- **Format:** JSON request and response bodies (`Content-Type: application/json`), except photo, video and chat file uploads, which are `multipart/form-data`.
+- **Uploaded images** are served statically from `http://localhost:4000/uploads/<filename>` (no auth required).
+
+## Conventions
+
+### Response envelope
+
+Every successful response is wrapped in:
+
+```json
+{ "success": true, "data": { ... } }
+```
+
+Every error response is:
+
+```json
+{ "success": false, "message": "Human-readable error message" }
+```
+
+Errors the app needs to branch on also carry a machine-readable `code`, and sometimes extra fields next to it (see the tables under Auth and Itinerary).
+
+| Status | Meaning |
+| --- | --- |
+| 400 | Validation failed (zod/Mongoose) or malformed id |
+| 401 | Missing/invalid/expired JWT |
+| 403 | Authenticated but not allowed (e.g. not a group member) |
+| 404 | Resource or route not found |
+| 409 | Duplicate value (e.g. email already registered) |
+| 426 | This build of the app is too old and must be updated (`code: "APP_UPDATE_REQUIRED"`, see App updates). Every request answers this until a newer build is installed |
+| 429 | Rate limit exceeded (auth routes: 50 requests / 15 min per IP; AI itinerary planning: see Itinerary) |
+| 500 | Server error |
+| 503 | A feature that depends on an outside service is not set up or is switched off for now (AI itinerary planning) |
+
+### Authentication
+
+All endpoints **except** `/health`, `/app/release`, `/app/branding` and the `/auth/*` routes require a JWT:
+
+```
+Authorization: Bearer <token>
+```
+
+The token is returned by `POST /auth/register` and `POST /auth/login`.
+
+### IDs and dates
+
+- All ids are MongoDB ObjectIds (24-char hex strings).
+- Dates are accepted as ISO-8601 strings (e.g. `"2026-08-15T10:00:00.000Z"`) and returned in the same format.
+- All documents carry `createdAt` / `updatedAt` timestamps.
+
+---
+
+## Health
+
+### `GET /health`
+
+No auth. Returns `{ "success": true, "status": "ok" }`.
+
+---
+
+## App updates
+
+Force update. Every build of the app has a number that goes up with each release (Android `versionCode`, iOS build number; both in `mobile/app.json`). The app sends it with every request:
+
+```
+X-App-Platform: android | ios
+X-App-Build: 7
+X-App-Version: 1.2.0
+```
+
+An owner sets, per platform in the admin panel, the lowest build still allowed in (`minBuild`), the newest build that exists (`latestBuild`), its label, where to get it (`downloadUrl`) and what is new. A request from a build below `minBuild` is answered **426** on every endpoint, whatever it asked for:
+
+```json
+{ "success": false, "message": "Please update Splix to continue.", "code": "APP_UPDATE_REQUIRED",
+  "platform": "android", "build": 2, "minBuild": 3, "latestBuild": 4, "latestVersion": "1.2.0",
+  "downloadUrl": "https://.../splix-1.2.0.apk", "notes": "..." }
+```
+
+The app shows a screen it cannot dismiss whose one button opens `downloadUrl`. A request that names no build (the admin panel, curl, builds from before the headers existed) is never refused, so builds older than the first one that sends the headers cannot be forced. Only `minBuild` forces anything; a build below `latestBuild` is told once that an update is available and carries on. The settings are cached for up to a minute per server process after a change.
+
+### `GET /app/release`
+
+No auth, and never refused. What the calling build is told, from its headers (`?platform=` for anyone else; `android` by default):
+
+`{ "data": { "release": { "platform", "build", "minBuild", "latestBuild", "latestVersion", "downloadUrl", "notes", "updateRequired", "updateAvailable" } } }`
+
+`build` is `null`, and both flags `false`, when no build was named.
+
+### Admin panel
+
+Under `/admin/app-release`, owners only.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/app-release` | `{ "settings": { "android": { "minBuild", "latestBuild", "latestVersion", "downloadUrl", "notes" }, "ios": { ...the same }, "updatedAt" } }` |
+| `PUT /admin/app-release` | the same fields for both platforms. Whole numbers; `minBuild` ≤ `latestBuild`; `downloadUrl` is `https://` and required whenever `minBuild` > 0 |
+
+---
+
+## Branding
+
+The app's name and logo, set by owners in the admin panel under General Settings → Branding. One settings document (`backend/src/models/Branding.js`); with nothing saved the app is **Splix** with the Splix logo. The app reads it on every start and keeps a copy for offline starts; the admin panel draws it in its sidebar and on its sign-in page.
+
+The name keeps the wordmark's look: the Splix wordmark is Poppins ExtraBold lettering with the "x" drawn as the logo's two chevrons, and an admin-set name is drawn the same way, every `x`/`X` in it as that mark (`mobile/src/components/BrandWordmark.js`). Changing the name here does not change the app's name under its icon on the phone, which is in the installed build (`expo.name` in `mobile/app.json`).
+
+### `GET /app/branding`
+
+No auth, ahead of the force-update gate like `/app/release`.
+
+`{ "data": { "branding": { "appName", "logoUrl", "inviteBaseUrl", "updatedAt" } } }`
+
+`logoUrl` is a full address, or `null` for the built-in mark. `inviteBaseUrl` is where group invite links point (`https://<host>/join`; see **Invite links** under Groups). The settings are cached for up to a minute per server process after a change.
+
+### Admin panel
+
+Under `/admin/branding`, owners only.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/branding` | `{ "settings": { "appName", "logoUrl", "updatedAt" } }` |
+| `PUT /admin/branding` | body `{ "appName" }`: 2–20 characters, one line |
+| `POST /admin/branding/logo` | multipart, one `logo` field: PNG, JPEG or WebP up to 2 MB. Put the right way up, shrunk to at most 512 px on its longer side and stored as PNG through the usual file storage (R2, or `/uploads` locally). The previous file is deleted. Returns `settings` |
+| `DELETE /admin/branding/logo` | back to the built-in logo; the file is deleted. Returns `settings` |
+
+SVG is refused on purpose: served back from the API's origin it could carry script, and the app cannot draw one.
+
+---
+
+## Auth
+
+Email sign-up is two steps: `register` creates an **unverified** account and emails a 6-digit code, and `verify-email` exchanges that code for a session. No token is issued until the address is proven. Accounts created before verification existed, and Google accounts, count as verified.
+
+**One-time codes** (sign-up and password reset alike): valid 10 minutes, single use, dead after 5 wrong guesses, at most one per 60 seconds and 5 per hour per account. Only a hash is stored.
+
+**Error codes.** Auth errors the app needs to branch on carry a `code` next to `message`:
+
+| `code` | Status | Meaning | Extra fields |
+| --- | --- | --- | --- |
+| `EMAIL_NOT_VERIFIED` | 403 | Right password, address never confirmed. A fresh code was emailed (unless one went out in the last 60s). | `email`, `retryAfter` |
+| `OTP_COOLDOWN` | 429 | A code was requested less than 60s ago; the earlier one is still valid. | `retryAfter` (seconds) |
+| `OTP_LIMIT` | 429 | 5 codes already sent this hour. | |
+
+### `POST /auth/register`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `name` | string | required, 2–60 chars |
+| `email` | string | required, valid email |
+| `password` | string | required, min 8 chars |
+| `phone` | string | optional, 7–15 digits; `+`, spaces, `-` and `()` allowed |
+
+Before anything is sent, the address is checked: common typos get a suggestion (`gmial.com` → "Did you mean …@gmail.com?"), throwaway inbox domains are refused, and the domain must be able to receive mail (DNS). All `400`.
+
+An email that is registered but **still unverified** can be registered again: the new name and password replace the old and a new code is sent, so an address can't be blocked by someone who doesn't own it. A verified email answers `409`.
+
+**Response `201`:** `{ "data": { "verificationRequired": true, "email", "sent": true, "retryAfter": 60 } }` and no token. `devOtp` is added only in test mode (the sender is Resend's `onboarding@resend.dev`, which can't reach other people's inboxes, so the code is not emailed and the app shows it instead), or when the server has no email provider configured and is not in production. Saving a sender on a verified domain ends test mode. Password reset codes are never returned this way.
+
+### `POST /auth/verify-email`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `email` | string | required |
+| `otp` | string | required, exactly 6 digits |
+
+Marks the account verified, sends the welcome email and logs the person in.
+
+**Response `200`:** `{ "data": { "user": { "_id", "name", "email", "emailVerified": true, ... }, "token": "<jwt>" } }`
+
+### `POST /auth/resend-code`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `email` | string | required |
+| `purpose` | enum | `verify-email` \| `reset-password` |
+
+Always answers `200 { "sent": true, "retryAfter": 60 }` for unknown or already-verified emails, so it can't be used to discover accounts.
+
+### `POST /auth/login`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `email` | string | required |
+| `password` | string | required |
+
+**Response `200`:** `{ "data": { "user", "token" } }`. An unverified account gets `403 EMAIL_NOT_VERIFIED` (only after the password checks out, so it reveals nothing to a guesser).
+
+### `POST /auth/google`
+
+Body: `{ "idToken" }`. Signs up or logs in with Google; the account is verified from the start.
+
+### `GET /auth/me` 🔒
+
+Returns the authenticated user: `{ "data": { "user": { ... } } }`
+
+Every user object the app gets about itself carries `username`, `phone`, `bio` and a computed `profileComplete` (true once both `username` and `phone` are set). The app keeps a new account on the Complete Profile screen until it is true. `phone` is never included when other users are shown.
+
+### `PATCH /auth/me` 🔒
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `name` | string | optional, 2–60 chars |
+| `username` | string | optional, 3–20 of `a-z 0-9 . _`; stored lowercase; unique |
+| `phone` | string | optional, same rules as at register |
+| `bio` | string | optional, up to 160 chars, `""` clears it |
+
+Only the fields sent change; anything else (email included) is a `400`. A username someone else holds answers `409`.
+
+**Response `200`:** `{ "data": { "user" } }`
+
+### `GET /auth/invite-code` 🔒
+
+The caller's personal invite code, shown on the Invite Friends screen: `{ "data": { "code": "SPLIX-ALEX-482" } }`. Created on the first request (`SPLIX-` + the first four letters of their name + three digits, unique) and permanent afterwards.
+
+### `POST /auth/forgot-password`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `email` | string | required, valid email |
+
+Emails a 6-digit reset code. Answers `200 { "sent": true }` for unknown emails too.
+
+### `POST /auth/verify-otp`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `email` | string | required |
+| `otp` | string | required, exactly 6 digits |
+
+**Response:** a `resetToken` valid for 15 minutes, good for one password change.
+
+### `POST /auth/reset-password`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `resetToken` | string | required (from verify-otp) |
+| `password` | string | required, min 8 chars |
+
+Changes the password, burns the code (the token can't be used twice), marks the email verified and sends a "password changed" security email.
+
+### Emails
+
+All emails share one branded template (`backend/src/emails/layout.js`) and are sent through Resend when `RESEND_API_KEY` is set; without it they are printed to the server console. `node scripts/preview-emails.js` renders them to `backend/email-previews/` for checking the design.
+
+---
+
+## Home
+
+### `GET /home`
+
+Everything the dashboard needs in one call, aggregated across all of the caller's groups.
+
+**Response `200`:**
+
+```json
+{
+  "data": {
+    "balance": { "net": 35.5, "youOwe": 84.5, "owedToYou": 120, "groupCount": 3 },
+    "upcomingTrips": [
+      { "_id", "name", "location", "startDate", "endDate", "memberCount", "status": "not-started" | "active" }
+    ],
+    "tasks": [{ "_id", "title", "priority", "dueAt", "status", "group": { "_id", "name", "groupType" } }],
+    "recentExpenses": [
+      { "_id", "description", "category", "amount", "date", "group", "paidBy": { "_id", "name" },
+        "paidByMe", "yourShare", "owedToYou", "settled" }
+    ]
+  }
+}
+```
+
+- `balance` counts **unsettled** splits only: `youOwe` is the caller's shares on expenses others paid, `owedToYou` is others' shares on expenses the caller paid, `net = owedToYou - youOwe`. `groupCount` is the number of groups with anything outstanding.
+- `upcomingTrips`: trip groups with a `startDate` that have not ended (`endDate = startDate + totalDays - 1`), soonest first.
+- `tasks`: the 5 most recently created tasks. `recentExpenses`: the 5 most recent expenses; `settled` means nothing is outstanding for the caller on that expense.
+
+---
+
+## Trips
+
+### `GET /trips`
+
+Every trip group the caller belongs to, with what the Trips tab needs, in a fixed number of queries.
+
+**Response `200`:** `{ "data": { "trips": [ ... ], "stats": { ... } } }`
+
+Each trip:
+
+| Field | Meaning |
+| --- | --- |
+| `status` | `ongoing`, `upcoming`, `unscheduled` (no start date) or `past` |
+| `daysUntil` | calendar days until it starts (upcoming only) |
+| `dayNumber` | which day of the trip today is (ongoing only; the last day still counts as ongoing) |
+| `startDate`, `endDate`, `totalDays`, `location` | `endDate = startDate + totalDays - 1` |
+| `members` | populated `{ _id, name, email }` |
+| `spend` | `{ total, yourShare, expenseCount }`; `yourShare` is the sum of the caller's own splits |
+| `tasks` | `{ total, done }` |
+| `nextTask` | the open task with the earliest due date, `{ _id, title, dueAt }`, or `null` |
+| `counts` | `{ itineraryDays, stays, photos }`; cancelled stays are not counted |
+
+Sorted: ongoing, then upcoming (soonest first), then unscheduled, then past (most recent first).
+
+`stats`: `{ totalTrips, upcoming, daysTravelled, places, totalSpent }`. `daysTravelled` counts finished trips in full plus the elapsed days of ongoing ones; `places` is distinct locations; `totalSpent` is the caller's share across all trips.
+
+---
+
+## Groups
+
+All group routes require auth, and all `/:groupId/...` routes require the caller to be a **member** of that group.
+
+### `POST /groups`
+
+Create a group. The creator becomes `createdBy` (the group admin) and the first member. An 8-char `inviteCode` is generated automatically.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `name` | string | required, 2–80 chars |
+| `description` | string | optional, ≤300 chars |
+| `groupType` | enum | `trip` \| `home` \| `couple` \| `event` \| `other` (default `trip`) |
+| `totalDays` | int | optional, 1–365 (trip length) |
+| `startDate` | date | optional, trip groups only — first day of the trip |
+| `location` | string | optional, ≤120 chars, trip groups only (e.g. `"Bali, Indonesia"`). Typed text; older app builds send this |
+| `destination` | object | optional, trip groups only: `{ "countryCode": "IN", "stateCode": "RJ" }`, codes from `GET /places/countries` and `GET /places/countries/:code/states` (`stateCode` optional). Checked against the lists (`400 UNKNOWN_COUNTRY` / `UNKNOWN_STATE`); the group gets `destination` with the names filled in and `location` set to `"Rajasthan, India"`. Suggestions and the place search are then kept to that state (or country) |
+
+**Response `201`:** `{ "data": { "group": { "_id", "name", "groupType", "totalDays", "createdBy", "members": [{ "_id", "name", "email" }], "inviteCode", ... } } }`
+
+### `GET /groups`
+
+List all groups the caller belongs to (members populated with `name`, `email`), newest activity first. Each group also carries the caller's outstanding money in it, so the Groups tab can show a balance per group:
+
+| `balance` field | Meaning |
+| --- | --- |
+| `youOwe` | the caller's unsettled shares of other members' expenses |
+| `owedToYou` | other members' unsettled shares of the caller's expenses |
+| `net` | `owedToYou - youOwe` |
+
+Only unsettled splits count, the same rule as the `balance` on `GET /home` and the Expenses tab's tiles. A group with no outstanding money has all three at `0`.
+
+### `POST /groups/join`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `inviteCode` | string | required, 4–16 chars |
+
+Adds the caller to the matching group and returns it.
+
+### `GET /groups/invites/:code` 🔒
+
+What an invite link leads to, for the app's Join screen, without joining:
+
+```json
+{ "data": { "invite": {
+  "code": "A1B2C3D4",
+  "group": { "_id", "name", "description", "groupType", "location", "startDate", "totalDays",
+             "memberCount", "members": [{ "_id", "name", "avatar" }] },
+  "invitedBy": { "_id", "name" },
+  "alreadyMember": false
+} } }
+```
+
+`members` holds at most six people; `memberCount` is the whole group. `invitedBy` is the group's admin. An unknown code is `404` with `"code": "INVITE_NOT_FOUND"`.
+
+### Invite links
+
+A group's invite link is `https://<host>/join/<code>`, where `<host>` is the API's public host (`PUBLIC_URL`, or the host the request came in on; the app learns the base from `GET /app/branding`). The server owns the format and serves two addresses outside `/api/v1` for it, which the Nginx in front passes through (`deploy/nginx`):
+
+| Address | Does |
+| --- | --- |
+| `GET /join/<code>` | An HTML page: the group, who invited them, how many are in, an **Open in Splix** button (an Android `intent://` link that opens the app on its Join screen when installed, and falls back to the APK link from App Updates otherwise) and the code to type into the app. `404` page for an unknown code. Rate limited per address. |
+| `GET /.well-known/assetlinks.json` | Android App Links: names the app's package and the SHA-256 of its signing certificate (`ANDROID_PACKAGE`, `ANDROID_CERT_SHA256`), so a phone with the app opens the link in the app without asking. |
+
+On a phone with the app installed, Android opens the link straight in the app (`mobile/app.json` `intentFilters`, `scheme: "splix"`); the app also accepts `splix://join/<code>`. Signed out, the code is kept until the person signs in or registers, and the Join screen opens then. Once the app is on the Play Store, the page's fallback becomes the store listing (`TODO(store launch)` in `backend/src/views/joinPage.js`).
+
+### `GET /groups/:groupId`
+
+Group detail with populated members. `createdBy` is the admin's user id.
+
+### `POST /groups/:groupId/leave`
+
+Leave the group. Fails (`400`) if the caller still has unsettled shares, owed either way.
+
+Optional body: `{ "newAdminId": "<userId>" }`. When the **admin** leaves, the role is handed over: automatically if only one other member remains, otherwise `newAdminId` is required and must be a remaining member. Posts "X left the group" (and "Y is now the group admin") in the chat, notifies the other members, and emits the realtime event `group:member-left` `{ groupId, userId }`.
+
+Group responses carry `admin` (the current admin's user id; falls back to `createdBy` for older groups) and `mutedBy` (ids of members who muted the group).
+
+### `DELETE /groups/:groupId/members/:memberId`
+
+**Admin only** (`403` otherwise). Removes a member. Fails (`400`) if that member has unsettled shares, or if the admin targets themselves. Posts "X was removed by Y" in the chat, notifies the removed person directly and the remaining members, and emits `group:member-left`.
+
+### `DELETE /groups/:groupId`
+
+**Admin only** (`403` "Only the group admin can delete this group"). Deletes the group for every member, with everything in it: chat messages, expenses (settled or not), tasks, reminders, itinerary days and AI jobs, gallery photos, attractions, stays, and the notifications about the group. Files behind gallery photos and chat attachments are removed from storage. It cannot be undone, and unsettled balances do not block it; the app warns the admin before calling it.
+
+Response: `{ "success": true, "message": "Group deleted" }`. Afterwards every request for the group answers `404`. Each other member gets a "Group Deleted" notification with no group attached, and the realtime event `group:deleted` `{ groupId, name, deletedBy }` goes to everyone who has the group open so their screens can close.
+
+### `PUT /groups/:groupId/mute`
+
+Body: `{ "muted": true | false }`. Mutes or unmutes the group for the caller only. While muted, the caller gets no device pushes from this group, other members' reminders there do not ring on their phone (their own still do), and the group's calls do not ring; in-app notifications are still recorded. Response: `{ "data": { "muted": true } }`
+
+### `PATCH /groups/:groupId/destination`
+
+Body: `{ "destination": { "countryCode": "IN", "stateCode": "RJ" } }` (picked from the lists, `stateCode` optional) or `{ "location": "Jaipur, Rajasthan" }` (typed text, 2–120 characters; clears any picked destination). Sets or changes a trip's destination after the fact; the suggestions and the place search below, and the AI planner, work within it. Admin only (`403 DESTINATION_FORBIDDEN`), trip groups only (`400 TRIP_ONLY`). Response: `{ "data": { "group": Group } }`.
+
+### `GET /groups/:groupId/suggestions/:type`
+
+Suggested places at the trip's destination for the Stays (`type=stay`, hotels and guest houses) and Attractions (`type=attraction`, sights ranked with heritage sites, forts and temples first) tabs. Data comes from a places provider (Geoapify, OpenStreetMap data); the key is set in the admin panel under Third-Party APIs or as `GEOAPIFY_API_KEY`. Members only, trip groups only (`400 TRIP_ONLY`).
+
+Where they look is the group's destination: a destination picked from the lists (`destination` on the group) is searched within that state's administrative boundary, or the country's when no state was picked, and its items carry no `distanceKm`; typed text (`location` only) is placed as a city and searched within its bounding box, nearest the centre first. One destination is looked up once per `PLACES_CACHE_HOURS` (24) and shared by every group going there, so cost grows with destinations, not with people. `?refresh=1` asks the provider again when the cached copy is older than ten minutes.
+
+```json
+{
+  "data": {
+    "configured": true,
+    "type": "stay",
+    "destination": { "text": "Jaipur", "resolved": "Jaipur, Rajasthan, India" },
+    "reason": null,
+    "fetchedAt": "2026-10-18T09:00:00.000Z",
+    "items": [
+      {
+        "placeId": "51c0f4…",
+        "name": "Hotel Pearl Palace",
+        "category": "Hotel",
+        "categoryKey": "accommodation.hotel",
+        "emoji": "🏨",
+        "address": "Hathroi Fort, Jaipur, Rajasthan, India",
+        "lat": 26.91,
+        "lon": 75.8,
+        "distanceKm": 1.5
+      }
+    ],
+    "addedPlaceIds": ["51c0f4…"],
+    "provider": { "name": "Geoapify", "attribution": "Powered by Geoapify · © OpenStreetMap contributors", "url": "https://www.geoapify.com/" }
+  }
+}
+```
+
+`configured: false` (no key on the server): the app shows no suggestions. `reason` is `NO_DESTINATION` when the group has none and `UNKNOWN_DESTINATION` when the provider could not place it; both come with an empty `items`. `addedPlaceIds` are the suggestions already in the group's list. The provider's attribution must be shown wherever the items are.
+
+| Code | HTTP | When | Extra |
+| --- | --- | --- | --- |
+| `PLACES_RATE_LIMITED` | 429 | More than 60 requests from one account in 15 minutes | |
+| `PLACES_LIMIT` | 429 | The caller caused more fresh lookups today than `PLACES_USER_DAILY_CAP` (30) | `retryAfter` (seconds) |
+| `PLACES_BUSY` | 503 | The provider is over its own allowance | |
+| `PLACES_UNAVAILABLE` | 503 | The provider refused the key, failed or timed out, or the server-wide `PLACES_GLOBAL_DAILY_CAP` (400) is reached | |
+
+Fresh lookups (cache misses and refreshes) are the only thing the caps count; reading a cached destination is free and unlimited.
+
+### `GET /groups/:groupId/places/search?type=stay|attraction&q=palace`
+
+Hotels (`type=stay`) or sights (`type=attraction`) whose name matches `q` (1–60 characters), within the trip's destination exactly as the suggestions above are. Same answer shape plus `query` (the name as typed); items come in the provider's order, best name match first, at most 10. Members only, trip groups only (`400 TRIP_ONLY`). A `q` of fewer than two letters is answered with an empty `items` and no provider call.
+
+Each new name in a destination is one provider call, cached for `PLACES_CACHE_HOURS` and shared by everyone searching for it there, under its own caps: `PLACES_SEARCH_USER_DAILY_CAP` (150) per account and `PLACES_SEARCH_GLOBAL_DAILY_CAP` (2000) server-wide, both also settable in the admin panel.
+
+| Code | HTTP | When | Extra |
+| --- | --- | --- | --- |
+| `PLACES_RATE_LIMITED` | 429 | More than 300 requests from one account in 15 minutes | |
+| `PLACES_SEARCH_LIMIT` | 429 | The caller searched more new names today than the per-account cap | `retryAfter` (seconds) |
+| `PLACES_BUSY` / `PLACES_UNAVAILABLE` | 503 | As for suggestions | |
+
+### `GET /places/countries` and `GET /places/countries/:code/states`
+
+The lists a trip's destination is picked from. `/places/countries` answers `{ "data": { "countries": [{ "code": "IN", "name": "India" }, …] } }`, every country by name with its ISO 3166-1 alpha-2 code. `/places/countries/IN/states` answers `{ "data": { "countryCode": "IN", "states": [{ "code": "RJ", "name": "Rajasthan" }, …] } }`, that country's states or provinces by name; `404` for a code not on the list. Both are served with `Cache-Control: private, max-age=86400`; the data ships with the server (the `country-region-data` package), so a change reaches every app build.
+
+### `GET /groups/:groupId/balances`
+
+Net money position per member plus suggested settlements.
+
+```json
+{
+  "data": {
+    "balances": [{ "user": { "_id", "name", "email" }, "net": 42.5 }],
+    "settlements": [{ "from": { ... }, "to": { ... }, "amount": 42.5 }]
+  }
+}
+```
+
+`net > 0` → member is owed money; `net < 0` → member owes.
+
+### `GET /groups/:groupId/contributions`
+
+Fairness dashboard combining money (paid vs fair share) and effort (tasks done vs assigned).
+
+```json
+{
+  "data": {
+    "totalExpenses": 1240.5,
+    "tasksTotal": 12,
+    "tasksCompleted": 8,
+    "score": 86,
+    "statusLabel": "Mostly Fair",
+    "headline": "...",
+    "adjustmentsNeeded": 35.0,
+    "me": { "expensesPaid": 400, "fairShare": 310, ... },
+    "members": [
+      {
+        "user": { "_id", "name", "email" },
+        "expensesPaid": 400,
+        "fairShare": 310,
+        "tasksAssigned": 4,
+        "tasksDone": 3,
+        "badge": "contributed-extra"
+      }
+    ]
+  }
+}
+```
+
+`badge` is one of `contributed-extra` | `balanced` | `owes-effort` | `owes-balance`.
+
+---
+
+## Expenses
+
+### `GET /groups/:groupId/expenses`
+
+List the group's expenses (`paidBy` and `splits[].user` populated). Response: `{ "data": { "expenses": [ ... ] } }`
+
+### `POST /groups/:groupId/expenses`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `description` | string | required, ≤200 chars |
+| `amount` | number | required, > 0 |
+| `paidBy` | ObjectId | required, must be a group member |
+| `splitType` | enum | `equal` (default) \| `exact` |
+| `participants` | ObjectId[] | for `equal`: who shares the cost (defaults to all members) |
+| `splits` | `[{ user, amount }]` | for `exact`: per-member amounts (must sum to `amount`) |
+| `category` | enum | `general` \| `food` \| `stay` \| `travel` \| `fun` \| `shopping` \| `transport` \| `housing` \| `entertainment` \| `utilities` \| `other` |
+| `date` | date | optional |
+
+**Response `201`:** `{ "data": { "expense": { ..., "splits": [{ "user", "amount", "settled" }] } } }`
+
+### `GET /expenses/:expenseId`
+
+Single expense detail.
+
+### `POST /expenses/:expenseId/settle`
+
+Mark a split as settled.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `userId` | ObjectId | optional — omit to settle **your own** share; the payer can pass another member's id |
+
+### `DELETE /expenses/:expenseId`
+
+Delete an expense.
+
+---
+
+## Chat messages
+
+### `GET /groups/:groupId/messages`
+
+Response: `{ "data": { "messages": [ ... ] } }`. Messages include system/activity entries (`type`) as well as plain `text` messages and `image` / `audio` / `file` messages with an `attachment` (see the upload endpoint below), with `sender` populated.
+
+Everything added to a group also lands in its chat as an **activity card**: a message whose `sender` is the member who did it and which carries the thing itself, populated. The app draws each as a card that opens the item in its tab.
+
+| `type` | Posted when | Carries |
+| --- | --- | --- |
+| `expense` | an expense is added | `expense` (with `paidBy`, `splits.user`) |
+| `task` | a task is added | `task` (with `assignees`), and `assignees`: who the task was for when the card was posted (`[]` for nobody; missing on cards from before this field) |
+| `task_done` | a task goes from open to done | `task`, and `assignees` as above. The `sender` is whoever completed it, who need not be an assignee. Reopening the task deletes the card |
+| `reminder` | a shared ("Everyone") reminder is set | `reminder` (without `mutedBy` / `armedBy`) |
+| `stay` | a stay is added | `stay` (with `bookedBy`) |
+| `attraction` | an attraction is added | `attraction` (without `savedBy`) |
+| `gallery` | photos or videos are uploaded to the gallery | `photos`: `[{ _id, imageUrl, thumbUrl, mediaType, durationMs, emoji, color, caption, createdAt }]`. Files picked together (same `batch`, see the photo upload) share one card |
+| `system` | members join or leave, a stay changes status, the itinerary changes | `text` only |
+
+A card goes when what it is about is deleted (an expense, task, reminder, stay or attraction). A deleted gallery photo or video comes off its card, and a card left empty goes. Stay status changes and itinerary days stay one-line `system` messages.
+
+Socket events for the group chat (to everyone with the group open):
+
+| Event | Payload | When |
+| --- | --- | --- |
+| `message:new` | `{ message }` | a message or card is posted |
+| `message:updated` | `{ message }` | a card already in the feed changed: a `gallery` card gained or lost a photo. Replace it by `_id` |
+| `message:removed` | `{ groupId, messageIds }` | cards were deleted along with what they were about, or a `task_done` card because the task was reopened. Drop them |
+| `message:deleted` | `{ message }` | "Delete for everyone" (below): the message stays as a placeholder |
+
+### `POST /groups/:groupId/messages`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `text` | string | required, 1–2000 chars |
+| `replyTo` | ObjectId | optional; the message being answered. Must be a `text` / `image` / `audio` / `file` message in the same group (`400` otherwise) |
+
+A reply comes back with `replyTo` populated just enough to draw the quote: `{ _id, type, text, sender, attachment: { name, durationMs }, deletedAt }`.
+
+### `DELETE /groups/:groupId/messages/:messageId`
+
+"Delete for everyone". Sender only (`403` otherwise), and only for `text` / `image` / `audio` / `file` messages (`400` for system lines and activity cards).
+
+The message is not removed: it stays in the feed as a placeholder with `deletedAt` set, `text` emptied and `attachment` null, so replies that quote it still resolve. Its file is deleted from storage, unless it is a photo the group gallery still lists. The updated message is returned and pushed to the group over the socket as **`message:deleted`** (`{ message }`).
+
+### `POST /groups/:groupId/messages/upload`
+
+Sends a photo, voice note or document into the chat. `multipart/form-data` with a single file field named **`file`**, any mimetype, max **10 MB** (`413` above that); the caller must be a group member.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `file` | file | required |
+| `text` | string | optional caption, ≤2000 chars |
+| `durationMs` | number | optional; length of a voice note, so the app can show it without downloading the audio |
+| `replyTo` | ObjectId | optional; as on the text endpoint |
+
+An `image` message is also added to the group gallery (a photo row pointing at the same stored file, with no "added a photo" line or notification). The file is only deleted from storage once both the message and the gallery photo are gone.
+
+The message `type` is taken from the file's mimetype: `image/*` → `image`, `audio/*` → `audio`, anything else → `file`. The file goes to the same storage provider as gallery photos (under `splix/groups/<groupId>/chat/`). The created message is returned and pushed to the group over the socket (`message:new`) like any other, and carries:
+
+| `attachment` field | Meaning |
+| --- | --- |
+| `url` | the file itself |
+| `thumbUrl` | small square preview for `image` messages; equals `url` otherwise |
+| `name`, `mimeType`, `size` | as uploaded (`size` in bytes) |
+| `durationMs` | voice notes only, `0` otherwise |
+| `storageProvider` | `r2` or `local` (`cloudinary` on rows from before the move to R2) |
+
+---
+
+## Direct messages (one-to-one chat)
+
+A conversation is between exactly two people. A new one can only be started with someone you share a group with; once it exists it stays open even if that group is left. Only the two participants can read or post (`403` otherwise).
+
+### `POST /conversations`
+
+Body: `{ "userId": "<the other person>" }`. Returns the existing conversation with that person, or creates it on first contact. Response: `{ "data": { "conversation": { "_id", "participants": [{ "_id", "name", "email", "lastSeenAt" }], "lastMessageText", "lastMessageAt" } } }`
+
+### `GET /conversations`
+
+The caller's conversations that have at least one message, newest activity first.
+
+### `GET /conversations/:conversationId`
+
+One conversation with participants populated (used when opening a chat from a push).
+
+### `GET /conversations/:conversationId/messages`
+
+Query: `limit` (default 50, max 200), `before` (ISO date, pages back through history), `after` (ISO date, catch-up after a reconnect). Returned oldest-first. Each message: `{ "_id", "conversation", "sender": { "_id", "name" }, "text", "createdAt" }`.
+
+### `POST /conversations/:conversationId/messages`
+
+Body: `{ "text": "..." }` (1–2000 chars, trimmed). The message is pushed live to both participants, and the recipient gets a device push (`data: { type: "dm", conversationId }`) unless they have that chat open.
+
+### Realtime events (socket.io)
+
+| Event | Direction | Payload |
+| --- | --- | --- |
+| `dm:new` | server → both participants | `{ conversationId, message }` |
+| `dm:typing` | client → server | `{ conversationId, typing }` — relayed to the other person as `{ conversationId, userId, name, typing }` |
+| `dm:open` / `dm:close` | client → server | `{ conversationId }` / none — marks the chat as on screen, which suppresses pushes for it |
+| `dm:presence` | client → server (ack) | `{ conversationId }` → `{ online, lastSeenAt }` for the other person |
+
+---
+
+## Tasks
+
+### `GET /groups/:groupId/tasks` · `POST /groups/:groupId/tasks`
+
+Create body:
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `title` | string | required, ≤200 chars |
+| `notes` | string | optional, ≤500 |
+| `priority` | enum | `high` \| `med` (default) \| `low` |
+| `assignees` | ObjectId[] | optional |
+| `dueAt` | date \| null | optional |
+| `subtasks` | `[{ title, done }]` | optional, ≤20 |
+| `links` | `[{ title?, url }]` | optional, ≤10 |
+| `source` | `{ message?, user?, text?, at? }` | optional — the chat message the task was created from |
+
+### `GET /tasks/:taskId`
+
+Single task detail.
+
+### `PATCH /tasks/:taskId`
+
+Any subset of the create fields plus `status`: `open` \| `done`.
+
+Moving a task to `done` sets `completedAt` and `completedBy` (the caller, populated as `{ _id, name, email }`) and posts a `task_done` card to the chat; sending `done` for a task that is already done changes nothing. Moving it back to `open` clears both and deletes that card (`message:removed`). Any member may do either.
+
+### `DELETE /tasks/:taskId`
+
+---
+
+## Reminders
+
+A reminder rings as an alarm **on the phone**: the app hands it to the phone's own alarm clock, so it rings at the exact minute with the app closed or no signal. The server's part is to keep every phone's alarms in step with what is stored here (silent pushes, below) and to act as a backup at reminder time.
+
+A reminder is one of three kinds:
+
+| Kind | `group` | `scope` | Rings for |
+| --- | --- | --- | --- |
+| Shared | a group | `group` | every member of the group |
+| Private | a group | `me` | its creator only; nobody else can see it, and it gets no chat card |
+| Personal | `null` | `me` | its creator only; it belongs to no group |
+
+Reminder object, as returned by every endpoint here. It is written for the person asking, so two members can get different `muted` and `rings` for the same reminder:
+
+| Field | Meaning |
+| --- | --- |
+| `_id`, `title`, `subtitle`, `remindAt`, `scope`, `repeatWeekly`, `icon`, `task`, `createdBy: { _id, name, email }` | as stored |
+| `group`, `groupName` | the group's id and name; both `null` for a personal reminder |
+| `enabled` | `false` means switched off for everybody |
+| `muted` | the caller switched it off for themselves |
+| `rings` | whether it rings on the caller's phone: `enabled`, not `muted`, and not someone else's reminder in a group the caller has muted. The app sets an alarm only when this is `true` |
+| `repeatUntil` | for a weekly reminder in a trip with a start date, the end of the trip's last day; otherwise `null` (no end) |
+| `firedAt` | when the server dealt with the current `remindAt`; `null` while it is still to come |
+
+### `GET /groups/:groupId/reminders`
+
+The group's shared reminders plus the caller's own private ones, soonest first.
+
+### `POST /groups/:groupId/reminders`
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `title` | string | required, ≤200 |
+| `subtitle` | string | optional, ≤200 |
+| `remindAt` | date | required, not in the past (`400` "Pick a time in the future for the reminder") |
+| `scope` | enum | `group` (default) \| `me` |
+| `repeatWeekly` | boolean | optional |
+| `icon` | string | optional Ionicons name, ≤40 |
+| `task` | ObjectId | optional linked task; must be a task of this group |
+
+A shared reminder posts a card in the group chat and notifies the other members ("Reminder Set"). A private one does neither.
+
+### `GET /reminders`
+
+Every reminder that can ring for the caller, across all their groups, plus their personal ones. One-off reminders older than 30 days are left out. This is what the app syncs its alarms from.
+
+### `POST /reminders`
+
+Creates a **personal** reminder. Body: `title`, `subtitle`, `remindAt`, `repeatWeekly`, `icon` as above.
+
+### `PATCH /reminders/:reminderId`
+
+Any subset of `title`, `subtitle`, `remindAt`, `scope`, `repeatWeekly`, `icon`, plus:
+
+| Body field | Meaning |
+| --- | --- |
+| `muted` | boolean. The caller's own switch: off on their phone, still ringing for everyone else |
+| `enabled` | boolean. Off or on for everybody |
+
+Any member of the group may edit a shared reminder. Only its creator may change `scope` (`403` otherwise); making it private removes its chat card. A new `remindAt` must be in the future.
+
+### `DELETE /reminders/:reminderId`
+
+The creator, or the group's admin (`403` "Only the reminder creator can delete it" otherwise). Deleting a task deletes its reminders too.
+
+### `POST /reminders/armed`
+
+Body: `{ "ids": ["<reminderId>", ...] }` (≤500). The phone reports the alarms it has set. Only reminders the caller can see are recorded; the rest are ignored. See "At reminder time" below.
+
+A report is forgotten when it can no longer be trusted: the reminder's time changes, the person signs out (`DELETE /notifications/push-token`), or a push token they have not used before is registered with `POST /notifications/push-token` (a new phone or a reinstall). The app reports again after its next sync.
+
+### Silent pushes (keeping phones in step)
+
+Whenever a reminder is created, changed, deleted, switched off, or its audience changes, the phones concerned get a **silent** push: no title or body, so nothing is shown, and the app's background task applies it.
+
+| `data` | Sent to | The app |
+| --- | --- | --- |
+| `{ type: "reminder-sync", action: "upsert", reminder }` | everyone it rings for | sets or moves that alarm. `reminder` holds `_id, title, subtitle, remindAt, group, groupName, task, repeatWeekly, repeatUntil` |
+| `{ type: "reminder-sync", action: "remove", reminderId }` | everyone it no longer rings for | drops that alarm |
+| `{ type: "reminder-sync", action: "refresh" }` | one person | reads `GET /reminders` again. Sent on joining, leaving or being removed from a group, muting or unmuting one, and when a group is deleted |
+
+Leaving or being removed from a group deletes that member's private reminders there.
+
+The realtime event `reminder:changed` `{ groupId }` goes to the group's members for a shared reminder, and to the creator alone for a private or personal one (`groupId` is `null` for personal). It carries no data: refetch.
+
+### At reminder time
+
+A timer in the API process (every 30 seconds) picks up reminders that have come due:
+
+- everyone the reminder is for, except those who switched it off, gets an in-app notification ("Reminder", type `reminder`, `entityId` = the linked task if any);
+- those it should ring for whose phone never called `POST /reminders/armed` get a visible push as a backup (`data: { type: "reminder", reminderId, groupId?, entityId? }`);
+- a weekly reminder moves on seven days, until `repeatUntil`.
+
+A reminder found more than 15 minutes late (the server was asleep, or the reminder predates this feature) is closed without telling anyone.
+
+The timer is on by default when `NODE_ENV=production` and off otherwise; `REMINDER_SWEEP=on|off` overrides. Keep it off on any machine whose `.env` points at the live database.
+
+---
+
+## Calls
+
+A group has one call, held by Stream (call type `default`, call id = the group id). The app joins it directly with Stream's SDK; this API hands out the token for that, and is told when a call starts and ends so the chat shows it and the other members' phones ring.
+
+### `GET /stream/token`
+
+A Stream token for the caller: `{ "data": { "apiKey", "token", "user": { "id", "name" } } }`. Valid for 24 hours; the app asks again when it expires.
+
+### `POST /stream/call-event`
+
+Body: `{ "groupId": "<groupId>", "event": "started" | "ended", "video"?: true | false }`. The caller must be a member of the group (`403` otherwise). The app sends `started` when it is the first to join the group's call and `ended` when it is the last to leave. Response: `{ "data": { "message" } }`, the chat card that was posted ("Asha started a call" / "Call ended").
+
+`video` (with `started`) is whether the call began with the camera on. An app from before calls rang does not send it; the others are then told only that it is a call.
+
+**`started` rings the group.** Everyone in it, except the caller and those who muted the group, gets:
+
+- a silent, data-only push (a push with a title would be shown by Android itself and never reach the app):
+
+  `data: { type: "call", action: "ring", groupId, groupName, callerId, callerName, video: true | false | null, text, at }`
+
+  `text` is the sentence for a phone that cannot ring: "Asha started a group video call" (or "voice call", or just "call"). `at` is the server's time in epoch milliseconds; with the group it names the ring. The push is given up on after 45 seconds (as long as a phone rings), so a phone that was out of reach does not ring for a call long over;
+- the realtime event `call:ring` with the same `data`, which is quicker while the app is open. A phone that gets both rings once.
+
+An Android app that knows about calls rings like a phone call from it; an iPhone, or an older Android build, shows `text` as an ordinary notification instead (made by the app's background push task), which opens the group when tapped. A second `started` for the same group within 15 seconds is the same call and rings nobody again.
+
+**`ended` stops the ringing.** Every other member (muted or not) gets a silent push `data: { type: "call", action: "end", groupId, at }` and the realtime event `call:end` with the same `data`. A phone still ringing for that group stops and shows the call as missed; one that has not had the ring yet shows it as missed when it arrives. It also stops the call's bill (see below), as a hint the billing sweep checks against Stream.
+
+### `POST /stream/call-start`
+
+Body: `{ "groupId": "<groupId>" }`. Sent by the app just before it starts a call in an empty room (before it joins and before `call-event started`). Members only (`403`).
+
+- While calls are free: `{ "data": { "billed": false } }`.
+- Otherwise the caller pays the first block now: `{ "data": { "billed": true, "price", "blockMinutes" } }`, or `402 NO_CREDITS` (with `needed`, `balance`, `feature: "call"`), in which case the app must not join or ring anyone. `{ "billed": false }` also answers a second member starting at the same moment: they join the first one's call.
+
+**How calls are billed.** Whoever starts a call pays `callBlock` credits for each started block of `callBlockMinutes` (see [Wallet](#wallet)); people who join pay nothing. Once a minute the server asks Stream which calls are live and charges each block as it starts. A live call the app never announced (an older build, or one that skipped `call-start`) is billed to whoever has been in it longest, if they are a member. A paid call Stream never showed within two minutes (the phone paid, then failed to join) has its first block given back.
+
+When the payer cannot pay the next block, the server takes everyone out of the call through Stream (it removes them rather than ending the call: an ended call cannot be joined again, and the group keeps the same call id), posts "Call ended: not enough credits" in the chat and sends the usual `call:end` to the others. Realtime events:
+
+- `wallet:call-low` `{ groupId, endsAt }`, to the payer, about 90 seconds before a block they cannot pay
+- `wallet:call-ended` `{ groupId, reason: "no_credits", payerId }`, to the whole group, so every phone in the call lets go of it
+
+---
+
+## Itinerary
+
+An itinerary is a list of **days**, each holding an ordered list of **activities**. A day's `dayNumber` is its position in the trip calendar (day N falls on `startDate + N - 1`), so deleting a day leaves a free number that a later create can fill. Activities are kept sorted by `time`; an activity with an empty or unreadable time sorts last.
+
+Day object: `{ _id, group, dayNumber, title, date, activities: [{ _id, time, endTime, title, location, icon, note, done }], createdBy: { _id, name, email }, createdAt, updatedAt }`. Days planned by AI are ordinary days created by the member who asked for the plan; nothing marks them as AI.
+
+**Progress.** An activity's `done` is its progress mark on the trip roadmap: `null` (the default) means the app follows the clock and shows the activity as done once its time has passed on the day's date; `true` means a member ticked it off; `false` means a member said it did not happen even though its time has passed. The server only stores the mark; what counts as "done" or "current" is worked out in the app, from the day's `date` and the activity's `time`/`endTime`.
+
+Every write below (create, update, delete, the activity endpoints, and an AI plan being saved or rolled back) emits the realtime event `itinerary:updated` to the group. While AI is planning a group's itinerary, every write answers `409` with code `AI_GENERATING` ("AI is planning this itinerary. Try again in a moment.").
+
+**Error codes.** Itinerary errors the app needs to branch on carry a `code` next to `message`, and some add extra fields at the top level of the error body:
+
+| `code` | Status | Meaning | Extra fields |
+| --- | --- | --- | --- |
+| `AI_GENERATING` | 409 | A write was attempted while AI is planning this group's itinerary | |
+| `DAY_DELETE_FORBIDDEN` | 403 | Caller is neither the day's creator nor the group admin | |
+| `INVALID_TARGET_DAY` | 400 | `targetDayId` does not exist or belongs to another group | |
+| `AI_TRIP_ONLY` | 400 | The group is not a trip group | |
+| `AI_TRIP_DETAILS_REQUIRED` | 400 | Neither the group nor the request gives a destination and/or a number of days | `missing`: array of `'destination'` \| `'days'` |
+| `AI_REPLACE_FORBIDDEN` | 403 | `replace` by someone who is neither the group admin nor the creator of every existing day | |
+| `ITINERARY_EXISTS` | 409 | The group already has days and `replace` was not set | `dayCount` |
+| `AI_ALREADY_RUNNING` | 409 | A plan is already being made for this group | `job` |
+| `AI_LIMIT` | 429 | Daily cap reached (by default 5 per person and 3 per group in any 24 hours) | `retryAfter` (seconds), `scope`: `'user'` \| `'group'` |
+| `AI_RATE_LIMITED` | 429 | More than 20 planning requests in 15 minutes from one account | |
+| `AI_NOT_CONFIGURED` | 503 | The server has no `OPENAI_API_KEY` | |
+| `AI_UNAVAILABLE` | 503 | The planner is switched off for now (a key or billing problem at OpenAI, or the server-wide daily cap) | |
+
+### `GET /groups/:groupId/itinerary` · `POST /groups/:groupId/itinerary`
+
+The itinerary belongs to trip groups. `POST` on any other kind of group answers `400` with code `TRIP_ONLY` ("Only trip groups have an itinerary."), and the app does not show the Itinerary tab there. `GET` still answers for every group, with whatever an older group already holds.
+
+Create-day body:
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `title` | string | required, ≤120 |
+| `date` | date \| null | optional |
+| `dayNumber` | int | optional, 1–365. Omitted: one more than the highest existing number. Given: that exact number, which is how the app fills the gap a deleted day left. `409` "Day N already exists" when it is taken |
+| `activities` | Activity[] | optional |
+
+Activity object: `{ time?, endTime?, title (required, ≤200), location?, icon?, note?, done? (boolean | null) }`
+
+Creating a day also posts "X added Day N · Title to the itinerary" in the group chat and notifies the other members ("Itinerary Updated", push `data: { type: "itinerary", groupId }`).
+
+### `PATCH /itinerary-days/:dayId`
+
+Update `title`, `date`, and/or replace `activities`. Each activity may carry its `_id`: an `_id` that belongs to this day is kept across the save, any other `_id` is ignored and the activity gets a new one. A kept activity also keeps its `done` mark unless the payload sets one. `dayNumber` cannot be changed.
+
+### `DELETE /itinerary-days/:dayId`
+
+The day's creator or the group admin; anyone else gets `403` `DAY_DELETE_FORBIDDEN` ("Only the group admin or the member who added this day can delete it."). The other days keep their numbers.
+
+### `POST /itinerary-days/:dayId/activities`
+
+Body: one Activity object (see above). Appends it to the day.
+
+### `PATCH /itinerary-days/:dayId/activities/:activityId`
+
+Edits one activity in place, and optionally moves it to another day. Any group member.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `time`, `endTime` | string | optional, ≤20. An empty string clears the field |
+| `title` | string | optional, 1–200 |
+| `location` | string | optional, ≤200. An empty string clears it |
+| `icon` | string | optional Ionicons name, ≤40 |
+| `note` | string | optional, ≤300. An empty string clears it |
+| `done` | boolean \| null | optional. `true` ticks the activity off, `false` marks it as not done although its time has passed, `null` hands it back to the clock (see Progress above) |
+| `targetDayId` | ObjectId | optional. A day of the same group to move the activity to; it keeps its `_id` |
+
+At least one field is required (`400` "Nothing to update"). Both days are re-sorted by time.
+
+**Response `200`:** `{ "data": { "day": Day, "targetDay": Day | null } }`. `day` is the day named in the URL. `targetDay` is the day now holding the activity after a move, and `null` otherwise.
+
+Errors: `400` `INVALID_TARGET_DAY` ("That day is not part of this itinerary."), `404` "Itinerary day not found", `404` "Activity not found", `409` `AI_GENERATING`.
+
+### `DELETE /itinerary-days/:dayId/activities/:activityId`
+
+### `POST /groups/:groupId/itinerary/generate`
+
+Asks AI (OpenAI) to plan the itinerary of a **trip** group. Any member. Planning takes about a minute, so the request only checks and records the job and answers at once; the outcome arrives through the `itinerary:ai` event, a push, and `GET` on the same path.
+
+The group's own `location`, `startDate` and `totalDays` always win. `destination`, `startDate` and `days` in the body are used only where the group has no value (a `location` shorter than 2 characters counts as none), with one exception: after a run that failed with `AI_BAD_DESTINATION` or `AI_REFUSED`, a `destination` in the body overrides the group's for the next run. Values taken from the body are saved on the group only after a plan has been saved, and without touching the group's `updatedAt`. At most 14 days are planned per run; for a longer trip AI plans the first 14.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `destination` | string | optional, 2–120 chars, trimmed |
+| `startDate` | date \| null | optional |
+| `days` | int | optional, 1–14 |
+| `groupSize` | int | optional, 1–1000; defaults to the member count. Planned for at most 50 |
+| `travellers` | enum | required: `friends` \| `couple` \| `family_kids` \| `with_elders` \| `solo` |
+| `interests` | enum[] | required, 1–9 of: `sightseeing` \| `food` \| `nature` \| `adventure` \| `shopping` \| `nightlife` \| `spiritual` \| `history` \| `relaxing` |
+| `pace` | enum | required: `relaxed` \| `balanced` \| `packed` |
+| `budget` | enum | required: `budget` \| `mid` \| `premium` |
+| `transport` | enum | required: `own_car` \| `cab` \| `public_transport` \| `walking` |
+| `arrivalTime`, `departureTime` | string \| null | optional, exactly `h:mm AM` or `h:mm PM` (e.g. `9:30 AM`) |
+| `food` | enum \| null | optional: `vegetarian` \| `non_veg` \| `vegan` \| `jain` |
+| `notes` | string | optional, ≤300: must-do and avoid wishes |
+| `dayStart` | enum | `early` \| `normal` (default) \| `late` |
+| `accessibility` | enum | `none` (default) \| `limited_walking` \| `wheelchair` |
+| `replace` | boolean | default `false`. Needed to plan over existing days. They are deleted only once a valid plan is ready, and they come back if saving it fails |
+
+**Response `202`:** `{ "data": { "job": Job } }`
+
+Job object: `{ _id, group, status: "running" | "done" | "failed", replace, requestedBy: { _id, name }, startedAt, finishedAt, dayCount, errorCode, errorMessage }`. `finishedAt`, `errorCode` and `errorMessage` are `null` until they apply.
+
+Errors: `400` (validation), `AI_TRIP_ONLY`, `AI_TRIP_DETAILS_REQUIRED`, `AI_REPLACE_FORBIDDEN`, `ITINERARY_EXISTS`, `AI_ALREADY_RUNNING`, `AI_LIMIT`, `AI_RATE_LIMITED`, `AI_NOT_CONFIGURED`, `AI_UNAVAILABLE` (see the table above), and `402 NO_CREDITS` when the plan has a price (see [Wallet](#wallet)) the caller cannot pay. None of them creates a job or costs anything.
+
+When the plan has a price, it is charged once the job is created and refunded automatically if the job ends in anything but a saved plan (any `errorCode`, a server dying mid-run, the group being deleted).
+
+A finished plan posts one chat line ("X planned a N-day itinerary with AI", or "X replanned the itinerary with AI (N days)"), notifies the other members ("Itinerary Ready") and notifies the requester ("Your itinerary is ready"). A failed one notifies only the requester ("Could not create itinerary", with the job's `errorMessage`); `AI_CANCELLED` and `AI_STALE` notify nobody. All of these pushes carry `data: { type: "itinerary", groupId }`. Text written by AI only ever appears in itinerary days, never in chat lines or notifications.
+
+A failed job carries one of these codes, and its `errorMessage` is always the fixed text shown:
+
+| `errorCode` | `errorMessage` |
+| --- | --- |
+| `AI_UNAVAILABLE` | AI planner is unavailable right now. You can still add days by hand. |
+| `AI_BUSY` | The AI planner is busy. Try again in a minute. |
+| `AI_TIMEOUT`, `AI_STALE` | That took longer than expected. Try again. |
+| `AI_REFUSED` | AI could not plan this trip. Check the destination and your notes, then try again. |
+| `AI_BAD_DESTINATION` | AI did not recognise that destination. Correct it and try again. |
+| `AI_TRUNCATED` | The plan came out too long. Try a more relaxed pace. |
+| `AI_BAD_OUTPUT` | AI returned a plan we could not read. Try again. |
+| `AI_CONFLICT` | The itinerary changed while AI was planning. Nothing was replaced. Try again. |
+| `AI_CANCELLED` | Planning was cancelled. |
+| `AI_FAILED` | Something went wrong while planning. Try again. |
+
+`AI_CANCELLED` means the requester left or was removed from the group, or the group is gone. `AI_STALE` is a job whose server stopped mid-run: it is closed the next time anyone reads or starts a plan for the group, and from 3 minutes after it started it no longer blocks edits.
+
+### `GET /groups/:groupId/itinerary/generate`
+
+The state of AI planning for this group. Any member.
+
+**Response `200`:** `{ "data": { "configured", "job", "lastPrefs", "destinationEditable", "serverNow" } }`
+
+| Field | Meaning |
+| --- | --- |
+| `configured` | boolean: the server has an OpenAI key. When `false`, `POST` answers `AI_NOT_CONFIGURED` |
+| `job` | the group's latest Job of any age, or `null` |
+| `lastPrefs` | the body (without `replace`) of the caller's own latest request in this group, or `null`; lets the form reopen the way they left it |
+| `destinationEditable` | boolean: a `destination` in the body would be used (the group has none, or the latest job failed with `AI_BAD_DESTINATION` or `AI_REFUSED`) |
+| `serverNow` | server time of this response. Judge how old `finishedAt` is against this, never against the phone's clock |
+
+### Realtime events (socket.io)
+
+| Event | Direction | Payload |
+| --- | --- | --- |
+| `itinerary:ai` | server → the group's members, and the requester directly | `{ groupId, job }`. Sent when a job starts running, is done, or has failed (not for `AI_STALE`). The requester gets it twice, through the group's room and their own, because the creator of a brand-new group is not in its room yet. Merge by `job._id`, and never let a finished job go back to `running` |
+| `itinerary:updated` | server → the group's members | `{ groupId }`. The itinerary changed, by hand or by AI. Carries no days: refetch with `GET /groups/:groupId/itinerary` |
+
+---
+
+## Photos (gallery)
+
+### `GET /groups/:groupId/photos`
+
+Response: `{ "data": { "photos": [ ... ] } }`, newest first. Each row is a photo or a video: `mediaType` is `image` (also on rows from before videos) or `video`, and a video has its length in `durationMs`.
+
+### `POST /groups/:groupId/photos`
+
+Add a photo entry by URL or as an emoji/colour placeholder tile.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `imageUrl` | string (URL) | optional |
+| `emoji` | string | optional, ≤8 |
+| `color` | string | optional, hex `#rrggbb` |
+| `caption` | string | optional, ≤200 |
+| `taggedMembers` | ObjectId[] | optional |
+
+### `POST /groups/:groupId/photos/upload`
+
+`multipart/form-data` with a single file field named **`photo`** (and an optional `caption`). Only `image/*` mimetypes, max **10 MB** (`413` above that); the caller must be a group member.
+
+Optional text fields, so that photos picked together make one chat card:
+
+| Field | Rules |
+| --- | --- |
+| `batch` | 1–64 letters, digits, `_` or `-`, shared by every file of one pick. A file joins the `gallery` card that an earlier file of the same batch (same member, within 30 minutes) posted, and the card is pushed again as `message:updated`. Missing or malformed: the file gets a card of its own, as older app versions expect |
+| `batchCount` | how many files the pick has (1–50). Only words the one notification sent per card ("added 3 photos") |
+
+The image is sent to the configured storage provider and never written to the API server's disk. With the four `R2_*` variables set that is Cloudflare R2 (stored as uploaded under `splix/groups/<groupId>/`, with a 400px square JPG next to it for the grid); without them it falls back to the local `uploads/` folder, for development only.
+
+The created photo carries:
+
+| Field | Meaning |
+| --- | --- |
+| `imageUrl` | the full-size image: what the app downloads to the phone and shows full-screen |
+| `thumbUrl` | a small square (400px) for the gallery grid |
+| `storageProvider` | `r2` or `local` (`cloudinary` on rows from before the move to R2) |
+
+Absolute URLs (`https://…`) are used as-is; relative ones (`/uploads/…`, `/media/…`) are relative to the API origin.
+
+An R2 address is `MEDIA_BASE_URL/<key>`. Until there is a domain that is this server's `GET /media/<key>`, which needs no sign-in and answers `302` to a link signed for an hour (`404` when no bucket is set up). Image, audio and download clients follow the redirect.
+
+### `POST /groups/:groupId/videos/upload`
+
+A video for the gallery. `multipart/form-data` with:
+
+| Field | Rules |
+| --- | --- |
+| `video` | file, required. Only `video/*` mimetypes, max **90 MB** (`413` "That video is too large (max 90MB)"); kept under the 100 MB a request may carry through Cloudflare's proxy |
+| `poster` | file, optional. An `image/*` frame of the video that the phone makes; stored as the 400px square `thumbUrl`. One over 10 MB is left out (the video still uploads, with no `thumbUrl`) |
+| `durationMs` | number, optional; the clip's length |
+| `caption`, `batch`, `batchCount` | as on the photo upload |
+
+The video is written to a temp file on the API server (not held in memory) and streamed to storage from there; the temp files are deleted either way. It is listed with the photos, as a row with `mediaType: "video"`, the file in `imageUrl`, the poster in `thumbUrl` (`""` when no poster was sent or it could not be read) and `durationMs`. Deleting it (below) removes the video and its poster. Response: `{ "data": { "photo": { ... } } }`, `201`.
+
+### `DELETE /photos/:photoId`
+
+Uploader only. Also deletes the image (or the video and its poster) from the storage provider, and takes it off its chat card.
+
+### `POST /photos/bulk-delete`
+
+Multi-select delete from the gallery.
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `photoIds` | ObjectId[] | required, 1–100 ids |
+
+Same rule as the single delete, applied per photo: only the caller's own uploads are removed (and their images deleted from storage, and taken off their chat cards). Ids that belong to someone else, or don't exist, are skipped rather than failing the batch.
+
+Response: `{ "data": { "deletedIds": [ ... ] } }` — the photos that were actually deleted.
+
+### `POST /groups/:groupId/face-scan`
+
+Face Scan: find the photos a person is in. `multipart/form-data` with a single image field named **`photo`** (same rules as the photo upload: `image/*`, max 10 MB): a selfie, or a picture of anyone. Members only; **30 scans per 15 minutes** per user (`429`, code `FACE_SCAN_RATE_LIMITED`). The picture is sent to the face service and forgotten; it is never stored.
+
+Response: `{ "data": { "width", "height", "faces": [ ... ], "pending", "threshold" } }`
+
+| Field | Meaning |
+| --- | --- |
+| `width`, `height` | the picture's size, turned the right way up |
+| `faces[]` | every face found in the picture, largest first (up to 6): its `box` (`[x1, y1, x2, y2]` as fractions of width/height) and its `matches[]` |
+| `faces[].matches[]` | this group's photos showing the same person, best first (up to 300): `{ photo, similarity }`, the photo as `GET /groups/:groupId/photos` lists it and `similarity` 0..1 |
+| `pending` | photos of the group the worker has not scanned yet (see below). The app polls the status and scans again once it reaches 0 |
+| `threshold` | the similarity a match needed (`FACE_MATCH_THRESHOLD`) |
+
+Errors: `422` `FACE_NOT_FOUND` (nobody in the picture), `422` `FACE_SCAN_UNREADABLE` (the service could not read the file), `503` `FACE_SCAN_UNAVAILABLE` (no face service configured, or it cannot be reached).
+
+### `GET /groups/:groupId/face-scan`
+
+Members only. `{ "data": { "enabled", "pending" } }`: whether Face Scan is on for this server, and how many of the group's photos still wait to be scanned.
+
+#### How Face Scan works
+
+Every uploaded image goes once, in the background, through the face service (`face-service/` at the project root, a container next to the API): each face it finds gets a fingerprint, a unit vector of 128 numbers from the `sface-2021dec` model, kept in the `faces` collection with the photo and group ids and the face's box. No crop of any face is stored, only the numbers, and they go when the photo, the group or the uploader's account goes. The photo's `faceScan.status` tracks the work: `pending` → `running` → `done` (`faceScan.faces` is the count; 0 is a photo with nobody in it) or `failed` (after three tries; `faceScan.error` says why). Videos, emoji tiles and rows with no stored file are `skipped`.
+
+A scan fingerprints the one picture sent and compares it with the group's stored fingerprints, a dot product each; a photo matches when its best face is at or above the threshold. Nothing outside the group is ever searched, and only the group's members may search it.
+
+The worker is a loop in the API process (one copy, like the reminder sweep) that runs only when `FACE_SERVICE_URL` is set; `FACE_SCAN_WORKER=off` keeps scans working but scans no uploads. Photos from before the feature are adopted at start-up and scanned after anything newer, so a burst of uploads only delays the tagging, never the API. Without Python, `node scripts/fake-face.js` stands in for the service in development (see the script).
+
+---
+
+## Attractions
+
+### `GET /groups/:groupId/attractions` · `POST /groups/:groupId/attractions`
+
+Attractions belong to trip groups. `POST` on any other kind of group answers `400` with code `TRIP_ONLY` ("Only trip groups have attractions."), and the app does not show the Attractions tab there. `GET` still answers for every group.
+
+Adding one posts an `attraction` card to the chat; deleting it deletes the card.
+
+Create body:
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `name` | string | required, ≤120 |
+| `category` | string | optional, ≤60 |
+| `rating` | number | optional, 0–5 |
+| `distanceKm` | number | optional, 0–10000 |
+| `emoji` | string | optional, ≤8 |
+| `placeId` | string | optional, ≤255. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
+
+### `POST /attractions/:attractionId/toggle-save`
+
+Toggles the caller in/out of the attraction's `savedBy` list (bookmark).
+
+### `PATCH /attractions/:attractionId`
+
+Any subset of the create fields (`rating`/`distanceKm` also accept `null` to clear).
+
+### `DELETE /attractions/:attractionId`
+
+---
+
+## Stays
+
+### `GET /groups/:groupId/stays` · `POST /groups/:groupId/stays`
+
+Adding one posts a `stay` card to the chat; deleting it deletes the card. A status change is still announced as a one-line `system` message.
+
+Create body:
+
+| Body field | Type | Rules |
+| --- | --- | --- |
+| `name` | string | required, ≤120 |
+| `stars` | int | optional, 1–5 |
+| `status` | enum | `pending` \| `confirmed` \| `cancelled` |
+| `checkIn` | date | required |
+| `checkOut` | date | required |
+| `guests` | int | optional, 1–50 |
+| `pricePerNight` | number | required, ≥ 0 |
+| `amenities` | string[] | optional, ≤12 items |
+| `address` | string | optional, ≤200 |
+| `emoji` | string | optional, ≤8 |
+| `placeId` | string | optional, ≤255. The provider id when added from the suggestions; `409 PLACE_ALREADY_ADDED` if the group already has it |
+
+### `PATCH /stays/:stayId`
+
+Any subset of the create fields (used e.g. to cycle `status`).
+
+### `DELETE /stays/:stayId`
+
+---
+
+## Notifications
+
+Every in-app notification is also delivered as a device push (via Expo's push service) to each recipient's registered devices. The push carries `data: { type, groupId, entityId? }` — `entityId` is the expense/task id for `expense` and `task` notifications.
+
+### `POST /notifications/push-token`
+
+Register this device for pushes. Body: `{ "token": "ExponentPushToken[...]" }`. The token is moved off any other account it was registered to.
+
+### `DELETE /notifications/push-token`
+
+Unregister this device (call on logout). Body: `{ "token": "ExponentPushToken[...]" }`.
+
+### `GET /notifications`
+
+The caller's notifications, newest first. Each carries `type`, `group` and, for `expense`, `task` and `support` notifications, `entityId` (the expense, task or support report id), which is what the app uses to decide where a tap leads.
+
+### `PATCH /notifications/read-all`
+
+Mark all as read.
+
+### `PATCH /notifications/:notificationId/read`
+
+Mark one as read.
+
+### `DELETE /notifications/:notificationId`
+
+Delete one.
+
+### `DELETE /notifications`
+
+Clear all.
+
+---
+
+## Support
+
+Reports people send from Profile › Help & Support: a bug, an idea, trouble with a payment or their account, a member they want to report, or just a message. Each has a `category`, a `status` the admin panel moves it through (`open`, `in_progress`, `resolved`, `closed`) and a timeline of `events`, oldest first. The app is sent events of kind `reply` (an admin's answer, in `body`) and `status` (a change, with the new `status`), each with `byName` and `createdAt`. Admin-only notes and the priority never leave the panel.
+
+Categories: `bug`, `feature`, `payment`, `account`, `abuse` (a member or group), `general`.
+
+### `POST /support/reports`
+
+Report a Problem. JSON, or `multipart/form-data` when screenshots come along.
+
+| Field | Type | Rules |
+| --- | --- | --- |
+| `category` | string | required, one of the categories above |
+| `subject` | string | required, 3–150 |
+| `message` | string | required, 10–2000 |
+| `platform`, `model`, `osVersion`, `appVersion`, `build` | string | optional, ≤40 each (`model` ≤60): what the phone says about itself |
+| `screenshots` | file | multipart only; up to 3 images of 10MB each |
+
+A person may send 10 reports in 24 hours; the next is `429` with code `SUPPORT_DAILY_CAP`. A fourth screenshot, or a file that is not an image, is `400` and nothing is stored.
+
+**Response `201`:** `{ "data": { "report": { "_id", "category", "subject", "message", "attachments": [{ "url", "thumbUrl", "mimeType", "size" }], "status": "open", "device": { "platform", "model", "osVersion", "appVersion", "build" }, "events": [], "createdAt", "updatedAt" } } }`
+
+### `GET /support/reports`
+
+The caller's own reports, newest first, at most 50: `{ "data": { "reports": [ ... ] } }`.
+
+### `GET /support/reports/:id`
+
+One of the caller's reports, with its events. `404` for anyone else's.
+
+### `POST /support/contact`
+
+Contact Us: a report of category `general` with no screenshots, at the address older builds of the app use. Body `subject` (2–150) and `message` (5–2000), plus the phone fields above if the app has them; `name` and `email` are accepted and ignored.
+
+**Response `201`:** `{ "data": { "report": { ... } } }`
+
+### What the reporter is told
+
+When an admin replies or changes the status, the reporter gets an in-app notification and a push of type `support` whose `entityId` is the report, so a tap opens it. Notes between admins and priority changes tell nobody.
+
+### Admin panel
+
+The queue lives under `/admin/support`, behind the panel's cookie session and the `support` permission module: read access to see, read-write to act. Nothing deletes a report; closing it keeps the record, and the rows go when the account that sent them is deleted.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/support/summary` | counts per status, plus `pending` (open + in progress) and `total` |
+| `GET /admin/support/reports` | the queue, newest first: `page`, `limit`, `search` (the title, or the reporter's name or email), `status`, `category` |
+| `GET /admin/support/reports/:id` | one report with its reporter, device, screenshots and full timeline |
+| `PATCH /admin/support/reports/:id/status` | `{ "status" }`; tells the reporter |
+| `PATCH /admin/support/reports/:id/priority` | `{ "priority": "low" / "normal" / "high" }`; tells nobody |
+| `POST /admin/support/reports/:id/replies` | `{ "body", "internal" }`; a reply tells the reporter and moves an `open` report to `in_progress`; an internal note is seen by admins only |
+
+---
+
+## Wallet
+
+Credits that paid features use up. A person's credits sit in two pots, shown as one `balance`:
+
+- `free`: this month's free credits. Spent first; topped up to `monthlyFree` at the start of each month (UTC), and unused ones do not carry over.
+- `paid`: everything else (the one-time signup bonus, credits added by an admin, later purchases). Never expires.
+
+A wallet appears the first time anything touches it, existing accounts included, with the signup bonus and this month's free credits. Nothing the app sends can add credits: these routes only read.
+
+Paid features and their prices (credits, `0` = free; both start at `0`, so charging is off until an owner sets a price in the admin panel):
+
+| Feature | Price | Paid by |
+| --- | --- | --- |
+| `ai_itinerary` | `aiItinerary` per plan; refunded when the plan fails | whoever asked for the plan |
+| `call` | `callBlock` per started `callBlockMinutes` | whoever started the call |
+
+When someone cannot pay, the request is `402` with `code: "NO_CREDITS"`, `needed`, `balance` and `feature`, and nothing is charged. Every change to a balance sends the owner the realtime event `wallet:updated` `{ balance, free, paid }`.
+
+### `GET /wallet`
+
+`{ "data": { "wallet": { "balance", "free", "paid", "monthlyFree", "freeRenewsAt", "prices": { "aiItinerary", "callBlock", "callBlockMinutes" } } } }`. `freeRenewsAt` is when this month's free credits are replaced.
+
+### `GET /wallet/transactions`
+
+The caller's history, newest first. Query `page` (default 1) and `limit` (1–50, default 20).
+
+`{ "data": { "items": [{ "id", "type", "amount", "feature", "balanceAfter", "freeAfter", "createdAt" }], "total", "page", "pages" } }`
+
+`type` is one of `bonus` (signup), `monthly` (free credits topped up; `amount` is the change, `freeAfter` what the pot now holds), `spend`, `refund`, `grant` and `deduct` (by an admin). `amount` is signed. An admin's reason, and who they are, never reach the app.
+
+### Admin panel
+
+Under `/admin/wallet`, behind the panel's session and the `wallet` permission module: read access to see balances and history, read-write to grant and deduct. Prices and allowances are owners only. Co-admins can grant or deduct at most `coAdminGrantCap` credits at once, never on their own account, and owners' wallets are "not found" to them.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /admin/wallet/summary` | the settings, credits held (`free`, `paid`, `wallets`), the last 30 days by type and feature, and `check`: balances whose history does not add up (should be empty) |
+| `GET /admin/wallet/settings` | `{ "settings": { "prices": { "aiItinerary", "callBlock" }, "callBlockMinutes", "signupBonus", "monthlyFree", "coAdminGrantCap", "updatedAt" } }` |
+| `PUT /admin/wallet/settings` | owners only; the same fields, whole numbers. Applies to the next request |
+| `GET /admin/wallet/transactions` | every change, newest first, with the person, the admin and their reason: `page`, `limit`, `type`, `feature` |
+| `GET /admin/wallet/users/:id` | one person's `wallet` and paged `transactions` |
+| `POST /admin/wallet/users/:id/adjust` | `{ "type": "grant" \| "deduct", "amount", "reason" (3–300), "requestId" (a UUID per press) }`. The same `requestId` is applied once. A deduction cannot take a balance below zero |
+
+---
+
+## Quick-start example
+
+```bash
+# Register
+curl -X POST http://localhost:4000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Alex K.","email":"alex@example.com","password":"secret123"}'
+
+# Create a group (use the token from the previous response)
+curl -X POST http://localhost:4000/api/v1/groups \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"name":"Tokyo Getaway","groupType":"trip","totalDays":8}'
+
+# Add an equal-split expense
+curl -X POST http://localhost:4000/api/v1/groups/<groupId>/expenses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"description":"Airbnb","amount":320,"paidBy":"<userId>","splitType":"equal","category":"stay"}'
+```

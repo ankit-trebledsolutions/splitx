@@ -1,0 +1,17 @@
+<svg width="750" height="420" viewBox="0 0 750 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="750" height="420" fill="url(#nb-gradient)"/>
+  <!-- Translucent diagonal facets, echoing the polygonal wallpaper -->
+  <polygon points="0,140 210,0 0,0" fill="#FFFFFF" opacity="0.06"/>
+  <polygon points="210,0 470,190 190,320 60,160" fill="#FFFFFF" opacity="0.045"/>
+  <polygon points="470,190 750,60 750,300" fill="#000000" opacity="0.05"/>
+  <polygon points="190,320 470,190 620,420 260,420" fill="#FFFFFF" opacity="0.035"/>
+  <polygon points="0,140 190,320 0,420" fill="#000000" opacity="0.06"/>
+  <polygon points="620,420 750,300 750,420" fill="#FFFFFF" opacity="0.04"/>
+  <defs>
+    <linearGradient id="nb-gradient" x1="60" y1="0" x2="690" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#40DE8C"/>
+      <stop offset="0.42" stop-color="#2CA69C"/>
+      <stop offset="1" stop-color="#2B4E9B"/>
+    </linearGradient>
+  </defs>
+</svg>

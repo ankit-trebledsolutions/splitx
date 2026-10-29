@@ -1,41 +1,59 @@
 # Splix
 
-Split expenses, not friendships. A full-stack expense-splitting app:
+Split expenses, not friendships. A full-stack expense-splitting and group
+trip-planning app:
 
 - **`backend/`** — Node.js + Express + MongoDB (Mongoose) REST API
-- **`mobile/`** — React Native (Expo) app
+- **`mobile/`** — React Native (Expo SDK 54) app
 
 ## Project structure
 
 ```
-splity/
+splitx/
+├── API.md                 # full REST API documentation
 ├── backend/
+│   ├── uploads/           # uploaded gallery photos (served at /uploads)
 │   └── src/
 │       ├── config/        # env + database connection
-│       ├── models/        # Mongoose schemas (User, Group, Expense)
-│       ├── services/      # business logic (auth, groups, expenses, balances)
+│       ├── models/        # User, Group, Expense, Task, Reminder, Message,
+│       │                  # ItineraryDay, Photo, Attraction, Stay,
+│       │                  # Notification, SupportReport
+│       ├── services/      # business logic (auth, groups, expenses, balances,
+│       │                  # contributions)
 │       ├── controllers/   # request/response handling
 │       ├── routes/        # route definitions + zod validation
-│       ├── middleware/    # auth (JWT), validation, error handling
+│       ├── middleware/    # auth (JWT), validation, upload (multer), errors
 │       ├── utils/         # ApiError, asyncHandler
 │       ├── app.js         # express app assembly
 │       └── server.js      # entrypoint
 └── mobile/
+    ├── index.js           # app entry (registerRootComponent)
+    ├── modules/
+    │   └── splix-alarm/   # native Android module: reminders that ring as
+    │                      # alarms, group calls that ring as phone calls
     └── src/
-        ├── api/           # axios client + endpoint wrappers
-        ├── components/    # Button, TextField, EmptyState, SplixLogo
+        ├── api/           # axios client + endpoint wrappers per resource
+        ├── components/    # Avatar, GradientButton, DarkScreen, sheets, ...
         ├── context/       # AuthContext (JWT session)
-        ├── navigation/    # RootNavigator (auth vs app stacks)
-        ├── screens/       # Splash, Login, Register, Groups, GroupDetail, ...
-        ├── theme/         # colors, spacing, radii
-        └── utils/         # formatting helpers
+        ├── navigation/    # RootNavigator (auth vs app stacks) + MainTabs
+        ├── screens/       # auth flow, Home, My Groups, group chat & tabs
+        │   │              # (chat/expenses/tasks/reminders/itinerary/gallery/
+        │   │              # attractions/stays), Group Info, Member Profile,
+        │   │              # Contributions, Expense/Task detail, Profile, ...
+        │   └── group/     # tab components for the group chat screen
+        ├── theme/         # dark palette, spacing, radii
+        └── utils/         # formatting, presence, task detection helpers
 ```
 
 ## Prerequisites
 
 - Node.js ≥ 18
-- MongoDB running locally (`brew services start mongodb-community`) or a MongoDB Atlas URI
-- Expo Go app on your phone, or an iOS simulator / Android emulator
+- MongoDB running locally or a MongoDB Atlas URI
+- **Expo Go on your phone — its version must match the project's Expo SDK.**
+  The project is on **SDK 54**, so you need Expo Go 54.x (Expo Go supports
+  exactly one SDK per version; a mismatch shows "Project is incompatible with
+  this version of Expo Go"). APKs for specific SDKs: https://expo.dev/go
+- Or an iOS simulator / Android emulator
 
 ## Running the backend
 
@@ -53,26 +71,280 @@ Health check: `GET http://localhost:4000/api/v1/health`
 ```bash
 cd mobile
 npm install
-npm start              # opens Expo dev tools
+npm start              # starts the Expo dev server (Metro on port 8081)
 ```
 
+Scan the QR code with Expo Go, or press `a` / `i` for an emulator/simulator.
+
 > **Physical device?** Edit `mobile/src/api/client.js` and set `HOST` to your
-> machine's LAN IP so the phone can reach the API. Android emulators use
-> `10.0.2.2` automatically; iOS simulator uses `localhost`.
+> machine's LAN IP so the phone can reach the API (phone and computer must be
+> on the same Wi-Fi). Android emulators use `10.0.2.2` automatically; iOS
+> simulator uses `localhost`.
 
-## API overview
+### Troubleshooting
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/api/v1/auth/register` | Create account, returns JWT |
-| POST | `/api/v1/auth/login` | Login, returns JWT |
-| GET | `/api/v1/auth/me` | Current user |
-| GET/POST | `/api/v1/groups` | List / create groups |
-| POST | `/api/v1/groups/join` | Join via invite code |
-| GET | `/api/v1/groups/:id` | Group detail |
-| POST | `/api/v1/groups/:id/leave` | Leave group (must be settled) |
-| GET | `/api/v1/groups/:id/balances` | Net balances + suggested settlements |
-| GET/POST | `/api/v1/groups/:id/expenses` | List / add expenses (equal or exact split) |
-| DELETE | `/api/v1/expenses/:id` | Delete an expense |
+- **"Port 8081 is being used by another process"** — an old Metro server is
+  still running. Kill it (`Get-NetTCPConnection -LocalPort 8081` → stop that
+  PID on Windows) and start again.
+- **Bundling errors after changing dependencies or SDK** (e.g.
+  `dependencies is not iterable`) — clear Metro's cache:
+  `npx expo start -c`.
+- **Upgrading the Expo SDK** (e.g. when Expo Go updates):
+  `npx expo install expo@^<version> --fix` aligns every dependency.
 
-All non-auth routes require `Authorization: Bearer <token>`.
+## App features
+
+- **Auth** — register/login (JWT), forgot-password with OTP reset flow
+- **Groups** — create (trip/home/couple/event), join via invite code or
+  invite link (opens the app on a Join screen; see "Invite links" below),
+  member list with admin (creator) badge
+- **Group chat** — messages with polling, smart task detection from chat,
+  activity entries for expenses/tasks/reminders
+- **Group calls** — voice or video, one call per group (Stream). Starting one
+  rings every other member's phone like a phone call, with the app closed or
+  the phone locked (Android; see "Incoming group calls" below)
+- **Expenses** — equal or exact splits, categories, settle per member,
+  balances with suggested settlements
+- **Contributions** — fairness dashboard (money + task effort per member)
+- **Tasks** — priorities, assignees, due dates, subtasks, links, reminders
+- **Reminders** — ring like an alarm at the exact time, with the app closed or
+  the phone locked (Android; see "Reminder alarms" below). For the whole
+  group, just me, or personal with no group; weekly repeat; each member can
+  switch a reminder off for themselves. The date comes from a calendar and the
+  time from slide wheels, like a phone's alarm clock. All of mine are listed on the
+  Reminders screen (alarm icon on Home)
+- **Itinerary** — days with timed activities
+- **Gallery** — photo upload (multipart, 15 MB max) or emoji/colour tiles;
+  Face Scan finds the photos a person is in (see "Face Scan" below)
+- **Attractions & Stays** — shortlists with bookmarks, stay status tracking
+- **Group Info screen** — tap the group name in the chat header: members with
+  presence, view contributions, add friends, preferences (mute/leave)
+- **Member profile** — tap another member: contact info, groups in common,
+  send message / remove from group (UI)
+- **Notifications** — list, mark read, clear
+
+## Reminder alarms
+
+A reminder is handed to the phone's own alarm clock, so it rings on the minute
+with Splix closed, the phone locked, or no signal. The pieces:
+
+- `mobile/modules/splix-alarm/` — the native Android module (Kotlin): sets the
+  alarm, rings on the alarm volume, shows the alarm screen over the lock
+  screen, and puts alarms back after a restart. It is native code, so a change
+  there (or a first install of it) needs a new build: `npx expo run:android`,
+  or a new EAS build for testers. Expo Go cannot run it.
+- `mobile/src/utils/reminderAlarms.js` — keeps the phone's alarms in step with
+  the server. `reminderPushTask.js` does the same from a silent push while the
+  app is closed.
+- `backend/src/services/reminderSync.service.js` sends those silent pushes;
+  `reminderSweep.service.js` is the server's backup at reminder time.
+
+**The sound** is one file: `mobile/modules/splix-alarm/android/src/main/res/raw/splix_alarm.ogg`.
+Replace it (same name; `.ogg`, `.mp3` or `.wav`) and rebuild to change the tone.
+Every alarm carries a sound name, so more files can sit next to it and be
+chosen per alarm later (`AlarmSound.kt`, and `DEFAULT_SOUND` in
+`reminderAlarms.js`).
+
+**Android permissions.** Notifications, "Alarms & reminders" (off by default
+from Android 14; without it a reminder is an ordinary notification that can be
+late), and on Android 14+ full-screen notifications. The app explains and asks
+for them the first time it is opened and again whenever a reminder is saved
+while one is missing.
+
+**The server's backup timer** is on by default only when `NODE_ENV=production`
+(`REMINDER_SWEEP=on|off` overrides). Keep it off on a machine whose `.env`
+points at the live database.
+
+**iOS** has no alarm clock an app may use below iOS 26, so there a reminder is
+an ordinary scheduled notification.
+
+Checks: `npm test` and `npm run smoke:reminders` in `backend/` (the second
+needs a local MongoDB and uses a throwaway database), and
+`gradlew :splix-alarm:testDebugUnitTest` in `mobile/android/` for the alarm
+time rules in the native module.
+
+## Incoming group calls
+
+When the first person joins a group's call, every other member's phone rings:
+the call screen over the lock screen, or a banner with Decline and Answer while
+the phone is in use, with Splix closed. Accept opens the app in the call (a
+locked phone is unlocked first); no answer in 45 seconds, or the call ending
+first, leaves a "Missed group call" notification. The pieces:
+
+- `backend/src/services/callRing.service.js` — on the app's "call started" it
+  sends the ring: a silent, data-only push to everyone in the group except the
+  caller and those who muted the group (a push with a title would be shown by
+  Android itself, and the app would never hear of it). "Call ended" sends
+  another that stops phones still ringing. Both also go over the socket.
+- `mobile/modules/splix-alarm/` — the same native module as the alarms.
+  `SplixMessagingService` stands in front of expo-notifications' push service:
+  it takes the pushes about calls and hands every other push on untouched.
+  `CallCenter` decides what a ring does, `CallService` rings (the phone's own
+  ringtone, on the ring volume, silent on silent or Do Not Disturb), and
+  `CallActivity` is the call screen. None of it needs the app's JavaScript, so
+  it rings just as well in a development build.
+- `mobile/src/utils/incomingCalls.js` and `hooks/useIncomingCalls.js` — what
+  the app does once it is open: joins the call that was accepted, and tells the
+  phone which call the person is already in (that one does not ring).
+
+**Android permissions.** Notifications, and on Android 14+ full-screen
+notifications. They are on the same sheet as the alarm permissions, shown the
+first time the app is opened and again when someone starts a call while one is
+missing. The microphone and camera are asked for when a call is joined.
+
+**iOS, and an Android build from before this,** have no part that rings, so
+there `reminderPushTask.js` turns the push into an ordinary notification
+("Asha started a group video call"); tapping it opens the group, where the
+call can be joined.
+
+**New native code:** like the alarms, it needs a new build
+(`npx expo run:android`, or a new EAS build for testers), and the backend has
+to be deployed for anything to ring.
+
+Checks: `npm test` in `backend/` (`test/callRing.test.js`), and the same
+`gradlew :splix-alarm:testDebugUnitTest` for reading the push and deciding what
+a ring does (`CallTest.kt`).
+
+## Face Scan
+
+The gallery's **Face Scan** finds the photos a person is in: take a selfie or
+pick a picture of anyone in the group, and the group's photos showing the same
+person come back, best match first. Three pieces:
+
+- `face-service/` — a small Python container (OpenCV's YuNet and SFace models,
+  MIT and Apache licensed) that finds the faces in a photo and gives each one a
+  fingerprint. It keeps nothing. See its README.
+- `backend/` — every uploaded image goes through the service once, in the
+  background, and its faces' fingerprints are kept next to the photo (the
+  `faces` collection; no face crops, only numbers). A scan fingerprints the one
+  picture sent and compares it with the group's stored fingerprints; nothing
+  outside the group is ever searched. `API.md` has the endpoints, the photo's
+  `faceScan` status fields and the tuning variables (`FACE_*` in `.env.example`).
+- `mobile/` — the Face Scan button on the Gallery tab opens
+  `screens/FaceScanScreen.js`. No new native module: the camera comes through
+  expo-image-picker, which the app already ships.
+
+Running it locally: the real service (`face-service/README.md`) or, without
+Python, `node scripts/fake-face.js` in `backend/`; then
+`FACE_SERVICE_URL=http://127.0.0.1:8000` (`:4020` for the fake) in the
+environment of `npm run dev:local`. Deploying: `docker compose up -d --build`
+builds the `face` container too (the first build downloads 37 MB of models and
+takes a few minutes); `docker-compose.yml` already points the API at it. Photos
+uploaded before the feature are scanned on the first start, newest first.
+
+Checks: `npm test` in `backend/` (`test/faceScan.test.js`, which needs a local
+MongoDB and is skipped without one).
+
+## Forcing an app update
+
+Every APK has a build number (`android.versionCode` in `mobile/app.json`), and
+the app sends it with every request (`X-App-Build`). An owner sets, in the
+admin panel under General Settings → App Updates, the lowest build still
+allowed in and where the newest one is. A phone on an older build is answered
+426 `APP_UPDATE_REQUIRED` to everything it asks and shows an update screen it
+cannot dismiss, whose one button opens the download link: an APK link for now,
+the Play Store page once Splix is listed, with nothing to rebuild for the
+switch. See `backend/src/middleware/appVersion.js` and
+`mobile/src/components/UpdateWall.js`.
+
+Releasing a new build:
+
+1. Raise `android.versionCode` (and `version`) in `mobile/app.json`, build the
+   APK, sign it with the same key as every build before it (Android refuses to
+   install over an app signed with a different key), and put it somewhere with
+   an `https://` link.
+2. In App Updates set **Latest build** to the new number, the version label and
+   the link. People on older builds are told once that an update is waiting
+   and can carry on.
+3. Only when the old app would no longer work against the server, raise
+   **Lowest allowed build** too. Everyone below it is locked out from their
+   very next tap; lowering it again lets them back in just as fast.
+
+Builds from before 1.1.0 (versionCode 2) send no build number and can never be
+forced: they have to be replaced by hand first.
+
+Checks: `npm test` in `backend/` (`test/appRelease.test.js`). On a phone: set
+Lowest allowed build above the installed build's number, open the app.
+
+## Invite links
+
+A group's invite link is `https://<api host>/join/<code>` (the Invite Friends
+screen shows and shares it). Tapped on a phone with Splix installed, Android
+opens the app straight on a **Join** screen: the group, who invited them, who
+is in it, one button. Signed out, the code is kept while they sign in or
+register, and the Join screen opens as soon as they are in (and their profile
+is complete). On a phone without the app, or on a laptop, the link opens a
+page served by the API with the same preview, an **Open in Splix** button and
+the APK link from App Updates. Splix is not on the Play Store yet; when it is,
+the page's fallback becomes the store listing (`TODO(store launch)` in
+`backend/src/views/joinPage.js`) and nothing else changes.
+
+Pieces: `backend/src/routes/join.routes.js` (the page and
+`/.well-known/assetlinks.json`), `GET /groups/invites/:code` (the preview),
+`mobile/src/invites` (catching the link, remembering it across sign-in),
+`mobile/src/screens/JoinGroupScreen.js`, and `scheme` + `intentFilters` in
+`mobile/app.json`. The Nginx in front passes `/join/` and `/.well-known/` to
+the API (`deploy/nginx`).
+
+Two things to know when building and deploying:
+
+1. **The intent filter is native.** Builds from before it ignore the links;
+   a new APK (`npx expo prebuild --clean`, then Gradle) is needed, and the
+   host in `intentFilters` must be the API's public host (today the VPS's
+   Hostinger name, in `mobile/src/api/client.js` too).
+2. **App Links are verified against the signing key.** Android fetches
+   `https://<host>/.well-known/assetlinks.json` and only opens the app
+   directly if the installed APK is signed with a certificate listed there.
+   The server lists `ANDROID_CERT_SHA256` from `backend/.env`; unset, it lists
+   the stock Android debug keystore (`mobile/android/app/debug.keystore`,
+   `SHA256 FA:C6:17:45:…:3B:9C`), which is what local Gradle builds sign with.
+   An EAS-built or release-signed APK has a different fingerprint: read it
+   with `keytool -list -v -keystore <keystore> | grep SHA256` and set it
+   (several, comma-separated, are fine). If verification fails the link
+   still works, through the page's Open button.
+
+Checks: `npm test` in `backend/` (`test/inviteLinks.test.js`). On a phone with
+the new build: open `https://<api host>/join/<code>` from a chat; `adb shell
+pm get-app-links com.splity.app` shows whether the host verified.
+
+## App name and logo
+
+Owners set the app's name and upload its logo in the admin panel under
+General Settings → Branding. Phones pick the change up the next time the app
+opens (it reads `GET /app/branding` on start and keeps a copy for offline
+starts); the admin panel's sidebar, loader and sign-in page redraw at once.
+
+The name keeps the wordmark's look. The Splix wordmark
+(`mobile/src/assets/wordmark.svg`) is not text in a font: it is Poppins
+ExtraBold lettering exported as paths, with the "x" replaced by the logo's
+mark, two chevron halves facing each other across a thin seam, standing at the
+height of the lowercase letters. An admin-set name is set in the same
+lettering (Poppins ExtraBold, bundled through `@expo-google-fonts/poppins`),
+and every `x` or `X` in it is drawn as that same mark, from the very paths in
+the SVG. "Splix" itself is still the original SVG. See
+`mobile/src/components/BrandWordmark.js`; the admin page shows a live preview
+(`wordmark-preview.jsx`) drawn by the same rules.
+
+The logo is stored like any other upload (R2, or `/uploads` locally),
+re-encoded as a PNG of at most 512 px; PNG, JPEG or WebP up to 2 MB, SVG
+refused. Removing it returns to the built-in Splix mark. Not covered, because
+they are part of the installed build: the name under the app icon
+(`expo.name` in `mobile/app.json`) and the icon itself.
+
+Checks: `npm test` in `backend/` (`test/branding.test.js`); `npm run build` in
+`admin/`.
+
+## API
+
+Full endpoint documentation lives in **[API.md](API.md)**.
+
+Base URL: `http://localhost:4000/api/v1` — all non-auth routes require
+`Authorization: Bearer <token>`. Resource groups:
+
+| Area | Endpoints |
+| --- | --- |
+| Auth | `/auth/register`, `/auth/login`, `/auth/me`, `/auth/forgot-password`, `/auth/verify-otp`, `/auth/reset-password` |
+| Groups | `/groups`, `/groups/join`, `/groups/invites/:code`, `/groups/:id`, `/groups/:id/leave`, `/groups/:id/balances`, `/groups/:id/contributions` |
+| Per-group resources | `/groups/:id/expenses`, `/messages`, `/tasks`, `/reminders`, `/itinerary`, `/photos` (+ `/photos/upload`), `/attractions`, `/stays` |
+| Items | `/expenses/:id` (+ `/settle`), `/tasks/:id`, `/reminders/:id`, `/itinerary-days/:id` (+ `/activities`), `/photos/:id`, `/attractions/:id` (+ `/toggle-save`), `/stays/:id` |
+| Other | `/notifications` (read/clear), `/support/reports` (Report a Problem, My Reports), `/support/contact`, `/app/release`, `/app/branding`, `/health` |

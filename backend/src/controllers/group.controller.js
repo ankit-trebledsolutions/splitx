@@ -1,5 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const groupService = require('../services/group.service');
+const groupDeletionService = require('../services/groupDeletion.service');
 
 const createGroup = asyncHandler(async (req, res) => {
   const group = await groupService.createGroup(req.user._id, req.body);
@@ -21,9 +22,36 @@ const joinGroup = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { group } });
 });
 
+// What an invite link leads to, for the Join screen, without joining.
+const previewInvite = asyncHandler(async (req, res) => {
+  const invite = await groupService.previewInvite(req.params.code, req.user._id);
+  res.json({ success: true, data: { invite } });
+});
+
 const leaveGroup = asyncHandler(async (req, res) => {
-  await groupService.leaveGroup(req.params.groupId, req.user._id);
+  await groupService.leaveGroup(req.params.groupId, req.user._id, req.body);
   res.json({ success: true, message: 'Left group' });
+});
+
+// Admin only. Everything in the group goes with it, for every member.
+const deleteGroup = asyncHandler(async (req, res) => {
+  await groupDeletionService.deleteGroup(req.params.groupId, req.user._id);
+  res.json({ success: true, message: 'Group deleted' });
+});
+
+const removeMember = asyncHandler(async (req, res) => {
+  await groupService.removeMember(req.params.groupId, req.user._id, req.params.memberId);
+  res.json({ success: true, message: 'Member removed' });
+});
+
+const setMuted = asyncHandler(async (req, res) => {
+  const data = await groupService.setMuted(req.params.groupId, req.user._id, req.body.muted);
+  res.json({ success: true, data });
+});
+
+const setDestination = asyncHandler(async (req, res) => {
+  const group = await groupService.setDestination(req.params.groupId, req.user._id, req.body);
+  res.json({ success: true, data: { group } });
 });
 
 const getBalances = asyncHandler(async (req, res) => {
@@ -31,4 +59,22 @@ const getBalances = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { createGroup, listGroups, getGroup, joinGroup, leaveGroup, getBalances };
+const getContributions = asyncHandler(async (req, res) => {
+  const data = await groupService.getContributions(req.params.groupId, req.user._id);
+  res.json({ success: true, data });
+});
+
+module.exports = {
+  createGroup,
+  listGroups,
+  getGroup,
+  joinGroup,
+  previewInvite,
+  leaveGroup,
+  deleteGroup,
+  removeMember,
+  setMuted,
+  setDestination,
+  getBalances,
+  getContributions,
+};

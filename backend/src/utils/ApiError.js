@@ -1,7 +1,12 @@
 class ApiError extends Error {
-  constructor(statusCode, message) {
+  // code: optional machine-readable reason (e.g. 'EMAIL_NOT_VERIFIED') for the
+  // app to branch on, since messages are for people and may be reworded.
+  // data: optional extra fields merged into the error response.
+  constructor(statusCode, message, { code, data } = {}) {
     super(message);
     this.statusCode = statusCode;
+    this.code = code;
+    this.data = data;
     this.isOperational = true;
     Error.captureStackTrace(this, this.constructor);
   }

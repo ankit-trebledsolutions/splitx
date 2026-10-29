@@ -1,3 +1,5 @@
+// Legacy light palette of the first screens (Button, EmptyState, the light
+// TextField variant). The app's real palettes are `dark` and `light` below.
 export const colors = {
   primary: '#4F46E5',
   primaryDark: '#4338CA',
@@ -10,18 +12,11 @@ export const colors = {
   danger: '#DC2626',
 };
 
-// Dark palette used by the Splix auth screens (per Figma).
-export const dark = {
-  background: '#04090C',
-  backgroundAlt: '#0A1614',
-  surface: 'rgba(255,255,255,0.05)',
-  border: 'rgba(255,255,255,0.10)',
-  text: '#F4F7FA',
-  textMuted: '#8A97A6',
-  accentBlue: '#4A7DF7',
-  accentGreen: '#17E695',
-  link: '#5B8CFF',
-};
+// The two palettes and the hooks that hand screens the active one. Screens
+// read colours through useTheme() / useStyles(makeStyles), never from `dark`
+// directly, so the Appearance setting can switch them.
+export { dark, light } from './palettes';
+export { ThemeProvider, useTheme, useThemeMode, useStyles, THEME_MODES } from './ThemeContext';
 
 export const spacing = {
   xs: 4,

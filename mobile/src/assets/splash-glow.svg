@@ -1,0 +1,27 @@
+<svg width="402" height="874" viewBox="0 0 402 874" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Adapted from splash-glow-original.svg (Figma "Group 11" export). The
+     original uses feGaussianBlur filters, which react-native-svg 15.2 /
+     Expo Go cannot render, so each blurred circle is approximated by a
+     radial gradient extended past its original radius. Circle centers,
+     colors, and group opacities are unchanged from the export. -->
+<defs>
+<radialGradient id="glowOuter" cx="50%" cy="50%" r="50%">
+<stop offset="0" stop-color="#00B17C" stop-opacity="1"/>
+<stop offset="0.45" stop-color="#009579" stop-opacity="0.55"/>
+<stop offset="1" stop-color="#007178" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="glowInner" cx="50%" cy="50%" r="50%">
+<stop offset="0" stop-color="#79E4C4" stop-opacity="1"/>
+<stop offset="0.45" stop-color="#55E9DE" stop-opacity="0.55"/>
+<stop offset="1" stop-color="#30EDF8" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<g opacity="0.29">
+<circle cx="57" cy="36" r="341" fill="url(#glowOuter)"/>
+<circle cx="57" cy="36" r="270" fill="url(#glowInner)"/>
+</g>
+<g opacity="0.125">
+<circle cx="305.5" cy="825.5" r="400" fill="url(#glowOuter)"/>
+<circle cx="305.5" cy="825.5" r="306" fill="url(#glowInner)"/>
+</g>
+</svg>

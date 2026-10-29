@@ -1,0 +1,43 @@
+import { ChevronFirst } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { useBranding } from '@/hooks/use-branding';
+import { Button } from '@/components/ui/button';
+import { useLayout } from './context';
+
+export function SidebarHeader() {
+  const { sidebarCollapse, setSidebarCollapse } = useLayout();
+  const { appName, logoUrl } = useBranding();
+
+  const handleToggleClick = () => {
+    setSidebarCollapse(!sidebarCollapse);
+  };
+
+  return (
+    <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
+      {/* The logo and name as set under General Settings > Branding (the
+          Splix mark until an owner changes them). The mark stays when the
+          sidebar is collapsed; the name carries .default-logo, which the
+          layout's CSS hides in that state. Text rather than the wordmark
+          image, so it follows the theme's colour. */}
+      <Link to="/" className="flex items-center gap-2.5">
+        <img src={logoUrl} className="size-7 max-w-none shrink-0 object-contain" alt="" />
+        <span className="default-logo text-lg font-semibold tracking-tight text-foreground">
+          {appName}
+        </span>
+      </Link>
+      <Button
+        onClick={handleToggleClick}
+        size="sm"
+        mode="icon"
+        variant="outline"
+        className={cn(
+          'size-7 absolute start-full top-2/4 rtl:translate-x-2/4 -translate-x-2/4 -translate-y-2/4',
+          sidebarCollapse ? 'ltr:rotate-180' : 'rtl:rotate-180',
+        )}
+      >
+        <ChevronFirst className="size-4!" />
+      </Button>
+    </div>
+  );
+}

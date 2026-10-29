@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The alarm screen: no title bar, the app's dark background behind the
+       system bars, and light icons in them. -->
+  <style name="Theme.SplixAlarm" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@drawable/splix_alarm_bg</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+  </style>
+</resources>

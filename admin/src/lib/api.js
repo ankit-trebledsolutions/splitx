@@ -1,0 +1,69 @@
+import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+// One base query for every feature slice. Previously each *Api.js file built its
+// own, with its own hardcoded fallback URL — so changing the API host meant
+// editing seven files, and a dropped session went unhandled in all of them.
+
+// The panel calls the API on its own origin and something in front forwards
+// /api and /uploads to the real one: the Vite dev server locally (see
+// vite.config.js, which is where VITE_API_URL is read), a rewrite rule on the
+// static host in production. Calling the API's own host directly would make the
+// session cookie a cross-site one, which browsers do not send with sameSite 'lax'.
+export const API_URL = '';
+
+// Everything the panel calls lives under the admin router. Nothing here should
+// ever reach the mobile app's endpoints.
+export const ADMIN_BASE = `${API_URL}/api/v1/admin`;
+
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: ADMIN_BASE,
+  // The session is an httpOnly cookie the panel cannot read, so the browser has
+  // to send it rather than us attaching it by hand.
+  credentials: 'include',
+  prepareHeaders: (headers) => {
+    // Proof to the server that this request came from our own JavaScript: a
+    // cross-site form post cannot set a custom header, and a cross-origin fetch
+    // that tries triggers a preflight only our origin is allowed to pass. Sent
+    // on reads too — the server only enforces it on methods that change state,
+    // and one unconditional header beats threading the method through here.
+    // See backend/src/middleware/adminAuth.js.
+    headers.set('X-Admin-Request', '1');
+    return headers;
+  },
+});
+
+// Session expiry is handled once, here. Without it an expired cookie left the
+// user staring at a page whose every panel had quietly failed.
+let onUnauthorized = null;
+export const setUnauthorizedHandler = (handler) => {
+  onUnauthorized = handler;
+};
+
+export const adminBaseQuery = async (args, api, extraOptions) => {
+  const result = await rawBaseQuery(args, api, extraOptions);
+
+  if (result.error?.status === 401) {
+    // Not on the sign-in request itself, or a wrong password would look like a
+    // dropped session and bounce the user away from the error they need to read.
+    const url = typeof args === 'string' ? args : args.url;
+    if (!String(url).includes('/auth/login')) onUnauthorized?.();
+  }
+
+  return result;
+};
+
+// A stored file's address as the server saved it: absolute when it points at
+// a storage host, or /uploads/... and /media/... on the API, which the dev
+// server and the static host both pass through (see vite.config.js). Same
+// origin, so the panel's own URL base is the right one to put in front.
+export const fileUrl = (url) =>
+  !url ? '' : /^https?:\/\//i.test(url) ? url : `${API_URL}${url}`;
+
+// The API answers { success, data: {...} }. Slices care about the payload, so it
+// is unwrapped here rather than in every endpoint's transformResponse.
+export const unwrap = (response) => response?.data ?? response;
+
+// Errors answer { success: false, message }, which RTK Query nests under
+// `.data` — awkward to read at every call site.
+export const errorMessage = (error, fallback = 'Something went wrong') =>
+  error?.data?.message || error?.error || fallback;

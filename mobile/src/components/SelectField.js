@@ -1,0 +1,164 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { radius, spacing, useStyles, useTheme } from '../theme';
+import useSheetBottom from '../hooks/useSheetBottom';
+
+// Dropdown styled to match TextField's dark variant.
+//   options: [{ label, value }]
+//   renderTrigger: optional ({ open, selected }) => element, for a screen that
+//     already draws its own box and only wants the options sheet behind it.
+//     Call `open` to show the sheet; `selected` is the chosen option, if any.
+const SelectField = ({
+  label,
+  value,
+  options = [],
+  onChange,
+  placeholder = 'Select',
+  style,
+  renderTrigger,
+}) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const { height } = useWindowDimensions();
+  const selected = options.find((o) => o.value === value);
+
+  const show = () => setOpen(true);
+  const sheetBottom = useSheetBottom(spacing.xl);
+
+  const pick = (option) => {
+    onChange?.(option.value);
+    setOpen(false);
+  };
+
+  // A caller's own trigger stands in for the label and the field, and brings
+  // its own spacing: nothing of the default look is drawn around it. Without
+  // one, this renders exactly as it always has.
+  return (
+    <View style={renderTrigger ? style : [styles.wrapper, style]}>
+      {renderTrigger ? (
+        renderTrigger({ open: show, selected })
+      ) : (
+        <>
+          {label ? <Text style={styles.label}>{label}</Text> : null}
+
+          <TouchableOpacity style={styles.field} activeOpacity={0.8} onPress={show}>
+            <Text style={[styles.value, !selected && styles.placeholder]}>
+              {selected ? selected.label : placeholder}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={theme.textMuted} />
+          </TouchableOpacity>
+        </>
+      )}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={styles.backdrop}>
+          {/* Behind the sheet, not around it: on Android a pressable ancestor
+              takes slow drags away from the list, leaving only flicks (see FormSheet). */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          <View style={[styles.sheet, { paddingBottom: sheetBottom }]}>
+            {label ? <Text style={styles.sheetTitle}>{label}</Text> : null}
+            {/* A long list (the 14 days of a trip) scrolls inside the sheet
+                rather than pushing its top off the screen. A short one stays
+                put, as it always has. */}
+            <ScrollView
+              style={{ maxHeight: height * 0.6 }}
+              keyboardShouldPersistTaps="handled"
+              alwaysBounceVertical={false}
+            >
+              {options.map((option) => {
+                const active = option.value === value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={styles.option}
+                    activeOpacity={0.7}
+                    onPress={() => pick(option)}
+                  >
+                    <Text
+                      style={[styles.optionText, active && styles.optionTextActive]}
+                      numberOfLines={1}
+                    >
+                      {option.label}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={18} color={theme.accentGreen} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const makeStyles = (theme) => StyleSheet.create({
+  wrapper: { marginBottom: spacing.md },
+  label: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  value: { color: theme.text, fontSize: 16 },
+  placeholder: { color: theme.textMuted },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: theme.sheet,
+    borderTopLeftRadius: radius.lg + 8,
+    borderTopRightRadius: radius.lg + 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sheetTitle: {
+    color: theme.textMuted,
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: spacing.sm,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  // Shrinks (and truncates) only when a label is too long for the row, so the
+  // check mark stays on screen; short labels lay out as they always have.
+  optionText: { flexShrink: 1, color: theme.text, fontSize: 16 },
+  optionTextActive: { color: theme.accentGreen, fontWeight: '600' },
+});
+
+export default SelectField;

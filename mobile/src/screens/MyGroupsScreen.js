@@ -1,0 +1,343 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  StyleSheet,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import DarkScreen, { TOP_ONLY } from '../components/DarkScreen';
+import SearchField from '../components/SearchField';
+import AiItineraryModal from '../components/AiItineraryModal';
+import { fetchGroups } from '../api/groups.api';
+import { fetchItineraryGeneration } from '../api/itinerary.api';
+import { initials, usd } from '../utils/format';
+import { radius, spacing, useStyles, useTheme } from '../theme';
+import AppAlert from '../components/AppAlert';
+import { useTour } from '../tour/TourProvider';
+import useTourTarget from '../tour/useTourTarget';
+
+// Matches the "You Owe" tile on the Expenses tab.
+
+// What the user still owes, and is still owed, in one group. Both can be true
+// at once (they paid for one thing, someone else for another), so each gets
+// its own line. A group with nothing outstanding says so. The server sends
+// the balance with the group; until it does, the row keeps its arrow.
+const GroupBalance = ({ balance }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  if (!balance) return <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />;
+  const youOwe = balance.youOwe ?? 0;
+  const owedToYou = balance.owedToYou ?? 0;
+  if (youOwe < 0.005 && owedToYou < 0.005) {
+    return <Text style={styles.settled}>Settled up</Text>;
+  }
+  return (
+    <View style={styles.balance}>
+      {youOwe >= 0.005 && (
+        <Text style={styles.balanceLine}>
+          You owe <Text style={[styles.balanceValue, { color: theme.owe }]}>{usd(youOwe)}</Text>
+        </Text>
+      )}
+      {owedToYou >= 0.005 && (
+        <Text style={styles.balanceLine}>
+          You get{' '}
+          <Text style={[styles.balanceValue, { color: theme.accentGreen }]}>{usd(owedToYou)}</Text>
+        </Text>
+      )}
+    </View>
+  );
+};
+
+const MyGroupsScreen = ({ navigation, route }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  const [groups, setGroups] = useState([]);
+  const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [itineraryFor, setItineraryFor] = useState(null);
+
+  // The + button is a stop on the welcome tour, which waits for it while
+  // another screen covers this one.
+  const isFocused = useIsFocused();
+  const { notifyTap } = useTour();
+  const fabRef = useTourTarget('groups-fab', { enabled: isFocused });
+
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const load = useCallback(async () => {
+    try {
+      setGroups(await fetchGroups());
+    } catch (err) {
+      AppAlert.alert('Could not load groups', err.message);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  // Offer the AI itinerary once, right after a trip group is created. The
+  // server is asked first, so nobody is offered a planner that then says it
+  // isn't set up; anything but a clear yes skips the offer without a word.
+  const { newGroupId, offerItinerary } = route.params ?? {};
+  const offerCheckedFor = useRef(null);
+  useEffect(() => {
+    if (!offerItinerary || !newGroupId || offerCheckedFor.current === newGroupId) return;
+    const group = groups.find((g) => g._id === newGroupId);
+    if (!group) return;
+    // `groups` reloads on every focus and re-runs this effect; ask only once.
+    offerCheckedFor.current = newGroupId;
+    fetchItineraryGeneration(newGroupId)
+      .then(({ configured }) => configured === true)
+      .catch(() => false)
+      .then((available) => {
+        if (!mounted.current) return;
+        // The modal draws over any screen, so it only opens while this one is showing.
+        if (available && navigation.isFocused()) setItineraryFor(group);
+        else navigation.setParams({ offerItinerary: false });
+      });
+  }, [offerItinerary, newGroupId, groups, navigation]);
+
+  const dismissItinerary = () => {
+    setItineraryFor(null);
+    navigation.setParams({ offerItinerary: false });
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const visibleGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter((g) => g.name.toLowerCase().includes(q));
+  }, [groups, query]);
+
+  const renderGroup = ({ item }) => {
+    const memberCount = item.members?.length ?? 0;
+    const subtitle =
+      item.description ||
+      `${memberCount} member${memberCount === 1 ? '' : 's'}${
+        item.totalDays ? ` · ${item.totalDays} days` : ''
+      }`;
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() =>
+          navigation.navigate('GroupChat', {
+            groupId: item._id,
+            name: item.name,
+            groupType: item.groupType,
+          })
+        }
+      >
+        <LinearGradient
+          colors={theme.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatar}
+        >
+          <Text style={styles.avatarText}>{initials(item.name)}</Text>
+        </LinearGradient>
+
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={styles.cardSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        </View>
+
+        <GroupBalance balance={item.balance} />
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <DarkScreen edges={TOP_ONLY}>
+      {/* Upper container on the raised card background: header, title, search. */}
+      <View style={styles.topArea}>
+        <View style={styles.headerRow}>
+          {navigation.canGoBack() ? (
+            <TouchableOpacity
+              style={styles.circleButton}
+              onPress={navigation.goBack}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-back" size={18} color={theme.text} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.circleButton} />
+          )}
+          <TouchableOpacity
+            style={styles.circleButton}
+            onPress={() => navigation.navigate('Profile')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="options-outline" size={17} color={theme.text} />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.title}>My Groups</Text>
+        <Text style={styles.subtitle}>
+          You have {groups.length} active group{groups.length === 1 ? '' : 's'} this month
+        </Text>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Find a trip..."
+          style={styles.search}
+        />
+      </View>
+
+      {/* Lower area on the deep base background, holding the group list. */}
+      <View style={styles.panel}>
+        <FlatList
+          data={visibleGroups}
+          keyExtractor={(item) => item._id}
+          renderItem={renderGroup}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textMuted} />
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No groups yet</Text>
+              <Text style={styles.emptyBody}>
+                Create a group or join one with an invite link to start splitting expenses.
+              </Text>
+            </View>
+          }
+        />
+      </View>
+
+      <TouchableOpacity
+        ref={fabRef}
+        style={styles.fab}
+        activeOpacity={0.9}
+        onPress={() => {
+          notifyTap('groups-fab');
+          navigation.navigate('GroupAction');
+        }}
+      >
+        <LinearGradient
+          colors={theme.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fabInner}
+        >
+          <Ionicons name="add" size={28} color="#04121C" />
+        </LinearGradient>
+      </TouchableOpacity>
+
+      <AiItineraryModal
+        visible={!!itineraryFor}
+        groupName={itineraryFor?.name}
+        onAccept={() => {
+          const group = itineraryFor;
+          dismissItinerary();
+          navigation.navigate('AiItineraryPrefs', {
+            groupId: group._id,
+            groupName: group.name,
+            from: 'groups',
+          });
+        }}
+        onSkip={dismissItinerary}
+      />
+    </DarkScreen>
+  );
+};
+
+const makeStyles = (theme) => StyleSheet.create({
+  topArea: { backgroundColor: theme.card, paddingHorizontal: spacing.lg },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  circleButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: theme.background,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  title: { color: theme.text, fontSize: 30, fontWeight: '800', marginTop: spacing.sm },
+  subtitle: { color: theme.textMuted, fontSize: 14, marginTop: spacing.xs },
+  search: { marginTop: spacing.lg, marginBottom: spacing.lg },
+
+  panel: {
+    flex: 1,
+    backgroundColor: theme.background,
+    paddingTop: spacing.md,
+  },
+  list: { paddingHorizontal: spacing.md, paddingBottom: 120 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.overlayFaint,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  avatarText: { color: '#04121C', fontSize: 15, fontWeight: '800' },
+  cardBody: { flex: 1 },
+  cardTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  cardSubtitle: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
+  balance: { alignItems: 'flex-end', marginLeft: spacing.sm },
+  balanceLine: { color: theme.textMuted, fontSize: 12, lineHeight: 18 },
+  balanceValue: { fontSize: 13, fontWeight: '700' },
+  settled: { color: theme.textMuted, fontSize: 12, marginLeft: spacing.sm },
+  empty: { alignItems: 'center', paddingVertical: spacing.xl * 2 },
+  emptyTitle: { color: theme.text, fontSize: 17, fontWeight: '700' },
+  emptyBody: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  fab: { position: 'absolute', right: spacing.lg, bottom: spacing.lg },
+  fabInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+export default MyGroupsScreen;

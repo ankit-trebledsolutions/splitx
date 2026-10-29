@@ -5,22 +5,51 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
-import { forgotPasswordRequest, verifyOtpRequest } from '../api/auth.api';
+import { resendCodeRequest, verifyOtpRequest } from '../api/auth.api';
+import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
 import GradientButton from '../components/GradientButton';
-import { dark, radius, spacing } from '../theme';
+import AuthFooter from '../components/AuthFooter';
+import { radius, spacing, useStyles } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const OTP_LENGTH = 6;
-const RESEND_SECONDS = 45;
+const RESEND_SECONDS = 60; // fallback; the server says how long to wait
 
+/**
+ * The 6-digit code screen, shared by two flows:
+ *   purpose 'verify-email'   sign-up: the right code logs the person in
+ *   purpose 'reset-password' forgot password: the right code leads to New Password
+ */
 const EnterOtpScreen = ({ route, navigation }) => {
-  const { email } = route.params;
+  const styles = useStyles(makeStyles);
+  const { email, purpose = 'reset-password', retryAfter, devOtp } = route.params;
+  const isSignup = purpose === 'verify-email';
+  const { verifyEmail } = useAuth();
   const [otp, setOtp] = useState('');
-  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(retryAfter ?? RESEND_SECONDS);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const inputRef = useRef(null);
+
+  // Open the keyboard once the screen has finished sliding in. autoFocus fires
+  // mid-animation, and Android sometimes drops a focus request made then.
+  useEffect(() => {
+    const focus = () => inputRef.current?.focus();
+    const unsubscribe = navigation.addListener('transitionEnd', focus);
+    // Fallback for when there is no transition to wait for (e.g. deep link).
+    const timer = setTimeout(focus, 600);
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
+  }, [navigation]);
+
+  // Only ever set when the server has no email provider configured (development).
+  useEffect(() => {
+    if (devOtp) AppAlert.alert('Development code', `No email provider is set up, so here is your code: ${devOtp}`);
+  }, [devOtp]);
 
   useEffect(() => {
     if (secondsLeft <= 0) return undefined;
@@ -30,53 +59,54 @@ const EnterOtpScreen = ({ route, navigation }) => {
 
   const handleVerify = async () => {
     if (otp.length !== OTP_LENGTH) {
-      Alert.alert('Incomplete code', `Enter the ${OTP_LENGTH}-digit code.`);
+      AppAlert.alert('Incomplete code', `Enter the ${OTP_LENGTH}-digit code.`);
       return;
     }
     setLoading(true);
     try {
-      const { resetToken } = await verifyOtpRequest(email, otp);
-      navigation.navigate('ResetPassword', { resetToken });
+      if (isSignup) {
+        // Success sets the signed-in user, and the navigator swaps to the app.
+        await verifyEmail(email, otp);
+      } else {
+        const { resetToken } = await verifyOtpRequest(email, otp);
+        navigation.navigate('ResetPassword', { resetToken });
+      }
     } catch (err) {
-      Alert.alert('Verification failed', err.message);
+      setOtp('');
+      AppAlert.alert('Verification failed', err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    if (resending) return;
+    setResending(true);
     try {
-      const data = await forgotPasswordRequest(email);
-      if (data.devOtp) {
-        Alert.alert('Development OTP', `Your code is ${data.devOtp}`);
-      }
+      const data = await resendCodeRequest(email, purpose);
+      if (data.devOtp) AppAlert.alert('Development code', `Your new code is ${data.devOtp}`);
+      else AppAlert.alert('Code sent', `We sent a new code to ${email}.`);
       setOtp('');
-      setSecondsLeft(RESEND_SECONDS);
+      setSecondsLeft(data.retryAfter ?? RESEND_SECONDS);
     } catch (err) {
-      Alert.alert('Could not resend code', err.message);
+      // Asked too soon: line the countdown up with the server's clock.
+      if (err.code === 'OTP_COOLDOWN') setSecondsLeft(err.details.retryAfter);
+      AppAlert.alert('Could not resend code', err.message);
+    } finally {
+      setResending(false);
     }
   };
 
-  const timerLabel = `0:${String(Math.max(secondsLeft, 0)).padStart(2, '0')}`;
+  const shown = Math.max(secondsLeft, 0);
+  const timerLabel = `${Math.floor(shown / 60)}:${String(shown % 60).padStart(2, '0')}`;
 
   return (
-    <AuthLayout title="Enter OTP" subtitle="We have sent a 6-digit code to your email address">
-      {/* Hidden input drives the six display boxes below. */}
-      <TextInput
-        ref={inputRef}
-        value={otp}
-        onChangeText={(text) => setOtp(text.replace(/\D/g, '').slice(0, OTP_LENGTH))}
-        keyboardType="number-pad"
-        maxLength={OTP_LENGTH}
-        style={styles.hiddenInput}
-        autoFocus
-      />
-
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.boxesRow}
-        onPress={() => inputRef.current?.focus()}
-      >
+    <AuthLayout
+      title={isSignup ? 'Verify your email' : 'Enter OTP'}
+      subtitle={`We sent a 6-digit code to ${email}. It expires in 10 minutes.`}
+      onBack={navigation.canGoBack() ? navigation.goBack : undefined}
+    >
+      <View style={styles.boxesRow}>
         {Array.from({ length: OTP_LENGTH }).map((_, i) => {
           const digit = otp[i];
           const isActive = i === otp.length && otp.length < OTP_LENGTH;
@@ -89,7 +119,26 @@ const EnterOtpScreen = ({ route, navigation }) => {
             </View>
           );
         })}
-      </TouchableOpacity>
+
+        {/* The real input, stretched invisibly over the boxes so a tap lands on
+            it directly. The system then opens the keyboard itself, every time.
+            Calling focus() from a tap handler instead does nothing once the
+            input is already focused, i.e. after the keyboard has been dismissed. */}
+        <TextInput
+          ref={inputRef}
+          value={otp}
+          // No maxLength: a pasted "Your code is 482913" must reach the digit filter whole.
+          onChangeText={(text) => setOtp(text.replace(/\D/g, '').slice(0, OTP_LENGTH))}
+          keyboardType="number-pad"
+          textContentType="oneTimeCode"
+          autoComplete="one-time-code"
+          importantForAutofill="yes"
+          caretHidden
+          selectionColor="transparent"
+          underlineColorAndroid="transparent"
+          style={styles.overlayInput}
+        />
+      </View>
 
       <View style={styles.resendRow}>
         {secondsLeft > 0 ? (
@@ -104,17 +153,33 @@ const EnterOtpScreen = ({ route, navigation }) => {
       </View>
 
       <View style={styles.spacer} />
-      <GradientButton title="Verify" onPress={handleVerify} loading={loading} />
+      <GradientButton
+        title={isSignup ? 'Verify & Continue' : 'Verify'}
+        onPress={handleVerify}
+        loading={loading}
+      />
+      <AuthFooter
+        text="Didn't receive it? Check your spam folder, or"
+        linkText="Resend"
+        onPress={() =>
+          secondsLeft > 0
+            ? AppAlert.alert('Please wait', `You can resend the code in ${timerLabel}.`)
+            : handleResend()
+        }
+      />
     </AuthLayout>
   );
 };
 
-const styles = StyleSheet.create({
-  hiddenInput: {
-    position: 'absolute',
-    opacity: 0,
-    height: 1,
-    width: 1,
+const makeStyles = (theme) => StyleSheet.create({
+  // Covers the whole row of boxes. Transparent rather than opacity: 0, which
+  // some Android versions treat as not worth focusing.
+  overlayInput: {
+    ...StyleSheet.absoluteFillObject,
+    color: 'transparent',
+    backgroundColor: 'transparent',
+    fontSize: 1,
+    padding: 0,
   },
   boxesRow: {
     flexDirection: 'row',
@@ -125,17 +190,17 @@ const styles = StyleSheet.create({
     flex: 1,
     aspectRatio: 0.82,
     borderRadius: radius.md,
-    backgroundColor: dark.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1.5,
-    borderColor: dark.border,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxFilled: { borderColor: dark.accentGreen },
-  boxDigit: { color: dark.text, fontSize: 28, fontWeight: '700' },
+  boxFilled: { borderColor: theme.accentGreen },
+  boxDigit: { color: theme.text, fontSize: 28, fontWeight: '700' },
   resendRow: { alignItems: 'center', marginTop: spacing.xl },
-  resendText: { color: dark.textMuted, fontSize: 15 },
-  resendTimer: { color: dark.accentGreen, fontSize: 15, fontWeight: '600' },
+  resendText: { color: theme.textMuted, fontSize: 15 },
+  resendTimer: { color: theme.accentGreen, fontSize: 15, fontWeight: '600' },
   spacer: { flex: 1, minHeight: spacing.xl },
 });
 

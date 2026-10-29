@@ -2,12 +2,54 @@ const { Router } = require('express');
 const authRoutes = require('./auth.routes');
 const groupRoutes = require('./group.routes');
 const expenseRoutes = require('./expense.routes');
+const taskRoutes = require('./task.routes');
+const reminderRoutes = require('./reminder.routes');
+const itineraryRoutes = require('./itinerary.routes');
+const photoRoutes = require('./photo.routes');
+const attractionRoutes = require('./attraction.routes');
+const stayRoutes = require('./stay.routes');
+const notificationRoutes = require('./notification.routes');
+const supportRoutes = require('./support.routes');
+const streamRoutes = require('./stream.routes');
+const homeRoutes = require('./home.routes');
+const directRoutes = require('./direct.routes');
+const tripRoutes = require('./trip.routes');
+const walletRoutes = require('./wallet.routes');
+const appRoutes = require('./app.routes');
+const regionRoutes = require('./region.routes');
+const adminRoutes = require('./admin.routes');
+const { appVersionGate } = require('../middleware/appVersion');
 
 const router = Router();
 
 router.get('/health', (_req, res) => res.json({ success: true, status: 'ok' }));
+// Where the newest app build is. Ahead of the gate below on purpose: a build
+// that is too old for everything else must still be able to ask.
+router.use('/app', appRoutes);
+// Force update: an app build below the lowest one an owner still allows is
+// answered 426 APP_UPDATE_REQUIRED from here on, whatever it asked for.
+// Requests that name no build (the admin panel, curl) are untouched.
+router.use(appVersionGate);
 router.use('/auth', authRoutes);
 router.use('/groups', groupRoutes);
 router.use('/expenses', expenseRoutes);
+router.use('/tasks', taskRoutes);
+router.use('/reminders', reminderRoutes);
+router.use('/itinerary-days', itineraryRoutes);
+router.use('/photos', photoRoutes);
+router.use('/attractions', attractionRoutes);
+router.use('/stays', stayRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/support', supportRoutes);
+router.use('/stream', streamRoutes);
+router.use('/home', homeRoutes);
+router.use('/conversations', directRoutes);
+router.use('/trips', tripRoutes);
+router.use('/wallet', walletRoutes);
+// The country and state lists a trip's destination is picked from.
+router.use('/places', regionRoutes);
+// Admin panel. Guarded inside by adminProtect rather than `protect`: the panel
+// is a browser holding a cookie, the app is a client holding a Bearer token.
+router.use('/admin', adminRoutes);
 
 module.exports = router;

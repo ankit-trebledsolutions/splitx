@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme';
+import usePushNotifications from '../hooks/usePushNotifications';
+import useReminderAlarms from '../hooks/useReminderAlarms';
+import useIncomingCalls from '../hooks/useIncomingCalls';
+import { useTheme } from '../theme';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -9,17 +12,44 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import EnterOtpScreen from '../screens/EnterOtpScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import PasswordChangedScreen from '../screens/PasswordChangedScreen';
-import GroupsScreen from '../screens/GroupsScreen';
-import GroupDetailScreen from '../screens/GroupDetailScreen';
+import CompleteProfileScreen from '../screens/CompleteProfileScreen';
+import MainTabs from './MainTabs';
+import GroupActionScreen from '../screens/GroupActionScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
+import InviteFriendsScreen from '../screens/InviteFriendsScreen';
+import JoinGroupScreen from '../screens/JoinGroupScreen';
+import GroupChatScreen from '../screens/GroupChatScreen';
+import DirectChatScreen from '../screens/DirectChatScreen';
+import GroupDetailScreen from '../screens/GroupDetailScreen';
+import MemberProfileScreen from '../screens/MemberProfileScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import NotificationDetailScreen from '../screens/NotificationDetailScreen';
+import EditItineraryDayScreen from '../screens/EditItineraryDayScreen';
+import AddActivityScreen from '../screens/AddActivityScreen';
+import AiItineraryPrefsScreen from '../screens/AiItineraryPrefsScreen';
+import UploadPhotosScreen from '../screens/UploadPhotosScreen';
+import FaceScanScreen from '../screens/FaceScanScreen';
+import TaskDetailScreen from '../screens/TaskDetailScreen';
+import RemindersScreen from '../screens/RemindersScreen';
+import ContributionsScreen from '../screens/ContributionsScreen';
+import ContactUsScreen from '../screens/ContactUsScreen';
+import ReportProblemScreen from '../screens/ReportProblemScreen';
+import MyReportsScreen from '../screens/MyReportsScreen';
+import ReportDetailScreen from '../screens/ReportDetailScreen';
+import WalletScreen from '../screens/WalletScreen';
+import CallScreen from '../screens/CallScreen';
+import FaqScreen from '../screens/FaqScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 
 const Stack = createNativeStackNavigator();
 
 const MIN_SPLASH_MS = 1500;
 
 const RootNavigator = () => {
+  const theme = useTheme();
   const { user, isLoading } = useAuth();
   const [splashDone, setSplashDone] = useState(false);
 
@@ -28,6 +58,12 @@ const RootNavigator = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  const ready = Boolean(user) && !isLoading && splashDone;
+  usePushNotifications({ userId: user?._id, ready });
+  // After the push hook: its notification prompt goes first (see the hook).
+  useReminderAlarms({ userId: user?._id, ready });
+  useIncomingCalls({ userId: user?._id, ready });
+
   if (isLoading || !splashDone) {
     return <SplashScreen />;
   }
@@ -35,31 +71,167 @@ const RootNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerTintColor: colors.text,
+        headerTintColor: theme.text,
         headerTitleStyle: { fontWeight: '600' },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: theme.background },
       }}
     >
-      {user ? (
+      {/* `=== false`, not falsy: a user saved on the phone before the server
+          sent this flag must not be held here while offline. The next answer
+          from the server refreshes it. */}
+      {user && user.profileComplete === false ? (
+        <Stack.Screen
+          name="CompleteProfile"
+          component={CompleteProfileScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+      ) : user ? (
         <>
-          <Stack.Screen name="Groups" component={GroupsScreen} options={{ title: 'Splix' }} />
+          <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
-            name="GroupDetail"
-            component={GroupDetailScreen}
-            options={({ route }) => ({ title: route.params?.name || 'Group' })}
+            name="GroupAction"
+            component={GroupActionScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="CreateGroup"
             component={CreateGroupScreen}
-            options={{ title: 'New group', presentation: 'modal' }}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GroupInvite"
+            component={InviteFriendsScreen}
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="InviteFriends"
+            component={InviteFriendsScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Where an invite link lands. Opened by MainTabs (see src/invites). */}
+          <Stack.Screen
+            name="JoinGroup"
+            component={JoinGroupScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GroupChat"
+            component={GroupChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="DirectChat"
+            component={DirectChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GroupDetail"
+            component={GroupDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MemberProfile"
+            component={MemberProfileScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="AddExpense"
             component={AddExpenseScreen}
-            options={{ title: 'Add expense', presentation: 'modal' }}
+            options={{ headerShown: false, presentation: 'modal' }}
           />
-          <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+          <Stack.Screen
+            name="ExpenseDetail"
+            component={ExpenseDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NotificationDetail"
+            component={NotificationDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="EditItineraryDay"
+            component={EditItineraryDayScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AddActivity"
+            component={AddActivityScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AiItineraryPrefs"
+            component={AiItineraryPrefsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="UploadPhotos"
+            component={UploadPhotosScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="FaceScan"
+            component={FaceScanScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="TaskDetail"
+            component={TaskDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Reminders"
+            component={RemindersScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Contributions"
+            component={ContributionsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Call"
+            component={CallScreen}
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="ContactUs"
+            component={ContactUsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportProblem"
+            component={ReportProblemScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MyReports"
+            component={MyReportsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReportDetail"
+            component={ReportDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="Wallet" component={WalletScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Faq" component={FaqScreen} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="PrivacyPolicy"
+            component={PrivacyPolicyScreen}
+            options={{ headerShown: false }}
+          />
         </>
       ) : (
         <>

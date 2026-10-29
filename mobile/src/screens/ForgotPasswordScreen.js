@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { forgotPasswordRequest } from '../api/auth.api';
 import AuthLayout from '../components/AuthLayout';
-import DarkTextField from '../components/DarkTextField';
+import TextField from '../components/TextField';
 import GradientButton from '../components/GradientButton';
+import AuthFooter from '../components/AuthFooter';
 import { spacing } from '../theme';
+import AppAlert from '../components/AppAlert';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -12,19 +14,30 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   const handleSendOtp = async () => {
     if (!email.trim()) {
-      Alert.alert('Missing email', 'Please enter your email address.');
+      AppAlert.alert('Missing email', 'Please enter your email address.');
       return;
     }
     setLoading(true);
     try {
       const data = await forgotPasswordRequest(email.trim());
-      // Backend returns the OTP in development since no mail provider is set up.
-      if (data.devOtp) {
-        Alert.alert('Development OTP', `Your code is ${data.devOtp}`);
-      }
-      navigation.navigate('EnterOtp', { email: email.trim() });
+      navigation.navigate('EnterOtp', {
+        email: email.trim().toLowerCase(),
+        purpose: 'reset-password',
+        retryAfter: data.retryAfter,
+        devOtp: data.devOtp,
+      });
     } catch (err) {
-      Alert.alert('Could not send code', err.message);
+      // A code went out moments ago: it is still valid, so carry on to the code
+      // screen rather than leaving them stuck here.
+      if (err.code === 'OTP_COOLDOWN') {
+        navigation.navigate('EnterOtp', {
+          email: email.trim().toLowerCase(),
+          purpose: 'reset-password',
+          retryAfter: err.details.retryAfter,
+        });
+        return;
+      }
+      AppAlert.alert('Could not send code', err.message);
     } finally {
       setLoading(false);
     }
@@ -33,9 +46,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
   return (
     <AuthLayout
       title="Forgot Password"
-      subtitle="Enter your email address to receive a password reset link"
+      subtitle="Enter your email address and we'll send you a 6-digit code to reset your password"
     >
-      <DarkTextField
+      <TextField
         label="Email Address"
         value={email}
         onChangeText={setEmail}
@@ -46,6 +59,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
       />
       <View style={styles.spacer} />
       <GradientButton title="Send OTP" onPress={handleSendOtp} loading={loading} />
+      <AuthFooter
+        text="Remember your password?"
+        linkText="Back to Login"
+        onPress={() => navigation.goBack()}
+      />
     </AuthLayout>
   );
 };

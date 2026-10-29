@@ -1,23 +1,75 @@
 const Group = require('../models/Group');
 const Expense = require('../models/Expense');
+const Task = require('../models/Task');
+const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
+const notificationService = require('./notification.service');
+const reminderSync = require('./reminderSync.service');
+const regions = require('./regions.service');
 
-const MEMBER_FIELDS = 'name email';
+const MEMBER_FIELDS = 'name email lastSeenAt';
 
-const createGroup = async (userId, { name, description }) => {
+/**
+ * What a trip's destination becomes on the group. Picked from the lists
+ * (`destination`: a country code and maybe a state code), it is checked
+ * against them, given its names, and written as text too, which is what every
+ * screen shows. Typed text alone (`location`, from older app builds and the
+ * AI planner) is kept as it is, with no picked destination.
+ */
+const destinationFields = ({ destination, location } = {}) => {
+  if (destination?.countryCode) {
+    const picked = regions.resolve(destination);
+    return { destination: picked, location: regions.labelOf(picked) };
+  }
+  return { destination: null, location: String(location ?? '').trim() };
+};
+
+const createGroup = async (userId, { name, description, groupType, totalDays, startDate, location, destination }) => {
   const group = await Group.create({
     name,
     description,
+    groupType,
+    totalDays: groupType === 'trip' ? totalDays : null,
+    startDate: groupType === 'trip' ? startDate : null,
+    ...(groupType === 'trip' ? destinationFields({ destination, location }) : { destination: null, location: '' }),
     createdBy: userId,
+    admin: userId,
     members: [userId],
   });
   return group.populate('members', MEMBER_FIELDS);
 };
 
-const listGroupsForUser = (userId) =>
-  Group.find({ members: userId })
+/**
+ * Every group the user belongs to, newest activity first. Each one carries
+ * what the user still owes and is still owed in it (see outstandingShares),
+ * found with a single expense query across all of their groups, so the
+ * groups list can show a balance per group without a request per group.
+ */
+const listGroupsForUser = async (userId) => {
+  const groups = await Group.find({ members: userId })
     .populate('members', MEMBER_FIELDS)
     .sort({ updatedAt: -1 });
+  if (!groups.length) return [];
+
+  const expenses = await Expense.find({
+    group: { $in: groups.map((g) => g._id) },
+    'splits.settled': false,
+  })
+    .select('group paidBy splits')
+    .lean();
+
+  const byGroup = new Map();
+  for (const expense of expenses) {
+    const key = expense.group.toString();
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key).push(expense);
+  }
+
+  return groups.map((group) => ({
+    ...group.toJSON(),
+    balance: outstandingShares(byGroup.get(group._id.toString()) ?? [], userId),
+  }));
+};
 
 const getGroupForMember = async (groupId, userId) => {
   const group = await Group.findById(groupId).populate('members', MEMBER_FIELDS);
@@ -25,6 +77,55 @@ const getGroupForMember = async (groupId, userId) => {
   const isMember = group.members.some((m) => m._id.equals(userId));
   if (!isMember) throw ApiError.forbidden('You are not a member of this group');
   return group;
+};
+
+/**
+ * The itinerary and attractions belong to trips. The app hides those tabs for
+ * every other kind of group; this is the same rule for anything that reaches
+ * the API another way. Only adding is refused: whatever an older group already
+ * holds can still be read and removed.
+ */
+const assertTripGroup = (group, message) => {
+  if (group.groupType !== 'trip') throw new ApiError(400, message, { code: 'TRIP_ONLY' });
+};
+
+// How many members an invite preview names; the rest are a count.
+const INVITE_PREVIEW_MEMBERS = 6;
+
+/**
+ * What an invite link shows before anyone joins: the group, who runs it and
+ * who is in it. Nothing in it is private to members (the invite message
+ * already names the group), and nothing changes. `userId` may be null (the
+ * public page a link opens in a browser), in which case `alreadyMember` is
+ * simply false.
+ */
+const previewInvite = async (inviteCode, userId) => {
+  const group = await Group.findOne({ inviteCode: String(inviteCode).trim().toUpperCase() })
+    .populate('members', 'name avatar')
+    .populate('createdBy', 'name')
+    .populate('admin', 'name')
+    .lean();
+  if (!group) throw new ApiError(404, 'This invite link is not valid', { code: 'INVITE_NOT_FOUND' });
+  const admin = group.admin ?? group.createdBy;
+  const members = group.members ?? [];
+  return {
+    code: group.inviteCode,
+    group: {
+      _id: group._id,
+      name: group.name,
+      description: group.description ?? '',
+      groupType: group.groupType,
+      location: group.location ?? '',
+      startDate: group.startDate ?? null,
+      totalDays: group.totalDays ?? null,
+      memberCount: members.length,
+      members: members
+        .slice(0, INVITE_PREVIEW_MEMBERS)
+        .map((m) => ({ _id: m._id, name: m.name, avatar: m.avatar ?? null })),
+    },
+    invitedBy: admin ? { _id: admin._id, name: admin.name } : null,
+    alreadyMember: Boolean(userId) && members.some((m) => sameId(m._id, userId)),
+  };
 };
 
 const joinGroupByCode = async (userId, inviteCode) => {
@@ -35,45 +136,228 @@ const joinGroupByCode = async (userId, inviteCode) => {
   }
   group.members.push(userId);
   await group.save();
-  return group.populate('members', MEMBER_FIELDS);
+  await group.populate('members', MEMBER_FIELDS);
+  // The group's reminders now ring for them too.
+  reminderSync.refresh([userId]);
+
+  const joiner = group.members.find((m) => m._id.equals(userId));
+  await notificationService.notifyGroup({
+    groupId: group._id,
+    actorId: userId,
+    type: 'member',
+    title: 'Friend Joined the Group',
+    body: `${joiner?.name ?? 'Someone'} has joined your "${group.name}" group.`,
+  });
+
+  return group;
 };
 
-const leaveGroup = async (groupId, userId) => {
+const sameId = (a, b) => a.toString() === b.toString();
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * What a member still owes, and is still owed, across some expenses. Only
+ * unsettled shares count: their share of someone else's expense is money they
+ * owe, and another member's share of their expense is money owed to them.
+ * Their own share of their own expense is neither. This is the same rule the
+ * Home tab's net balance and the Expenses tab's tiles use.
+ */
+const outstandingShares = (expenses, userId) => {
+  let youOwe = 0;
+  let owedToYou = 0;
+  for (const expense of expenses) {
+    const paid = sameId(expense.paidBy, userId);
+    for (const split of expense.splits) {
+      if (split.settled) continue;
+      const mine = sameId(split.user, userId);
+      if (paid && !mine) owedToYou += split.amount;
+      else if (!paid && mine) youOwe += split.amount;
+    }
+  }
+  return { youOwe: round2(youOwe), owedToYou: round2(owedToYou), net: round2(owedToYou - youOwe) };
+};
+
+/**
+ * Everything a member still owes or is owed in a group, as one sum: the amount
+ * that has to reach zero before they can leave or be removed.
+ */
+const outstandingFor = async (groupId, userId) => {
+  const expenses = await Expense.find({ group: groupId, 'splits.settled': false })
+    .select('paidBy splits')
+    .lean();
+  const { youOwe, owedToYou } = outstandingShares(expenses, userId);
+  return round2(youOwe + owedToYou);
+};
+
+// Takes someone out of the group document and off its live chat room.
+const detachMember = async (group, userId) => {
+  group.members = group.members.filter((m) => !sameId(m._id, userId));
+  group.mutedBy = group.mutedBy.filter((m) => !sameId(m, userId));
+  await group.save();
+  // Required lazily: the realtime layer, message service and reminder service
+  // all depend on this module.
+  require('../realtime/socket').removeFromGroup(userId, group._id);
+  await require('./reminder.service').forgetMember(group._id, userId);
+};
+
+const postSystem = (groupId, text) => require('./message.service').postSystem(groupId, text);
+
+/**
+ * Leave a group. An admin hands the role over on the way out: automatically
+ * when only one other member remains, otherwise to the `newAdminId` they chose.
+ */
+const leaveGroup = async (groupId, userId, { newAdminId } = {}) => {
   const group = await getGroupForMember(groupId, userId);
-  const balances = await computeBalances(groupId);
-  const mine = balances.find((b) => b.user._id.equals(userId));
-  if (mine && Math.abs(mine.net) >= 0.01) {
+  if ((await outstandingFor(groupId, userId)) >= 0.01) {
     throw ApiError.badRequest('Settle your balance before leaving the group');
   }
-  group.members = group.members.filter((m) => !m._id.equals(userId));
-  await group.save();
+
+  const leaver = group.members.find((m) => sameId(m._id, userId));
+  const others = group.members.filter((m) => !sameId(m._id, userId));
+
+  let nextAdmin = null;
+  if (sameId(group.adminId, userId) && others.length) {
+    if (others.length === 1) [nextAdmin] = others;
+    else {
+      if (!newAdminId) throw ApiError.badRequest('Choose a new admin before leaving the group');
+      nextAdmin = others.find((m) => sameId(m._id, newAdminId));
+      if (!nextAdmin) throw ApiError.badRequest('The new admin must be a member of this group');
+    }
+    group.admin = nextAdmin._id;
+  }
+
+  await detachMember(group, userId);
+
+  await postSystem(groupId, `${leaver.name} left the group`);
+  if (nextAdmin) await postSystem(groupId, `${nextAdmin.name} is now the group admin`);
+
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: userId,
+    type: 'member',
+    title: 'Member Left',
+    body: nextAdmin
+      ? `${leaver.name} left "${group.name}". ${nextAdmin.name} is now the admin.`
+      : `${leaver.name} left "${group.name}".`,
+  });
+
   return group;
+};
+
+// Admin only. The removed person is told directly, since they are no longer in the group.
+const removeMember = async (groupId, adminId, memberId) => {
+  const group = await getGroupForMember(groupId, adminId);
+  if (!sameId(group.adminId, adminId)) {
+    throw ApiError.forbidden('Only the group admin can remove members');
+  }
+  if (sameId(memberId, adminId)) throw ApiError.badRequest('Use leave group to remove yourself');
+
+  const member = group.members.find((m) => sameId(m._id, memberId));
+  if (!member) throw ApiError.notFound('That person is not a member of this group');
+  if ((await outstandingFor(groupId, memberId)) >= 0.01) {
+    throw ApiError.badRequest(`Settle ${member.name}'s balance before removing them`);
+  }
+
+  const admin = group.members.find((m) => sameId(m._id, adminId));
+  await detachMember(group, memberId);
+
+  await postSystem(groupId, `${member.name} was removed by ${admin.name}`);
+
+  await notificationService.notifyUser({
+    userId: memberId,
+    type: 'member',
+    title: 'Removed from Group',
+    body: `${admin.name} removed you from "${group.name}".`,
+  });
+  await notificationService.notifyGroup({
+    groupId,
+    actorId: adminId,
+    type: 'member',
+    title: 'Member Removed',
+    body: `${member.name} was removed from "${group.name}" by ${admin.name}.`,
+  });
+
+  return group;
+};
+
+// Muting silences device pushes and other members' reminder alarms; the in-app
+// notification list still fills.
+const setMuted = async (groupId, userId, muted) => {
+  await getGroupForMember(groupId, userId);
+  await Group.updateOne(
+    { _id: groupId },
+    muted ? { $addToSet: { mutedBy: userId } } : { $pull: { mutedBy: userId } }
+  );
+  reminderSync.refresh([userId]);
+  return { muted };
+};
+
+/**
+ * Fills in or changes a trip's destination after the fact. Admin only, like
+ * the other things that change a group for everyone; trips only, because
+ * nothing else reads it. Takes what createGroup takes: a picked country and
+ * state, or typed text. The AI planner writes the text field on a successful
+ * plan (see savePlan in aiItinerary.service).
+ */
+const setDestination = async (groupId, userId, body) => {
+  const group = await getGroupForMember(groupId, userId);
+  assertTripGroup(group, 'Only trip groups have a destination.');
+  if (!sameId(group.adminId, userId)) {
+    throw new ApiError(403, 'Only the group admin can change the destination.', {
+      code: 'DESTINATION_FORBIDDEN',
+    });
+  }
+  Object.assign(group, destinationFields(body));
+  // Not activity in the group: it must not jump to the top of the list.
+  await group.save({ timestamps: false });
+  return group;
+};
+
+/**
+ * The people behind some user ids, as MEMBER_FIELDS documents: the group's
+ * members as already loaded, plus one lookup for anyone who has since left.
+ */
+const peopleIn = async (group, userIds) => {
+  const people = new Map(group.members.map((m) => [m._id.toString(), m]));
+  const missing = userIds.filter((id) => !people.has(id));
+  if (missing.length) {
+    const former = await User.find({ _id: { $in: missing } }).select(MEMBER_FIELDS);
+    for (const person of former) people.set(person._id.toString(), person);
+  }
+  return people;
 };
 
 /**
  * Net balance per member: positive = the group owes them, negative = they owe.
  * Also returns a minimal list of settlement transfers (greedy matching).
  */
-const computeBalances = async (groupId) => {
-  const expenses = await Expense.find({ group: groupId })
-    .populate('paidBy', MEMBER_FIELDS)
-    .populate('splits.user', MEMBER_FIELDS);
+const computeBalances = async (group) => {
+  // Plain ids and amounts only, rather than every expense with its payer and
+  // shares populated: that took seconds for a big group, on the one thread
+  // every other request needs.
+  const expenses = await Expense.find({ group: group._id })
+    .select('paidBy amount splits.user splits.amount')
+    .lean();
 
-  const net = new Map(); // userId -> { user, net }
-  const touch = (user) => {
-    const key = user._id.toString();
-    if (!net.has(key)) net.set(key, { user, net: 0 });
-    return net.get(key);
+  const net = new Map(); // userId -> net, in order of first appearance
+  const add = (userId, amount) => {
+    const key = userId.toString();
+    net.set(key, (net.get(key) ?? 0) + amount);
   };
 
   for (const expense of expenses) {
-    touch(expense.paidBy).net += expense.amount;
-    for (const split of expense.splits) {
-      touch(split.user).net -= split.amount;
+    add(expense.paidBy, expense.amount);
+    for (const split of expense.splits ?? []) {
+      add(split.user, -split.amount);
     }
   }
 
-  const balances = [...net.values()].map((b) => ({ ...b, net: Math.round(b.net * 100) / 100 }));
+  const people = await peopleIn(group, [...net.keys()]);
+  const balances = [...net.entries()]
+    // Someone whose account is gone has nobody to show.
+    .filter(([userId]) => people.has(userId))
+    .map(([userId, amount]) => ({ user: people.get(userId), net: Math.round(amount * 100) / 100 }));
 
   // Greedy settlement: repeatedly match the largest debtor with the largest creditor.
   const debtors = balances.filter((b) => b.net < -0.005).map((b) => ({ ...b }));
@@ -101,16 +385,123 @@ const computeBalances = async (groupId) => {
 };
 
 const getBalances = async (groupId, userId) => {
-  await getGroupForMember(groupId, userId);
-  const balances = await computeBalances(groupId);
+  const group = await getGroupForMember(groupId, userId);
+  const balances = await computeBalances(group);
   return { balances: [...balances], settlements: balances.settlements };
+};
+
+// Ignore net differences under this when deciding contribution badges.
+const MONEY_EPSILON = 5;
+
+/**
+ * The contribution dashboard: money fairness (paid vs fair share) combined
+ * with effort fairness (tasks done vs assigned), per member and group-wide.
+ */
+const getContributions = async (groupId, userId) => {
+  const group = await getGroupForMember(groupId, userId);
+  // Just the fields counted below, as plain objects.
+  const [expenses, tasks] = await Promise.all([
+    Expense.find({ group: groupId }).select('amount paidBy splits.user splits.amount').lean(),
+    Task.find({ group: groupId }).select('assignees createdBy status').lean(),
+  ]);
+
+  const totalExpenses = round2(expenses.reduce((sum, e) => sum + e.amount, 0));
+  const tasksTotal = tasks.length;
+  const tasksCompleted = tasks.filter((t) => t.status === 'done').length;
+
+  // Seed one stat row per member so members with no activity still appear.
+  const stats = new Map();
+  for (const member of group.members) {
+    stats.set(member._id.toString(), {
+      user: member,
+      paid: 0,
+      fairShare: 0,
+      tasksAssigned: 0,
+      tasksDone: 0,
+    });
+  }
+
+  for (const expense of expenses) {
+    const payer = stats.get(expense.paidBy.toString());
+    if (payer) payer.paid += expense.amount;
+    for (const split of expense.splits ?? []) {
+      const owner = stats.get(split.user.toString());
+      if (owner) owner.fairShare += split.amount;
+    }
+  }
+
+  for (const task of tasks) {
+    // Unassigned tasks count toward whoever created them.
+    const owners = task.assignees?.length ? task.assignees : [task.createdBy];
+    for (const ownerId of owners) {
+      const owner = stats.get(ownerId.toString());
+      if (!owner) continue;
+      owner.tasksAssigned += 1;
+      if (task.status === 'done') owner.tasksDone += 1;
+    }
+  }
+
+  const members = [...stats.values()]
+    .map((s) => {
+      const net = round2(s.paid - s.fairShare);
+      let badge = 'balanced';
+      if (net < -MONEY_EPSILON) badge = 'owes-balance';
+      else if (net > MONEY_EPSILON) badge = 'contributed-extra';
+      else if (s.tasksAssigned > 0 && s.tasksDone / s.tasksAssigned < 0.5) badge = 'owes-effort';
+      return {
+        user: s.user,
+        expensesPaid: round2(s.paid),
+        fairShare: round2(s.fairShare),
+        net,
+        tasksAssigned: s.tasksAssigned,
+        tasksDone: s.tasksDone,
+        badge,
+      };
+    })
+    .sort((a, b) => b.expensesPaid - a.expensesPaid);
+
+  // Minimal total transfer to make everyone even (sum of what debtors owe).
+  const adjustmentsNeeded = round2(
+    members.reduce((sum, m) => sum + Math.max(0, -m.net), 0)
+  );
+
+  // Balance score: half money fairness, half task completion.
+  const moneyScore = totalExpenses > 0 ? Math.max(0, 1 - adjustmentsNeeded / totalExpenses) : 1;
+  const taskScore = tasksTotal > 0 ? tasksCompleted / tasksTotal : 1;
+  const score = Math.round(((moneyScore + taskScore) / 2) * 100);
+
+  const statusLabel = score >= 90 ? 'Fair' : score >= 70 ? 'Uneven' : 'Unbalanced';
+  const headline =
+    score >= 90 ? 'Almost Perfectly Balanced' : score >= 70 ? 'Slightly Uneven' : 'Time to Settle Up';
+
+  const me = members.find((m) => m.user._id.equals(userId)) ?? null;
+
+  return {
+    totalExpenses,
+    tasksCompleted,
+    tasksTotal,
+    score,
+    statusLabel,
+    headline,
+    adjustmentsNeeded,
+    members,
+    me,
+  };
 };
 
 module.exports = {
   createGroup,
   listGroupsForUser,
   getGroupForMember,
+  assertTripGroup,
+  previewInvite,
   joinGroupByCode,
   leaveGroup,
+  removeMember,
+  setMuted,
+  setDestination,
+  destinationFields,
   getBalances,
+  getContributions,
+  outstandingShares,
 };

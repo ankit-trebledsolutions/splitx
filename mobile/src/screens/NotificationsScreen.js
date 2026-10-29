@@ -1,0 +1,304 @@
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { routeForNotification } from '../utils/notificationRoute';
+import DarkScreen from '../components/DarkScreen';
+import SwipeableRow from '../components/SwipeableRow';
+import {
+  fetchNotifications,
+  markNotificationRead,
+  clearNotification,
+} from '../api/notifications.api';
+import { radius, spacing, useStyles, useTheme } from '../theme';
+import { timeAgo } from '../utils/format';
+import AppAlert from '../components/AppAlert';
+
+// Icon tile + accent per notification type.
+const TYPE_STYLE = {
+  expense: { icon: 'card-outline', tint: '#F97362' },
+  task: { icon: 'checkmark-circle-outline', tint: '#22C55E' },
+  reminder: { icon: 'alarm-outline', tint: '#F5B342' },
+  member: { icon: 'person-add-outline', tint: '#8B5CF6' },
+  itinerary: { icon: 'map-outline', tint: '#4A7DF7' },
+  photo: { icon: 'images-outline', tint: '#2DD4BF' },
+  attraction: { icon: 'compass-outline', tint: '#2DD4BF' },
+  stay: { icon: 'bed-outline', tint: '#4A7DF7' },
+  support: { icon: 'chatbubble-ellipses-outline', tint: '#00C4D0' },
+  system: { icon: 'sparkles-outline', tint: '#8A97A6' },
+};
+
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'transactions', label: 'Transactions' },
+  { key: 'alerts', label: 'Alerts' },
+];
+
+const matchesFilter = (item, filter) => {
+  if (filter === 'unread') return !item.read;
+  if (filter === 'transactions') return item.type === 'expense' || item.type === 'stay';
+  if (filter === 'alerts') return item.type === 'task' || item.type === 'reminder';
+  return true;
+};
+
+const signedAmount = (amount) =>
+  `${amount < 0 ? '-' : '+'}$${Math.abs(amount).toFixed(2)}`;
+
+const NotificationsScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const data = await fetchNotifications();
+          if (active) setNotifications(data);
+        } catch (err) {
+          AppAlert.alert('Could not load notifications', err.message);
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const visible = useMemo(
+    () => notifications.filter((n) => matchesFilter(n, filter)),
+    [notifications, filter]
+  );
+
+  // Tapping marks it read and goes to whatever it is about: the expense
+  // summary, the task, or the right tab of the group.
+  const handleOpen = (item) => {
+    const route = routeForNotification(item);
+    if (route) navigation.navigate(...route);
+
+    if (item.read) return;
+    setNotifications((prev) =>
+      prev.map((n) => (n._id === item._id ? { ...n, read: true } : n))
+    );
+    // Read state is cosmetic; the next fetch resolves any drift.
+    markNotificationRead(item._id).catch(() => {});
+  };
+
+  const handleDismiss = async (item) => {
+    setNotifications((prev) => prev.filter((n) => n._id !== item._id));
+    try {
+      await clearNotification(item._id);
+    } catch (err) {
+      setNotifications((prev) => [item, ...prev]); // restore on failure
+      AppAlert.alert('Could not clear notification', err.message);
+    }
+  };
+
+  const renderNotification = ({ item }) => {
+    const look = TYPE_STYLE[item.type] ?? TYPE_STYLE.system;
+    return (
+      <SwipeableRow onDismiss={() => handleDismiss(item)}>
+        <TouchableOpacity
+          style={[
+            styles.card,
+            item.read ? styles.cardRead : { borderColor: `${look.tint}55` },
+          ]}
+          activeOpacity={0.85}
+          onPress={() => handleOpen(item)}
+        >
+          <View
+            style={[
+              styles.iconTile,
+              { backgroundColor: `${look.tint}${item.read ? '12' : '1F'}` },
+            ]}
+          >
+            <Ionicons
+              name={look.icon}
+              size={18}
+              color={item.read ? `${theme.ink(look.tint)}99` : theme.ink(look.tint)}
+            />
+          </View>
+
+          <View style={styles.body}>
+            <Text style={[styles.title, item.read && styles.titleRead]}>{item.title}</Text>
+            <Text style={[styles.message, item.read && styles.messageRead]}>{item.body}</Text>
+            <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
+          </View>
+
+          <View style={styles.right}>
+            {!item.read && <View style={styles.unreadDot} />}
+            {item.amount != null && (
+              <Text style={styles.amount}>{signedAmount(item.amount)}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </SwipeableRow>
+    );
+  };
+
+  return (
+    <DarkScreen>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={navigation.goBack}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Notifications</Text>
+        <View style={styles.backButtonGhost} />
+      </View>
+
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {FILTERS.map((option) => {
+            const active = filter === option.key;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.chip, active && styles.chipActive]}
+                activeOpacity={0.8}
+                onPress={() => setFilter(option.key)}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {loading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={theme.accentGreen} />
+        </View>
+      ) : (
+        <FlatList
+          data={visible}
+          keyExtractor={(item) => item._id}
+          renderItem={renderNotification}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {filter === 'all'
+                ? "You're all caught up — activity from your groups will show up here."
+                : 'Nothing here for this filter.'}
+            </Text>
+          }
+        />
+      )}
+    </DarkScreen>
+  );
+};
+
+const makeStyles = (theme) => StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonGhost: { width: 36 },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  chipRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  chip: {
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 1,
+  },
+  chipActive: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
+  chipText: { color: theme.textMuted, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: '#04121C', fontWeight: '800' },
+
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xl },
+  empty: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+
+  card: {
+    flexDirection: 'row',
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm + 2,
+  },
+  // Viewed notifications sit back: darker fill, plain border, dimmed content.
+  cardRead: { backgroundColor: theme.readCard, borderColor: theme.overlayFaint },
+  iconTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  body: { flex: 1, marginRight: spacing.sm },
+  title: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  titleRead: { color: theme.textFaint },
+  message: { color: theme.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  messageRead: { color: theme.textFaint },
+  time: { color: theme.textMuted, fontSize: 10, marginTop: spacing.sm },
+  right: { alignItems: 'flex-end', justifyContent: 'space-between' },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.accentFill,
+  },
+  amount: { color: theme.text, fontSize: 13, fontWeight: '800' },
+});
+
+export default NotificationsScreen;

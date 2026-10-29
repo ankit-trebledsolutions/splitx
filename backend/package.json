@@ -6,21 +6,37 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "node --test",
+    "smoke:ai": "node scripts/smoke-ai-itinerary.js",
+    "smoke:reminders": "node scripts/smoke-reminders.js",
+    "smoke:cards": "node scripts/smoke-chat-cards.js",
+    "smoke:places": "node scripts/smoke-places.js",
+    "smoke:wallet": "node scripts/smoke-wallet.js",
+    "seed:admin": "node scripts/seed-super-admin.js",
+    "dev:local": "node scripts/dev-local.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
+    "@stream-io/node-sdk": "^0.8.6",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
+    "country-region-data": "^4.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
+    "google-auth-library": "^11.0.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.0",
     "morgan": "^1.10.0",
+    "multer": "^2.2.0",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {

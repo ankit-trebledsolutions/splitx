@@ -1,4 +1,7 @@
 const env = require('../config/env');
+const { MAX_UPLOAD_BYTES, MAX_VIDEO_BYTES } = require('./upload');
+
+const megabytes = (bytes) => `${Math.round(bytes / (1024 * 1024))}MB`;
 
 const notFound = (req, res) => {
   res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` });
@@ -15,6 +18,17 @@ const errorHandler = (err, _req, res, _next) => {
   } else if (err.name === 'CastError') {
     statusCode = 400;
     message = `Invalid ${err.path}: ${err.value}`;
+  } else if (err.name === 'MulterError') {
+    // Upload problems are the sender's to fix, not a server fault.
+    statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? err.field === 'video'
+          ? `That video is too large (max ${megabytes(MAX_VIDEO_BYTES)})`
+          : `That file is too large (max ${megabytes(MAX_UPLOAD_BYTES)})`
+        : err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT'
+          ? 'Too many files, or a file in an unexpected field'
+          : err.message;
   } else if (err.code === 11000) {
     statusCode = 409;
     const field = Object.keys(err.keyValue || {})[0] || 'field';
@@ -26,7 +40,10 @@ const errorHandler = (err, _req, res, _next) => {
     if (env.nodeEnv === 'production') message = 'Internal server error';
   }
 
-  res.status(statusCode).json({ success: false, message });
+  // err.code is also set by Mongo/Multer errors (numbers, LIMIT_*); only pass on
+  // the app's own string codes from ApiError.
+  const extra = err.isOperational && typeof err.code === 'string' ? { code: err.code, ...err.data } : {};
+  res.status(statusCode).json({ success: false, message, ...extra });
 };
 
 module.exports = { notFound, errorHandler };

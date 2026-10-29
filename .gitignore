@@ -150,3 +150,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code local settings
 .claude/
+
+# Cloudflare origin certificate for the VPS (deploy/certs/origin.pem, origin.key)
+deploy/certs/

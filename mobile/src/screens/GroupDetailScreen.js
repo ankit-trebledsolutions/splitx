@@ -1,234 +1,671 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  StyleSheet,
+  ScrollView,
   TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Share,
+  ActivityIndicator,
+  Switch,
+  Modal,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchGroup, fetchExpenses, fetchBalances, deleteExpense } from '../api/groups.api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DarkScreen from '../components/DarkScreen';
+import Avatar from '../components/Avatar';
+import { fetchGroup, leaveGroup, deleteGroup, setGroupMuted } from '../api/groups.api';
 import { useAuth } from '../context/AuthContext';
-import Button from '../components/Button';
-import EmptyState from '../components/EmptyState';
-import { colors, radius, spacing } from '../theme';
-import { formatMoney, formatDate } from '../utils/format';
+import { useSocket } from '../context/SocketProvider';
+import { radius, spacing, useStyles, useTheme } from '../theme';
+import { presenceFrom } from '../utils/presence';
+import { syncReminderAlarms } from '../utils/reminderAlarms';
+import { useGroupPresence } from '../hooks/useGroupPresence';
+import AppAlert from '../components/AppAlert';
 
+// "Group Info" screen, opened by tapping the group name in the chat header.
 const GroupDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useStyles(makeStyles);
   const { groupId } = route.params;
   const { user } = useAuth();
-  const [group, setGroup] = useState(null);
-  const [expenses, setExpenses] = useState([]);
-  const [balances, setBalances] = useState([]);
-  const [settlements, setSettlements] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState('expenses');
+  const currentUserId = user?._id;
+  const onlineIds = useGroupPresence(groupId);
 
-  const load = useCallback(async () => {
-    try {
-      const [groupData, expenseData, balanceData] = await Promise.all([
-        fetchGroup(groupId),
-        fetchExpenses(groupId),
-        fetchBalances(groupId),
-      ]);
-      setGroup(groupData);
-      setExpenses(expenseData);
-      setBalances(balanceData.balances);
-      setSettlements(balanceData.settlements);
-    } catch (err) {
-      Alert.alert('Could not load group', err.message);
-    }
-  }, [groupId]);
+  const [group, setGroup] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [pickingAdmin, setPickingAdmin] = useState(false);
+  const [newAdminId, setNewAdminId] = useState(null);
+  const [leaving, setLeaving] = useState(false);
+  // True while our own leave request is in flight, so its echo isn't mistaken for a removal.
+  const leavingRef = useRef(false);
+  // The "⋮" menu (admin only) and the delete confirmation it leads to.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Same idea as leavingRef: our own delete also comes back as a socket event.
+  const deletingRef = useRef(false);
+  const insets = useSafeAreaInsets();
+  const { socket } = useSocket();
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      let active = true;
+      (async () => {
+        try {
+          const data = await fetchGroup(groupId);
+          if (!active) return;
+          setGroup(data);
+          setMuted((data.mutedBy ?? []).includes(currentUserId));
+        } catch (err) {
+          AppAlert.alert('Could not load group', err.message);
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [groupId, currentUserId])
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  // Someone left or was removed while this screen is open: drop them from the
+  // list, or leave the screen if it was us (removed by the admin).
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onMemberLeft = async (event) => {
+      if (event.groupId !== groupId) return;
+      if (event.userId === currentUserId) {
+        if (leavingRef.current) return;
+        AppAlert.alert('You are no longer in this group');
+        navigation.navigate('MainTabs');
+        return;
+      }
+      try {
+        setGroup(await fetchGroup(groupId));
+      } catch {
+        // The next focus reloads it.
+      }
+    };
+    // The admin deleted the group while another member has this screen open.
+    const onGroupDeleted = (event) => {
+      if (event.groupId !== groupId || deletingRef.current) return;
+      AppAlert.alert('Group deleted', `"${event.name}" was deleted by its admin.`);
+      navigation.navigate('MainTabs');
+    };
+    socket.on('group:member-left', onMemberLeft);
+    socket.on('group:deleted', onGroupDeleted);
+    return () => {
+      socket.off('group:member-left', onMemberLeft);
+      socket.off('group:deleted', onGroupDeleted);
+    };
+  }, [socket, groupId, currentUserId, navigation]);
 
-  const shareInvite = () => {
-    if (!group) return;
-    Share.share({
-      message: `Join "${group.name}" on Splix with invite code: ${group.inviteCode}`,
+  if (loading || !group) {
+    return (
+      <DarkScreen>
+        <View style={styles.loading}>
+          <ActivityIndicator color={theme.accentGreen} />
+        </View>
+      </DarkScreen>
+    );
+  }
+
+  const adminId = group.admin ?? group.createdBy?._id ?? group.createdBy;
+  const iAmAdmin = adminId === currentUserId;
+  const others = group.members.filter((m) => m._id !== currentUserId);
+  const memberCount = group.members?.length ?? 0;
+  const tripLabel = group.totalDays
+    ? `${group.totalDays}-day trip`
+    : group.groupType
+      ? `${group.groupType[0].toUpperCase()}${group.groupType.slice(1)} group`
+      : '';
+
+  const openMember = (member) => {
+    // The profile page is only for other members, not yourself.
+    if (member._id === currentUserId) return;
+    navigation.navigate('MemberProfile', {
+      member,
+      groupId,
+      isAdmin: member._id === adminId,
+      viewerIsAdmin: iAmAdmin,
     });
   };
 
-  const confirmDelete = (expense) => {
-    Alert.alert('Delete expense', `Delete "${expense.description}"?`, [
+  // Optimistic: flip the switch now, put it back if the server says no.
+  const toggleMuted = async (next) => {
+    setMuted(next);
+    try {
+      await setGroupMuted(groupId, next);
+      // A muted group's reminders stop ringing on this phone (and start again).
+      syncReminderAlarms();
+    } catch (err) {
+      setMuted(!next);
+      AppAlert.alert('Could not update notifications', err.message);
+    }
+  };
+
+  const doLeave = async (adminSuccessorId) => {
+    setLeaving(true);
+    leavingRef.current = true;
+    try {
+      await leaveGroup(groupId, adminSuccessorId);
+      setPickingAdmin(false);
+      navigation.navigate('MainTabs');
+    } catch (err) {
+      AppAlert.alert('Could not leave group', err.message);
+    } finally {
+      setLeaving(false);
+      leavingRef.current = false;
+    }
+  };
+
+  const doDelete = async () => {
+    setDeleting(true);
+    deletingRef.current = true;
+    try {
+      await deleteGroup(groupId);
+      setConfirmingDelete(false);
+      navigation.navigate('MainTabs');
+    } catch (err) {
+      // Only on failure: after a success the screen is on its way out, and the
+      // socket echo of our own delete must keep being ignored until it is gone.
+      deletingRef.current = false;
+      setDeleting(false);
+      setConfirmingDelete(false);
+      // Once the sheet has closed: two modals at the same moment fight on iOS.
+      setTimeout(() => AppAlert.alert('Could not delete group', err.message), 250);
+    }
+  };
+
+  const confirmLeave = () => {
+    // An admin with several members left behind chooses who takes over.
+    if (iAmAdmin && others.length > 1) {
+      setNewAdminId(null);
+      setPickingAdmin(true);
+      return;
+    }
+    const message =
+      iAmAdmin && others.length === 1
+        ? `${others[0].name} will become the group admin.`
+        : `You will no longer see "${group.name}" or its chat.`;
+    AppAlert.alert('Leave group?', message, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteExpense(expense._id);
-            await load();
-          } catch (err) {
-            Alert.alert('Could not delete', err.message);
-          }
-        },
-      },
+      { text: 'Leave', style: 'destructive', onPress: () => doLeave() },
     ]);
   };
 
-  const renderExpense = ({ item }) => (
-    <TouchableOpacity style={styles.card} onLongPress={() => confirmDelete(item)} activeOpacity={0.8}>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{item.description}</Text>
-        <Text style={styles.cardSubtitle}>
-          {item.paidBy?.name} paid · {formatDate(item.date)}
-        </Text>
-      </View>
-      <Text style={styles.amount}>{formatMoney(item.amount)}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderBalances = () => (
-    <View>
-      {balances.map((b) => {
-        const isMe = b.user._id === user?._id;
-        const owed = b.net >= 0;
-        return (
-          <View key={b.user._id} style={styles.card}>
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitle}>{isMe ? 'You' : b.user.name}</Text>
-            </View>
-            <Text style={[styles.amount, owed ? styles.positive : styles.negative]}>
-              {owed ? 'gets back ' : 'owes '}
-              {formatMoney(b.net)}
-            </Text>
-          </View>
-        );
-      })}
-      {settlements.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Suggested settlements</Text>
-          {settlements.map((s, idx) => (
-            <View key={idx} style={styles.card}>
-              <Text style={styles.cardSubtitle}>
-                <Text style={styles.cardTitle}>{s.from._id === user?._id ? 'You' : s.from.name}</Text>
-                {'  →  '}
-                <Text style={styles.cardTitle}>{s.to._id === user?._id ? 'you' : s.to.name}</Text>
-                {'   '}
-                {formatMoney(s.amount)}
-              </Text>
-            </View>
-          ))}
-        </>
-      )}
-      {balances.length === 0 && (
-        <EmptyState title="All settled" subtitle="No balances yet — add an expense first." />
-      )}
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.tabs}>
-        {['expenses', 'balances'].map((t) => (
+    <DarkScreen>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerIcon} onPress={navigation.goBack} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={18} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Group Info</Text>
+        {/* Everything in the menu is admin-only, so other members get a spacer
+            that keeps the title centred rather than dots that open nothing. */}
+        {iAmAdmin ? (
           <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
+            style={styles.headerIcon}
+            activeOpacity={0.7}
+            onPress={() => setMenuOpen(true)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'expenses' ? 'Expenses' : 'Balances'}
-            </Text>
+            <Ionicons name="ellipsis-vertical" size={15} color={theme.text} />
           </TouchableOpacity>
-        ))}
+        ) : (
+          <View style={styles.headerIconGhost} />
+        )}
       </View>
 
-      {tab === 'expenses' ? (
-        <FlatList
-          data={expenses}
-          keyExtractor={(item) => item._id}
-          renderItem={renderExpense}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <EmptyState title="No expenses yet" subtitle="Add the first expense to get started." />
-          }
-        />
-      ) : (
-        <FlatList
-          data={[]}
-          renderItem={null}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListHeaderComponent={renderBalances()}
-        />
-      )}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Avatar name={group.name} size={92} />
+          <Text style={styles.groupName}>{group.name}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaMuted}>
+              {memberCount} Member{memberCount === 1 ? '' : 's'}
+            </Text>
+            {!!tripLabel && (
+              <>
+                <View style={styles.metaDot} />
+                <Text style={styles.metaAccent}>{tripLabel}</Text>
+              </>
+            )}
+          </View>
+        </View>
 
-      <View style={styles.footer}>
-        <Button
-          title="Add expense"
-          onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members ?? [] })}
-        />
-        <Button
-          title={`Share invite code · ${group?.inviteCode ?? ''}`}
-          variant="outline"
-          onPress={shareInvite}
-          style={styles.shareButton}
-        />
-      </View>
-    </View>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>GROUP MEMBERS</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('GroupInvite', { group })}
+          >
+            <Text style={styles.addFriend}>+ Add Friend</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.contribButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Contributions', { groupId })}
+          >
+            <Text style={styles.contribButtonText}>View contributions</Text>
+          </TouchableOpacity>
+
+          {group.members.map((member, index) => {
+            const presence = presenceFrom(onlineIds.has(member._id), member.lastSeenAt);
+            const isAdmin = member._id === adminId;
+            return (
+              <TouchableOpacity
+                key={member._id}
+                style={[styles.memberRow, index > 0 && styles.memberRowBorder]}
+                activeOpacity={member._id === currentUserId ? 1 : 0.7}
+                onPress={() => openMember(member)}
+              >
+                <View>
+                  <Avatar name={member.name} size={40} solid />
+                  <View
+                    style={[
+                      styles.presenceDot,
+                      { backgroundColor: presence.online ? '#22C55E' : theme.textMuted },
+                    ]}
+                  />
+                </View>
+                <View style={styles.memberBody}>
+                  <Text style={styles.memberName} numberOfLines={1}>
+                    {member._id === currentUserId ? `${member.name} (You)` : member.name}
+                  </Text>
+                  <Text style={styles.memberMeta}>{presence.label}</Text>
+                </View>
+                {isAdmin ? (
+                  <View style={styles.adminBadge}>
+                    <Text style={styles.adminBadgeText}>Admin</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.memberRole}>Member</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sectionLabel, styles.prefsLabel]}>PREFERENCES</Text>
+
+        <View style={styles.card}>
+          <View style={styles.prefRow}>
+            <View style={styles.prefIcon}>
+              <Ionicons name="notifications-off-outline" size={16} color={theme.textMuted} />
+            </View>
+            <Text style={styles.prefText}>Mute notifications</Text>
+            <Switch
+              value={muted}
+              onValueChange={toggleMuted}
+              trackColor={{ false: theme.overlayStrong, true: '#22C55E' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.prefRow, styles.prefRowBorder]}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Contributions', { groupId, segment: 'Expenses' })}
+          >
+            <View style={styles.prefIcon}>
+              <Ionicons name="card-outline" size={16} color={theme.textMuted} />
+            </View>
+            <Text style={styles.prefText}>Shared expenses</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.prefRow, styles.prefRowBorder]}
+            activeOpacity={0.7}
+            onPress={confirmLeave}
+            disabled={leaving}
+          >
+            <View style={[styles.prefIcon, styles.leaveIcon]}>
+              <Ionicons name="log-out-outline" size={16} color="#F97362" />
+            </View>
+            <Text style={[styles.prefText, styles.leaveText]}>Leave group</Text>
+            <Ionicons name="chevron-forward" size={16} color="#F97362" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <View style={[styles.menu, { top: insets.top + 50 }]}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setMenuOpen(false);
+                // Let the menu finish closing: two modals swapping in the same
+                // frame can leave iOS showing neither.
+                setTimeout(() => setConfirmingDelete(true), 250);
+              }}
+            >
+              <Ionicons name="trash-outline" size={17} color="#F97362" />
+              <Text style={styles.menuItemDanger}>Delete group</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={confirmingDelete}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => !deleting && setConfirmingDelete(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => !deleting && setConfirmingDelete(false)}>
+          <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
+            <View style={styles.dangerBadge}>
+              <Ionicons name="warning-outline" size={24} color="#F97362" />
+            </View>
+            <Text style={styles.sheetTitle}>Delete "{group.name}"?</Text>
+            <Text style={styles.sheetHint}>
+              This deletes the group for all {memberCount} member{memberCount === 1 ? '' : 's'}, not
+              just you. Everything in it is removed for good:
+            </Text>
+
+            {[
+              ['chatbubbles-outline', 'The whole chat, with its photos, files and voice notes'],
+              ['cash-outline', 'All expenses and balances, including any that are not settled'],
+              ['checkbox-outline', 'Tasks and reminders'],
+              // Only a trip has an itinerary and attractions to lose.
+              [
+                'map-outline',
+                group.groupType === 'trip' ? 'The itinerary, stays and attractions' : 'Stays',
+              ],
+              ['images-outline', 'Every photo in the gallery'],
+            ].map(([icon, label]) => (
+              <View key={icon} style={styles.lossRow}>
+                <Ionicons name={icon} size={15} color={theme.textMuted} />
+                <Text style={styles.lossText}>{label}</Text>
+              </View>
+            ))}
+
+            <Text style={styles.dangerNote}>This cannot be undone.</Text>
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetCancel]}
+                activeOpacity={0.8}
+                onPress={() => setConfirmingDelete(false)}
+                disabled={deleting}
+              >
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetLeave]}
+                activeOpacity={0.8}
+                onPress={doDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.sheetLeaveText}>Delete group</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={pickingAdmin}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickingAdmin(false)}
+      >
+        <View style={styles.backdrop}>
+          {/* Behind the sheet, not around it: on Android a pressable ancestor
+              takes slow drags away from the list, leaving only flicks (see FormSheet). */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !leaving && setPickingAdmin(false)} />
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
+            <Text style={styles.sheetTitle}>Choose a new admin</Text>
+            <Text style={styles.sheetHint}>
+              You're the admin of "{group.name}". Pick who takes over before you leave.
+            </Text>
+
+            <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
+              {others.map((member, index) => {
+                const selected = member._id === newAdminId;
+                return (
+                  <TouchableOpacity
+                    key={member._id}
+                    style={[styles.memberRow, index > 0 && styles.memberRowBorder]}
+                    activeOpacity={0.7}
+                    onPress={() => setNewAdminId(member._id)}
+                  >
+                    <Avatar name={member.name} size={36} solid />
+                    <Text style={[styles.memberName, styles.sheetMemberName]} numberOfLines={1}>
+                      {member.name}
+                    </Text>
+                    <Ionicons
+                      name={selected ? 'radio-button-on' : 'radio-button-off'}
+                      size={20}
+                      color={selected ? theme.accentGreen : theme.textMuted}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetCancel]}
+                activeOpacity={0.8}
+                onPress={() => setPickingAdmin(false)}
+                disabled={leaving}
+              >
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetButton, styles.sheetLeave, !newAdminId && styles.sheetLeaveDisabled]}
+                activeOpacity={0.8}
+                onPress={() => doLeave(newAdminId)}
+                disabled={!newAdminId || leaving}
+              >
+                {leaving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.sheetLeaveText}>Make admin & leave</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </DarkScreen>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  tabs: {
+const makeStyles = (theme) => StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  header: {
     flexDirection: 'row',
-    margin: spacing.md,
-    backgroundColor: colors.border,
-    borderRadius: radius.md,
-    padding: 3,
-  },
-  tab: {
-    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md - 3,
-    alignItems: 'center',
   },
-  tabActive: { backgroundColor: colors.surface },
-  tabText: { color: colors.textMuted, fontWeight: '600' },
-  tabTextActive: { color: colors.text },
-  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
-  card: {
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
+  headerIconGhost: { width: 36, height: 36 },
+
+  // Drops down from the "⋮" button in the header's top-right corner.
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  menu: {
+    position: 'absolute',
+    right: spacing.md,
+    minWidth: 190,
+    backgroundColor: theme.card2,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xs,
+  },
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
+    gap: spacing.sm + 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 6,
+  },
+  menuItemDanger: { color: theme.coral, fontSize: 14, fontWeight: '700' },
+
+  dangerBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(249,115,98,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  lossRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, marginTop: spacing.sm },
+  lossText: { flex: 1, color: theme.text, fontSize: 13, lineHeight: 18 },
+  dangerNote: { color: theme.coral, fontSize: 13, fontWeight: '700', marginTop: spacing.md },
+
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+
+  hero: { alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.lg },
+  groupName: { color: theme.text, fontSize: 24, fontWeight: '800', marginTop: spacing.md },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
+  metaMuted: { color: theme.textMuted, fontSize: 13 },
+  metaDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: theme.textMuted },
+  metaAccent: { color: theme.accentGreen, fontSize: 13, fontWeight: '600' },
+
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: spacing.sm,
+  },
+  sectionLabel: {
+    color: theme.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+  },
+  addFriend: { color: theme.accentGreen, fontSize: 13, fontWeight: '700' },
+
+  card: {
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.border,
+    borderRadius: radius.lg + 4,
+    padding: spacing.md,
   },
-  cardBody: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-  cardSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  amount: { fontSize: 15, fontWeight: '700', color: colors.text },
-  positive: { color: colors.success },
-  negative: { color: colors.danger },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textMuted,
-    marginVertical: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  contribButton: {
+    backgroundColor: theme.accentFill,
+    borderRadius: 22,
+    paddingVertical: spacing.sm + 5,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  footer: { padding: spacing.md, gap: spacing.sm },
-  shareButton: { marginTop: spacing.sm },
+  contribButtonText: { color: '#04121C', fontSize: 14, fontWeight: '800' },
+
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 4,
+  },
+  memberRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
+  presenceDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.card,
+  },
+  memberBody: { flex: 1, marginLeft: spacing.sm + 4 },
+  memberName: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  memberMeta: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
+  adminBadge: {
+    backgroundColor: 'rgba(0,196,208,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,196,208,0.35)',
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: 3,
+  },
+  adminBadgeText: { color: theme.accentGreen, fontSize: 11, fontWeight: '700' },
+  memberRole: { color: theme.textMuted, fontSize: 12 },
+
+  prefsLabel: { marginTop: spacing.lg, marginBottom: spacing.sm },
+  prefRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 4,
+  },
+  prefRowBorder: { borderTopWidth: 1, borderTopColor: theme.border },
+  prefIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: theme.overlayFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveIcon: { backgroundColor: 'rgba(249,115,98,0.12)' },
+  prefText: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600', marginLeft: spacing.sm + 4 },
+  leaveText: { color: theme.coral },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: theme.sheet,
+    borderTopLeftRadius: radius.lg + 8,
+    borderTopRightRadius: radius.lg + 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sheetTitle: { color: theme.text, fontSize: 17, fontWeight: '800' },
+  sheetHint: { color: theme.textMuted, fontSize: 13, marginTop: 4, marginBottom: spacing.sm },
+  sheetList: { maxHeight: 300 },
+  sheetMemberName: { flex: 1, marginLeft: spacing.sm + 4 },
+  sheetActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  sheetButton: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md - 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCancel: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
+  sheetCancelText: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  sheetLeave: { backgroundColor: '#F97362' },
+  sheetLeaveDisabled: { opacity: 0.4 },
+  sheetLeaveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
 });
 
 export default GroupDetailScreen;
