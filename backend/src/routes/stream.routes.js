@@ -20,6 +20,11 @@ const callEventSchema = {
 router.get('/token', controller.getToken);
 router.post('/call-event', validate(callEventSchema), controller.callEvent);
 router.post(
+  '/call-join',
+  validate({ body: z.object({ groupId: objectId }) }),
+  controller.callJoin
+);
+router.post(
   '/call-start',
   validate({ body: z.object({ groupId: objectId }) }),
   controller.callStart

@@ -24,10 +24,15 @@ const callSessionSchema = new mongoose.Schema(
     // without ever being seen most likely never connected, so its first block
     // is given back.
     seenLive: { type: Boolean, default: false },
+    // When the sweep first found the payer no longer in the call (or no longer
+    // in the group). Nothing more is charged while they are away; still away a
+    // sweep later, and their bill stops (endReason payer_left).
+    payerAwaySince: { type: Date, default: null },
     endedAt: { type: Date, default: null },
     // left: everyone hung up · gone: Stream no longer has it · no_credits: we
     // ended it · replaced: a new call started in the group · free: calls were
-    // made free mid-call
+    // made free mid-call · payer_left: the person paying left the call while
+    // others stayed, and the rest of it is free
     endReason: { type: String, default: null },
   },
   { timestamps: false }

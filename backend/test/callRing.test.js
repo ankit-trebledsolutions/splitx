@@ -118,6 +118,41 @@ test('a call that has ended can be started again straight away', async (t) => {
   assert.deepEqual(sent.pushes.map((p) => p.message.data.action), ['ring', 'end', 'ring']);
 });
 
+test('posting "started" and "ended" in turn cannot ring a group over and over', async (t) => {
+  const sent = stubDelivery(t);
+  const group = trip();
+
+  // A phone alternating the two, a second apart.
+  const rang = [];
+  for (let i = 0; i < 10; i += 1) {
+    const at = NOW + i * 2000;
+    // eslint-disable-next-line no-await-in-loop
+    rang.push(Boolean(await callRing.ring({ group, caller: asha(), video: true, now: at })));
+    // eslint-disable-next-line no-await-in-loop
+    await callRing.end({ group, by: asha(), now: at + 1000 });
+  }
+
+  assert.equal(rang.filter(Boolean).length, callRing.RING_LIMIT);
+  assert.equal(sent.pushes.filter((p) => p.message.data.action === 'ring').length, callRing.RING_LIMIT);
+
+  // Once the window has passed, the group can be rung again.
+  const later = NOW + callRing.RING_WINDOW_MS + 1000;
+  assert.ok(await callRing.ring({ group, caller: asha(), video: true, now: later }));
+});
+
+test('the ring limit is per group: one busy group does not quiet another', async (t) => {
+  stubDelivery(t);
+  const busy = trip();
+  const other = trip();
+
+  for (let i = 0; i < callRing.RING_LIMIT; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await callRing.ring({ group: busy, caller: asha(), now: NOW + i * callRing.SAME_CALL_MS });
+  }
+  assert.equal(await callRing.ring({ group: busy, caller: asha(), now: NOW + 60 * 1000 }), null);
+  assert.ok(await callRing.ring({ group: other, caller: asha(), now: NOW + 60 * 1000 }));
+});
+
 test('the end of a call is told to every other member, silently', async (t) => {
   const sent = stubDelivery(t);
   // Cara muted the group, but may have been rung before she did.

@@ -32,13 +32,31 @@ const SAME_CALL_MS = 15 * 1000;
 
 const idOf = (value) => String(value?._id ?? value);
 
+// However calls come and go, a group's phones ring at most this many times in
+// this long. Kept apart from the same-call memory, which end() clears so that a
+// new call rings straight away: without this, a phone posting "started" and
+// "ended" in turn would ring every member full-screen again and again.
+const RING_LIMIT = 3;
+const RING_WINDOW_MS = 5 * 60 * 1000;
+
 // groupId -> when its phones were last told to ring.
 const lastRing = new Map();
+// groupId -> when they rang within the last RING_WINDOW_MS. Never cleared by end().
+const recentRings = new Map();
+
+const ringsWithin = (groupId, now) =>
+  (recentRings.get(groupId) ?? []).filter((at) => now - at < RING_WINDOW_MS);
 
 const forgetOldRings = (now) => {
-  if (lastRing.size < 500) return;
-  for (const [groupId, at] of lastRing) {
-    if (now - at >= SAME_CALL_MS) lastRing.delete(groupId);
+  if (lastRing.size >= 500) {
+    for (const [groupId, at] of lastRing) {
+      if (now - at >= SAME_CALL_MS) lastRing.delete(groupId);
+    }
+  }
+  if (recentRings.size >= 500) {
+    for (const groupId of recentRings.keys()) {
+      if (!ringsWithin(groupId, now).length) recentRings.delete(groupId);
+    }
   }
 };
 
@@ -62,16 +80,21 @@ const describe = (video) => {
  * started it with the camera on; an app from before calls rang does not say,
  * and the phones are then told only that it is a call.
  *
- * Resolves to what was sent, or null when this is the call already ringing.
- * Never throws: a ring that fails must not fail the call.
+ * Resolves to what was sent, or null when this is the call already ringing,
+ * or the group has rung RING_LIMIT times in the last RING_WINDOW_MS (the call
+ * itself goes ahead; only the phones stay quiet). Never throws: a ring that
+ * fails must not fail the call.
  */
 const ring = async ({ group, caller, video, now = Date.now() }) => {
   try {
     const groupId = idOf(group);
     const previous = lastRing.get(groupId);
     if (previous !== undefined && now - previous < SAME_CALL_MS) return null;
+    const recent = ringsWithin(groupId, now);
+    if (recent.length >= RING_LIMIT) return null;
     forgetOldRings(now);
     lastRing.set(groupId, now);
+    recentRings.set(groupId, [...recent, now]);
 
     const to = ringersOf(group, caller);
     const kind = typeof video === 'boolean' ? video : null;
@@ -105,7 +128,8 @@ const ring = async ({ group, caller, video, now = Date.now() }) => {
 const end = async ({ group, by, now = Date.now() }) => {
   try {
     const groupId = idOf(group);
-    // The next call in this group is a new one, however soon it starts.
+    // The next call in this group is a new one, however soon it starts (within
+    // RING_LIMIT, which this leaves alone).
     lastRing.delete(groupId);
 
     const to = group.members.map(idOf).filter((id) => id !== idOf(by));
@@ -120,4 +144,4 @@ const end = async ({ group, by, now = Date.now() }) => {
   }
 };
 
-module.exports = { TYPE, RING_SECONDS, SAME_CALL_MS, ringersOf, ring, end };
+module.exports = { TYPE, RING_SECONDS, SAME_CALL_MS, RING_LIMIT, RING_WINDOW_MS, ringersOf, ring, end };

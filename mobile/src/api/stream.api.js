@@ -15,6 +15,20 @@ export const postCallEvent = async (groupId, event, { video } = {}) => {
   return data.data;
 };
 
+// Asked before joining a group's call at all, started or not. Stream lets only
+// a call's members in, and the server makes them the group's members (creating
+// the call the first time a group calls). Resolves to { live }; rejects with
+// 403 for someone not in the group. A server from before this answers 404
+// "Route not found" (see isOldServer).
+export const prepareCall = async (groupId) => {
+  const { data } = await client.post('/stream/call-join', { groupId });
+  return data.data;
+};
+
+// The server has no such endpoint yet: it is from before this build.
+export const isOldServer = (err) =>
+  err?.status === 404 && /^Route not found/.test(err?.message ?? '');
+
 // Asked just before starting a call in an empty room. While calls cost
 // credits the server charges the caller's first block here, so someone who
 // cannot pay is stopped before anyone's phone rings. Resolves to

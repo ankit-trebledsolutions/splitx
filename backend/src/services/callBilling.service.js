@@ -10,8 +10,11 @@ const callRing = require('./callRing.service');
 
 /**
  * Credits for group calls. Whoever starts a call pays for each started block of
- * minutes (WalletSettings.callBlockMinutes) at the price of `callBlock`; the
- * people who join pay nothing. Free while that price is 0.
+ * minutes (WalletSettings.callBlockMinutes) at the price of `callBlock`, while
+ * they are in it; the people who join pay nothing (the app's Wallet screen says
+ * "Joining is free"). Once the starter has left a call that others stay on, the
+ * rest of it is free. Only a member of the group ever pays. Free while that
+ * price is 0.
  *
  * What the app says is only a hint. The bill comes from the sweep, which asks
  * Stream which calls are really happening: a call the app never announced is
@@ -28,6 +31,9 @@ const JOIN_GRACE_MS = 2 * MINUTE_MS;
 const SAME_START_MS = 15 * 1000;
 // How long before the next block the payer is warned that it cannot be paid.
 const WARN_BEFORE_MS = 90 * 1000;
+// How long the payer may be out of the call before their bill stops: one sweep
+// apart, so a phone that drops off for a moment does not end it.
+const PAYER_AWAY_MS = 45 * 1000;
 
 const chargeKeyOf = (sessionId, block) => `call:${sessionId}:${block}`;
 
@@ -35,10 +41,12 @@ const chargeKeyOf = (sessionId, block) => `call:${sessionId}:${block}`;
 const blocksDue = (startedAt, blockMinutes, now = Date.now()) =>
   Math.floor(Math.max(0, now - new Date(startedAt).getTime()) / (blockMinutes * MINUTE_MS)) + 1;
 
-const close = (filter, reason) =>
+const timeOf = (date) => (date ? new Date(date).getTime() : null);
+
+const close = (filter, reason, at = new Date()) =>
   CallSession.updateMany(
     { ...filter, status: 'active' },
-    { $set: { status: 'ended', endedAt: new Date(), endReason: reason } }
+    { $set: { status: 'ended', endedAt: at, endReason: reason } }
   );
 
 /**
@@ -110,35 +118,57 @@ const start = async (userId, groupId) => {
 const ended = (groupId) => close({ group: groupId }, 'left');
 
 /**
- * The session a live call is billed to: the open one, one closed a moment ago
- * by an early "ended", or a new one for a call nobody announced, paid by
- * whoever has been in it longest (if they belong to the group).
+ * The session a live call is billed to, or null when nobody pays for it.
+ * `present` is the group's members in the call, longest in it first.
+ *  - the open one
+ *  - one closed a moment ago by an early "ended" (the app said the last person
+ *    left, but the call carried on)
+ *  - none, when the person paying left this call earlier and is not back in
+ *    it: the rest of it is free, as joining is
+ *  - otherwise a new one, paid by whoever has been in the call longest: the
+ *    starter back in their own call (billed afresh from now), or a call nobody
+ *    announced (billed from when it began, or from the end of the last bill in
+ *    this same call, so no block is charged twice). Never from further back
+ *    than one sweep could have missed it.
  */
-const sessionFor = async (call, now) => {
+const sessionFor = async (call, present, now) => {
   const open = await CallSession.findOne({ group: call.groupId, status: 'active' }).lean();
   if (open) return open;
 
   try {
-    const resumed = await CallSession.findOneAndUpdate(
-      {
-        group: call.groupId,
-        status: 'ended',
-        endReason: 'left',
-        endedAt: { $gte: new Date(now - JOIN_GRACE_MS) },
-      },
-      { $set: { status: 'active', endedAt: null, endReason: null } },
-      { sort: { endedAt: -1 }, new: true }
-    ).lean();
-    if (resumed) return resumed;
+    const last = await CallSession.findOne({ group: call.groupId, status: 'ended' })
+      .sort({ endedAt: -1 })
+      .lean();
+    const lastEnded = timeOf(last?.endedAt);
+    if (last?.endReason === 'left' && lastEnded >= now - JOIN_GRACE_MS) {
+      const resumed = await CallSession.findOneAndUpdate(
+        { _id: last._id, status: 'ended' },
+        { $set: { status: 'active', endedAt: null, endReason: null } },
+        { new: true }
+      ).lean();
+      if (resumed) return resumed;
+    }
 
-    if (!call.firstUserId || !mongoose.isValidObjectId(call.firstUserId)) return null;
-    const isMember = await Group.exists({ _id: call.groupId, members: call.firstUserId });
-    if (!isMember) return null;
+    const callStart = timeOf(call.startedAt);
+    // The last bill ended during this call, not an earlier one.
+    const sameCall = lastEnded !== null && callStart !== null && lastEnded >= callStart;
+    let payer;
+    let from;
+    if (sameCall && last.endReason === 'payer_left') {
+      if (!present.includes(String(last.startedBy))) return null;
+      payer = String(last.startedBy);
+      from = now;
+    } else {
+      [payer] = present;
+      if (!payer) return null;
+      from = sameCall ? lastEnded : callStart ?? now;
+    }
     return (
       await CallSession.create({
         group: call.groupId,
-        startedBy: call.firstUserId,
-        startedAt: call.startedAt ?? new Date(now),
+        startedBy: payer,
+        startedAt: new Date(Math.max(from, now - JOIN_GRACE_MS)),
+        seenLive: true,
       })
     ).toObject();
   } catch (err) {
@@ -179,10 +209,45 @@ const endForCredits = async (session) => {
     .catch((err) => console.error(`[calls] chat line for ${groupId} failed:`, err.message));
 };
 
+/**
+ * The payer is not in the call (or no longer in the group) while it goes on:
+ * nothing more is charged to them. A phone that dropped off for a moment is
+ * back by the next sweep and carries on paying, blocks that came due included.
+ * Still away then, they have left, and their bill stops there.
+ */
+const payerAway = async (session, now) => {
+  // Still joining: call-start charges before the phone is in the call.
+  if (now - timeOf(session.startedAt) < JOIN_GRACE_MS) return;
+  if (!session.payerAwaySince) {
+    await CallSession.updateOne(
+      { _id: session._id, status: 'active', payerAwaySince: null },
+      { $set: { payerAwaySince: new Date(now) } }
+    );
+    return;
+  }
+  if (now - timeOf(session.payerAwaySince) < PAYER_AWAY_MS) return;
+  await close({ _id: session._id }, 'payer_left', new Date(now));
+};
+
 const billCall = async (call, settings, now) => {
-  const session = await sessionFor(call, now);
+  const group = await Group.findById(call.groupId).select('members').lean();
+  // Gone with its group: the access sweep empties the call.
+  if (!group) return;
+  const members = new Set(group.members.map(String));
+  // Only a member of the group ever pays for its call.
+  const present = call.participantIds.filter((id) => members.has(id));
+
+  const session = await sessionFor(call, present, now);
   if (!session) return;
   if (!session.seenLive) await CallSession.updateOne({ _id: session._id }, { $set: { seenLive: true } });
+
+  if (!present.includes(String(session.startedBy))) {
+    await payerAway(session, now);
+    return;
+  }
+  if (session.payerAwaySince) {
+    await CallSession.updateOne({ _id: session._id }, { $set: { payerAwaySince: null } });
+  }
 
   const blockMs = settings.callBlockMinutes * MINUTE_MS;
   const due = blocksDue(session.startedAt, settings.callBlockMinutes, now);
@@ -259,4 +324,4 @@ const sweep = async (now = Date.now()) => {
   }
 };
 
-module.exports = { start, ended, sweep, blocksDue, chargeKeyOf };
+module.exports = { start, ended, sweep, blocksDue, chargeKeyOf, JOIN_GRACE_MS, PAYER_AWAY_MS };

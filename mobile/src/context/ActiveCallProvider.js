@@ -5,7 +5,7 @@ import { useStreamClient } from './StreamVideoProvider';
 import { useSocket } from './SocketProvider';
 import { useAuth } from './AuthContext';
 import AppAlert from '../components/AppAlert';
-import { postCallEvent, startCall } from '../api/stream.api';
+import { isOldServer, postCallEvent, prepareCall, startCall } from '../api/stream.api';
 import { ensureCallPermissions } from '../components/AlarmPermissionSheet';
 import { isNoCredits, showCallEndedNoCredits, showNoCredits } from '../components/NoCreditsSheet';
 import { callsSupported, setActiveCall } from '../utils/incomingCalls';
@@ -133,6 +133,19 @@ export const ActiveCallProvider = ({ children }) => {
 
         const nextCall = client.call('default', targetGroupId);
 
+        // Stream lets only the call's members in, and only the server says who
+        // they are: it makes them this group's members, and creates the call
+        // the first time the group calls. So it is asked before anything else
+        // here, even reading the call. A server from before that has no such
+        // step; the phone then creates the call itself, as it always did.
+        let prepared = true;
+        try {
+          await prepareCall(targetGroupId);
+        } catch (err) {
+          if (!isOldServer(err)) throw err;
+          prepared = false;
+        }
+
         // If nobody is in the call yet, we're the one starting it — used to post
         // the "call started" chat message only once.
         let isFirst = false;
@@ -166,7 +179,8 @@ export const ActiveCallProvider = ({ children }) => {
         // the others are still being rung.
         if (audioOnly) await nextCall.camera.disable();
         else await nextCall.camera.enable();
-        await nextCall.join({ create: true });
+        // The server has made the call already; a phone is not allowed to.
+        await nextCall.join({ create: !prepared });
 
         activeRef.current = { call: nextCall, groupId: targetGroupId };
         setCall(nextCall);

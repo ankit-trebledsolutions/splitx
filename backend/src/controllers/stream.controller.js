@@ -33,6 +33,16 @@ const callEvent = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { message } });
 });
 
+// Asked by the app before it joins a group's call, whether starting it or
+// joining one already on: only a member gets past getGroupForMember, and the
+// call's Stream members are then made the group's members, so Stream lets this
+// person in and nobody outside the group. Answers { live }.
+const callJoin = asyncHandler(async (req, res) => {
+  const group = await groupService.getGroupForMember(req.body.groupId, req.user._id);
+  const data = await streamService.prepareCall(group, req.user);
+  res.json({ success: true, data });
+});
+
 // Asked by the app just before it starts a call in an empty room: charges the
 // first block, or answers 402 NO_CREDITS so the phone never joins or rings
 // anyone. Free calls answer { billed: false }.
@@ -41,4 +51,4 @@ const callStart = asyncHandler(async (req, res) => {
   res.json({ success: true, data });
 });
 
-module.exports = { getToken, callEvent, callStart };
+module.exports = { getToken, callEvent, callJoin, callStart };

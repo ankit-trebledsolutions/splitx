@@ -199,6 +199,9 @@ const detachMember = async (group, userId) => {
   // all depend on this module.
   require('../realtime/socket').removeFromGroup(userId, group._id);
   await require('./reminder.service').forgetMember(group._id, userId);
+  // Out of the group's call too, and kept out of it. Not awaited: leaving must
+  // not wait on Stream (the call sweep catches anything this misses).
+  require('./callAccess.service').memberLeft(group._id, userId);
 };
 
 const postSystem = (groupId, text) => require('./message.service').postSystem(groupId, text);
