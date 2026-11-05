@@ -157,6 +157,13 @@ if (!settingsKey && isProduction) {
 // otherwise send pushes to real people. REMINDER_SWEEP=on|off overrides.
 const reminderSweep = (process.env.REMINDER_SWEEP || (isProduction ? 'on' : 'off')) === 'on';
 
+// Expo's push service (services/push.service.js). With push security turned on
+// for the Expo project, Expo sends only the pushes that carry this access
+// token, so someone holding a leaked push token can no longer make a phone ring
+// a fake call or alarm. Empty sends without one, which Expo accepts only while
+// push security is off. Steps: docs/expo-push-security.md.
+const expoAccessToken = (process.env.EXPO_ACCESS_TOKEN || '').trim();
+
 // Admin panel. The panel is a browser on a different origin to the API, and it
 // authenticates with a cookie, so its origins must be listed explicitly —
 // a wildcard is not allowed alongside credentials. The mobile app is
@@ -219,6 +226,7 @@ module.exports = {
   android,
   settingsKey,
   reminderSweep,
+  expoAccessToken,
   // Admin sessions are shorter-lived than the mobile app's: a panel that can
   // delete accounts should not stay signed in for a week by default.
   adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '8h',

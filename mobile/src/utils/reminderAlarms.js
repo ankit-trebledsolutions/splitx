@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import SplixAlarm from '../../modules/splix-alarm';
-import { TOKEN_KEY } from '../api/client';
+import { hasToken } from '../api/sessionToken';
 import { fetchMyReminders, markRemindersArmed } from '../api/reminders.api';
+import { isServerId, serverIdOrNull } from './serverId';
 
 /**
  * Reminders that ring like an alarm.
@@ -57,7 +57,7 @@ const toAlarm = (reminder) => ({
   repeatUntil: reminder.repeatUntil ? new Date(reminder.repeatUntil).getTime() : 0,
 });
 
-const signedIn = async () => Boolean(await AsyncStorage.getItem(TOKEN_KEY));
+const signedIn = hasToken;
 
 // ---- Without the alarm module: plain scheduled notifications ---------------
 
@@ -184,11 +184,12 @@ export const applyReminderPush = async (data) => {
 
   if (!SplixAlarm || data.action === 'refresh') {
     await syncReminderAlarms();
-  } else if (data.action === 'upsert' && data.reminder) {
+  } else if (data.action === 'upsert' && isServerId(data.reminder?._id)) {
+    // The phone refuses an alarm whose group or task is not a server id too.
     const waiting = await SplixAlarm.upsert(toAlarm(data.reminder));
-    if (waiting) markRemindersArmed([String(data.reminder._id)]).catch(() => {});
-  } else if (data.action === 'remove' && data.reminderId) {
-    await SplixAlarm.remove(String(data.reminderId));
+    if (waiting) markRemindersArmed([data.reminder._id]).catch(() => {});
+  } else if (data.action === 'remove' && isServerId(data.reminderId)) {
+    await SplixAlarm.remove(data.reminderId);
   }
 };
 
@@ -235,13 +236,18 @@ export const openAlarmSettings = (kind) => SplixAlarm?.openSettings(kind);
 
 /**
  * Where an alarm asked the app to go ("Open in Splix" on the alarm screen, or
- * a tap on a missed reminder), as [screen, params]. Handed over once.
+ * a tap on a missed reminder), as [screen, params]. Handed over once. Another
+ * app can hand the launch screen an "alarm" too, so an id that is not a
+ * server id leads nowhere (the phone already refuses those; this is the
+ * second check).
  */
 export const takeAlarmRoute = () => {
   const alarm = SplixAlarm?.takeOpen();
   if (!alarm) return null;
-  if (alarm.taskId) return ['TaskDetail', { taskId: alarm.taskId }];
-  if (alarm.groupId) return ['GroupChat', { groupId: alarm.groupId, initialTab: 'reminders' }];
+  const taskId = serverIdOrNull(alarm.taskId);
+  const groupId = serverIdOrNull(alarm.groupId);
+  if (taskId) return ['TaskDetail', { taskId }];
+  if (groupId) return ['GroupChat', { groupId, initialTab: 'reminders' }];
   return ['Reminders'];
 };
 

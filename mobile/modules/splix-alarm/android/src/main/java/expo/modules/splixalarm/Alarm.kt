@@ -89,7 +89,20 @@ data class Alarm(
     // Anything shorter is not a repeat a person asked for.
     private const val MIN_REPEAT_MS = 60_000L
 
-    fun fromJson(json: JSONObject): Alarm = Alarm(
+    /**
+     * Every id it carries is a server id, or it is no alarm of ours: one handed
+     * over by another app (see ServerId) is refused whole.
+     */
+    private fun checked(alarm: Alarm): Alarm {
+      require(
+        ServerId.isValid(alarm.id) &&
+          ServerId.isValidOrAbsent(alarm.groupId) &&
+          ServerId.isValidOrAbsent(alarm.taskId)
+      ) { "An alarm carries an id that is not a server id" }
+      return alarm
+    }
+
+    fun fromJson(json: JSONObject): Alarm = checked(Alarm(
       id = json.getString("id"),
       fireAt = json.getLong("fireAt"),
       title = json.optString("title"),
@@ -101,7 +114,7 @@ data class Alarm(
       repeatMs = json.optLong("repeatMs", 0),
       repeatUntil = json.optLong("repeatUntil", 0),
       snoozed = json.optBoolean("snoozed", false)
-    )
+    ))
 
     fun fromJsonOrNull(text: String?): Alarm? = try {
       if (text.isNullOrEmpty()) null else fromJson(JSONObject(text))
@@ -110,7 +123,7 @@ data class Alarm(
     }
 
     // From JavaScript, where every number is a double.
-    fun fromMap(map: Map<String, Any?>): Alarm = Alarm(
+    fun fromMap(map: Map<String, Any?>): Alarm = checked(Alarm(
       id = map["id"] as String,
       fireAt = (map["fireAt"] as Number).toLong(),
       title = (map["title"] as? String).orEmpty(),
@@ -121,7 +134,7 @@ data class Alarm(
       sound = (map["sound"] as? String) ?: AlarmSound.DEFAULT,
       repeatMs = (map["repeatMs"] as? Number)?.toLong() ?: 0,
       repeatUntil = (map["repeatUntil"] as? Number)?.toLong() ?: 0
-    )
+    ))
 
     private fun JSONObject.optStringOrNull(key: String): String? =
       if (isNull(key)) null else optString(key).ifEmpty { null }

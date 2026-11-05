@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io } from 'socket.io-client';
-import { API_ORIGIN, TOKEN_KEY } from '../api/client';
+import { API_ORIGIN } from '../api/client';
+import { getToken } from '../api/sessionToken';
 import { useAuth } from './AuthContext';
 
 /**
@@ -30,7 +30,7 @@ export const SocketProvider = ({ children }) => {
       // Read the token on every (re)connection attempt so a fresh login is
       // picked up without recreating the socket.
       auth: (cb) => {
-        AsyncStorage.getItem(TOKEN_KEY)
+        getToken()
           .then((token) => cb({ token }))
           .catch(() => cb({}));
       },

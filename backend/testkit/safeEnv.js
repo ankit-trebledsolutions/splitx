@@ -43,6 +43,8 @@ Object.assign(process.env, {
   R2_BUCKET: '',
   MEDIA_BASE_URL: '',
   RESEND_API_KEY: '',
+  // Pushes are never really sent from a test (fetch is stubbed); blank all the same.
+  EXPO_ACCESS_TOKEN: '',
   // Locks nothing real: only what the tests themselves store.
   SETTINGS_ENCRYPTION_KEY: 'test-only-settings-key-0123456789abcdef',
   // Not a key: the fake OpenAI server (scripts/fake-openai.js) reads it as the scenario to play.

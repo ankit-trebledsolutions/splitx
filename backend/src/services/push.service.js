@@ -1,3 +1,4 @@
+const env = require('../config/env');
 const User = require('../models/User');
 const Reminder = require('../models/Reminder');
 
@@ -16,10 +17,18 @@ const chunk = (items, size) => {
   return chunks;
 };
 
+// With push security on in Expo, a request without the project's access token
+// is refused. Without a token set (env.expoAccessToken), none is sent.
+const headers = () => ({
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  ...(env.expoAccessToken ? { Authorization: `Bearer ${env.expoAccessToken}` } : {}),
+});
+
 const post = async (url, body) => {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Expo push responded ${res.status}`);

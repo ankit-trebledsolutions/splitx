@@ -1,11 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  TOKEN_KEY,
-  ACCOUNT_SUSPENDED,
-  setAccountSuspendedHandler,
-  onNextServerAnswer,
-} from '../api/client';
+import { ACCOUNT_SUSPENDED, setAccountSuspendedHandler, onNextServerAnswer } from '../api/client';
+import { clearToken, hasToken, setToken } from '../api/sessionToken';
 import {
   loginRequest,
   registerRequest,
@@ -20,8 +16,10 @@ import { clearReminderAlarms } from '../utils/reminderAlarms';
 
 const AuthContext = createContext(null);
 
-// The signed-in user as the server last described them. Kept beside the token
-// so the app can still be opened when the server cannot be reached.
+// The signed-in user as the server last described them, so the app can still
+// be opened when the server cannot be reached. In AsyncStorage: it is the
+// person's profile, not a secret, and too big for secure storage. The token
+// itself is in secure storage (api/sessionToken).
 const USER_KEY = 'splix.user';
 
 // Bumped whenever the saved session is replaced or removed. A check of the
@@ -29,21 +27,23 @@ const USER_KEY = 'splix.user';
 // longer exists, and must not put it back.
 let epoch = 0;
 
-// Token and user go in together, so the saved user can never belong to a
-// different account than the saved token.
-const saveSession = (token, user) => {
+// The saved user must never belong to a different account than the saved
+// token. They are kept in two places, so they cannot be written in one go;
+// in this order, a save cut short leaves a token with no saved user (the
+// sign-in screen when offline, the user fetched again when online), never a
+// token with someone else's.
+const saveSession = async (token, user) => {
   epoch += 1;
-  return AsyncStorage.multiSet([
-    [TOKEN_KEY, token],
-    [USER_KEY, JSON.stringify(user)],
-  ]);
+  await AsyncStorage.removeItem(USER_KEY);
+  await setToken(token);
+  await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 const clearSession = () => {
   epoch += 1;
   // Nobody is left whose session would still need checking.
   onNextServerAnswer(null);
-  return AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+  return Promise.all([clearToken(), AsyncStorage.removeItem(USER_KEY)]);
 };
 
 const savedUser = async () => {
@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }) => {
 
     const restoreSession = async () => {
       try {
-        if (!(await AsyncStorage.getItem(TOKEN_KEY))) return;
+        if (!(await hasToken())) return;
         if (await checkSession()) return;
         // No answer is no reason to end the session: someone opening the app
         // in airplane mode would be signed out, with no way back in until they

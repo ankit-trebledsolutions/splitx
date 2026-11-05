@@ -9,3 +9,9 @@ dist/
 /android
 /ios
 splix-e3191-firebase-adminsdk-fbsvc-0e2d29a770.json
+
+# Signing keys and their passwords never go in git (RELEASE-SIGNING.md).
+*.jks
+*.keystore
+keystore.properties
+credentials.json

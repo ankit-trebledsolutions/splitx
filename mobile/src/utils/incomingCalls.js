@@ -1,4 +1,5 @@
 import SplixAlarm from '../../modules/splix-alarm';
+import { isServerId } from './serverId';
 
 /**
  * Group calls that ring like a phone call.
@@ -28,14 +29,15 @@ export const allowIncomingCalls = () => {
 };
 
 // `data` is what the server sends with 'call:ring' (backend callRing.service).
+// Every group id here is checked (isServerId): it is where the call leads.
 export const showIncomingCall = (data) => {
-  if (callsSupported && data?.groupId) SplixAlarm.showIncomingCall(data).catch(() => {});
+  if (callsSupported && isServerId(data?.groupId)) SplixAlarm.showIncomingCall(data).catch(() => {});
 };
 
 // `data` is what the server sends with 'call:end'.
 export const endIncomingCall = (data) => {
-  if (callsSupported && data?.groupId) {
-    SplixAlarm.endIncomingCall(String(data.groupId), Number(data.at) || 0).catch(() => {});
+  if (callsSupported && isServerId(data?.groupId)) {
+    SplixAlarm.endIncomingCall(data.groupId, Number(data.at) || 0).catch(() => {});
   }
 };
 
@@ -53,7 +55,7 @@ let accepted = null;
 export const acceptedCall = () => {
   if (!accepted && callsSupported) {
     const call = SplixAlarm.takeAnsweredCall();
-    if (call) accepted = { call, since: Date.now() };
+    if (isServerId(call?.groupId)) accepted = { call, since: Date.now() };
   }
   return accepted;
 };
@@ -64,9 +66,11 @@ export const forgetAcceptedCall = () => {
 };
 
 // Where a tap on a "missed call" notification leads, as [screen, params]. Once.
+// Any app can hand the launch screen a "missed call", so a group id that is
+// not a server id leads nowhere (the phone refuses those first).
 export const takeCallRoute = () => {
   const call = callsSupported ? SplixAlarm.takeCallOpen() : null;
-  return call ? ['GroupChat', { groupId: call.groupId }] : null;
+  return isServerId(call?.groupId) ? ['GroupChat', { groupId: call.groupId }] : null;
 };
 
 /**

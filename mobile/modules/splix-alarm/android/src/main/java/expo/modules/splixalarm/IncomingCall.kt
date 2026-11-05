@@ -54,16 +54,21 @@ data class IncomingCall(
     // optString() answers the word "null" for a JSON null.
     private fun JSONObject.text(name: String): String = if (isNull(name)) "" else optString(name)
 
-    /** Null unless it names a group and a time: without those there is nothing to ring for. */
+    /**
+     * Null unless it names a group and a time: without those there is nothing
+     * to ring for. The group must be a server id (see ServerId): it is where
+     * the call screen and "missed call" lead. A caller id that is not one is
+     * left out; nothing is opened with it.
+     */
     fun fromJson(json: JSONObject): IncomingCall? {
       val groupId = json.text("groupId")
       val at = json.optLong("at", 0L)
-      if (groupId.isEmpty() || at <= 0L) return null
+      if (!ServerId.isValid(groupId) || at <= 0L) return null
       return IncomingCall(
         groupId = groupId,
         groupName = json.text("groupName").ifEmpty { NO_GROUP_NAME },
         callerName = json.text("callerName").ifEmpty { NO_CALLER_NAME },
-        callerId = json.text("callerId").ifEmpty { null },
+        callerId = json.text("callerId").takeIf { ServerId.isValid(it) },
         video = if (json.isNull("video")) null else json.optBoolean("video"),
         at = at
       )
@@ -79,12 +84,12 @@ data class IncomingCall(
     fun fromMap(map: Map<String, Any?>): IncomingCall? {
       val groupId = map["groupId"] as? String ?: return null
       val at = (map["at"] as? Number)?.toLong() ?: return null
-      if (groupId.isEmpty() || at <= 0L) return null
+      if (!ServerId.isValid(groupId) || at <= 0L) return null
       return IncomingCall(
         groupId = groupId,
         groupName = (map["groupName"] as? String).orEmpty().ifEmpty { NO_GROUP_NAME },
         callerName = (map["callerName"] as? String).orEmpty().ifEmpty { NO_CALLER_NAME },
-        callerId = (map["callerId"] as? String)?.ifEmpty { null },
+        callerId = (map["callerId"] as? String)?.takeIf { ServerId.isValid(it) },
         video = map["video"] as? Boolean,
         at = at
       )
@@ -121,7 +126,7 @@ sealed class CallSignal {
         "end" -> {
           val groupId = if (json.isNull("groupId")) "" else json.optString("groupId")
           val at = json.optLong("at", 0L)
-          if (groupId.isEmpty() || at <= 0L) null else End(groupId, at)
+          if (!ServerId.isValid(groupId) || at <= 0L) null else End(groupId, at)
         }
         else -> null
       }

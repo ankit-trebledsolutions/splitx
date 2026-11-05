@@ -72,7 +72,9 @@ class SplixAlarmModule : Module() {
     }
 
     // A tap on a missed or plain reminder, or on a missed call, while the app
-    // was already running.
+    // was already running. The launch screen takes intents from any app, so
+    // what they carry is read with fromJsonOrNull, which refuses any record
+    // whose ids are not server ids (ServerId); here and in takeOpen/takeCallOpen.
     OnNewIntent { intent ->
       val alarm = Alarm.fromJsonOrNull(intent.getStringExtra(AlarmNotifications.EXTRA_OPEN))
       if (alarm != null) {
@@ -212,7 +214,7 @@ class SplixAlarmModule : Module() {
 
     // The call is over (the same news as the silent push, over the app's connection).
     AsyncFunction("endIncomingCall") { groupId: String, at: Double ->
-      CallCenter.end(context, groupId, at.toLong())
+      if (ServerId.isValid(groupId)) CallCenter.end(context, groupId, at.toLong())
     }
 
     Function("getIncomingCall") {

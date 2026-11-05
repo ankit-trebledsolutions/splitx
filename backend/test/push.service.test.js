@@ -27,7 +27,7 @@ const stubExpo = (t, users) => {
   t.mock.method(User, 'find', () => ({ select: () => ({ lean: async () => users }) }));
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     const messages = JSON.parse(options.body);
-    requests.push({ url, messages });
+    requests.push({ url, messages, headers: options.headers });
     return { ok: true, json: async () => ({ data: messages.map((_m, i) => ({ status: 'ok', id: `ticket-${i}` })) }) };
   });
   return requests;
@@ -79,6 +79,52 @@ test('a push that is only worth having now says how long it may be kept trying',
   assert.equal(requests[1].messages[0].ttl, 45);
   // Everything else is left to the push services' own, much longer, limit.
   assert.equal('ttl' in requests[2].messages[0], false);
+});
+
+// Sets EXPO_ACCESS_TOKEN as env.js would have read it, for this test only.
+const withAccessToken = (t, token) => {
+  const before = env.expoAccessToken;
+  env.expoAccessToken = token;
+  t.after(() => {
+    env.expoAccessToken = before;
+  });
+};
+
+test('with no Expo access token set, pushes go out as they always have', async (t) => {
+  withAccessToken(t, '');
+  const requests = stubExpo(t, [{ pushTokens: [TOKEN] }]);
+
+  await pushService.sendToUsers([ASHA], { title: 'Tokyo Trip', body: 'Ben started a group call' });
+
+  assert.deepEqual(requests[0].headers, { Accept: 'application/json', 'Content-Type': 'application/json' });
+});
+
+test('with an Expo access token set, every request to Expo carries it, receipt checks included', async (t) => {
+  // With push security on, Expo refuses a request without it: a leaked push
+  // token alone can no longer make a phone ring.
+  withAccessToken(t, 'expo-access-token');
+  t.mock.method(User, 'find', () => ({ select: () => ({ lean: async () => [{ pushTokens: [TOKEN] }] }) }));
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push({ url, headers: options.headers });
+    const answer = url.endsWith('/getReceipts') ? {} : [{ status: 'ok', id: 'ticket-0' }];
+    return { ok: true, json: async () => ({ data: answer }) };
+  });
+  // The receipt check runs a minute after sending.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  await pushService.sendToUsers([ASHA], { title: 'Tokyo Trip', body: 'Ben started a group call' });
+  t.mock.timers.tick(60 * 1000);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(
+    requests.map(({ url }) => url.split('/').pop()),
+    ['send', 'getReceipts']
+  );
+  for (const { headers } of requests) {
+    assert.equal(headers.Authorization, 'Bearer expo-access-token');
+    assert.equal(headers['Content-Type'], 'application/json');
+  }
 });
 
 test('nothing is sent when nobody has a phone registered', async (t) => {

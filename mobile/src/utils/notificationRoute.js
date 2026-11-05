@@ -1,5 +1,6 @@
 // Where a notification leads when tapped: the same answer whether it was tapped
 // in the in-app list or as a push on the lock screen.
+import { serverIdOrNull } from './serverId';
 
 // Notifications about something inside a group open that group on the right tab.
 const GROUP_TAB = {
@@ -19,10 +20,16 @@ const GROUP_TAB = {
  *
  * Accepts a stored notification ({ type, group, entityId, ... }) or the flat
  * shape a push carries ({ type, groupId, entityId, conversationId, ... }).
+ *
+ * The ids become screen params and from there API paths, and a push can be
+ * sent by anyone who has this phone's push token (until push security is on
+ * in Expo), so an id that is not a server id is treated as absent.
  */
 export const routeForNotification = (notification = {}) => {
-  const { type, entityId, conversationId } = notification;
-  const groupId = notification.group?._id ?? notification.group ?? notification.groupId;
+  const { type } = notification;
+  const entityId = serverIdOrNull(notification.entityId);
+  const conversationId = serverIdOrNull(notification.conversationId);
+  const groupId = serverIdOrNull(notification.group?._id ?? notification.group ?? notification.groupId);
 
   if (type === 'dm' && conversationId) return ['DirectChat', { conversationId }];
   // Expenses get the summary screen first; it links on to the full expense.

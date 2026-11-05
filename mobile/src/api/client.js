@@ -1,7 +1,7 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { getToken } from './sessionToken';
 
 // Production builds (the APK) talk to the deployed API: the Hostinger VPS under
 // its own Hostinger name until there is a domain, then https://api.<domain>.
@@ -35,8 +35,6 @@ export const API_ORIGIN = __DEV__ ? `http://${DEV_HOST}:4000` : PROD_ORIGIN;
 
 export const API_BASE_URL = `${API_ORIGIN}/api/v1`;
 
-export const TOKEN_KEY = 'splity.token';
-
 // This build's number (Android versionCode, iOS build number: see app.json)
 // and its label. The number is what the server compares against the lowest
 // build an owner still allows; the label is only ever shown to people.
@@ -49,7 +47,7 @@ const client = axios.create({
 });
 
 client.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  const token = await getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   // Who is asking, build-wise, so a build that is too old can be turned away
   // (backend middleware/appVersion.js). Left off when the number is unknown:
