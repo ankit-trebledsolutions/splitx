@@ -40,10 +40,11 @@ const buildLoginLimiter = (overrides = {}) =>
   });
 
 /**
- * Invite codes that do not exist, per signed-in account. A code is 8 hex
- * characters (models/Group.js), which is guessable at an unlimited request
- * rate; a few dozen wrong codes is far more than any person mistypes. Must run
- * after `protect`.
+ * Invite codes that do not exist, per signed-in account. New codes carry 65
+ * bits, but groups made before November 2026 keep 8 hex characters (32 bits,
+ * utils/inviteCode.js), which are guessable at an unlimited request rate; a
+ * few dozen wrong codes is far more than any person mistypes. Must run after
+ * `protect`.
  */
 const buildInviteLimiter = (overrides = {}) =>
   rateLimit({

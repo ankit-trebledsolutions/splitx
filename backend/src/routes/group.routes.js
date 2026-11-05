@@ -8,6 +8,7 @@ const placesLimiter = require('../middleware/placesLimiter');
 const faceScanLimiter = require('../middleware/faceScanLimiter');
 const { inviteLimiter } = require('../middleware/guessLimiter');
 const { TIME_12H } = require('../utils/itineraryTime');
+const { INVITE_CODE_PATTERN } = require('../utils/inviteCode');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
 const messageController = require('../controllers/message.controller');
@@ -23,6 +24,14 @@ const router = Router();
 router.use(protect);
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
+
+// Amounts are stored as plain numbers rounded to the cent (expense.service.js
+// round2), and a group's balances are sums of them. Ten million per expense is
+// far beyond any shared bill and keeps every total exact to the cent. It also
+// stops 1e999 (JSON for Infinity) and numbers too long to show.
+const MAX_EXPENSE_AMOUNT = 10_000_000;
+const moneyAmount = z.number().max(MAX_EXPENSE_AMOUNT, 'Amount cannot be more than 10,000,000');
+
 const webLink = z.string().max(500).regex(/^https?:\/\//i, 'Links must start with http:// or https://');
 
 // A trip's destination as picked from the country and state lists (GET
@@ -45,15 +54,20 @@ const createGroupSchema = {
   }),
 };
 
+// An invite code as typed or tapped: 13 characters for groups made now, 8 for
+// older groups (utils/inviteCode.js).
+const inviteCodeField = z
+  .string({ required_error: 'Invite code is required' })
+  .trim()
+  .regex(INVITE_CODE_PATTERN, 'That invite code is not valid');
+
 const joinGroupSchema = {
-  body: z.object({
-    inviteCode: z.string().min(4, 'Invite code is required').max(16),
-  }),
+  body: z.object({ inviteCode: inviteCodeField }),
 };
 
 // The code from an invite link (https://<host>/join/<code>), as typed or tapped.
 const invitePreviewSchema = {
-  params: z.object({ code: z.string().trim().min(4, 'Invite code is required').max(16) }),
+  params: z.object({ code: inviteCodeField }),
 };
 
 const groupParams = { params: z.object({ groupId: objectId }) };
@@ -75,11 +89,11 @@ const createExpenseSchema = {
   params: z.object({ groupId: objectId }),
   body: z.object({
     description: z.string().min(1, 'Description is required').max(200),
-    amount: z.number().positive('Amount must be greater than 0'),
+    amount: moneyAmount.positive('Amount must be greater than 0'),
     paidBy: objectId,
     splitType: z.enum(['equal', 'exact']).default('equal'),
     participants: z.array(objectId).optional(),
-    splits: z.array(z.object({ user: objectId, amount: z.number().nonnegative() })).optional(),
+    splits: z.array(z.object({ user: objectId, amount: moneyAmount.nonnegative() })).optional(),
     category: z
       .enum([
         'general',
@@ -213,6 +227,10 @@ const generateItinerarySchema = {
   }),
 };
 
+// The JSON add makes an emoji-and-colour tile only. Pictures come in through
+// POST /:groupId/photos/upload, which stores the file itself. This route used
+// to take any `imageUrl`, which put an outside address (a tracking pixel, say)
+// on every member's phone; no app build since July 2026 sends one.
 const addPhotoSchema = {
   params: z.object({ groupId: objectId }),
   body: z.object({
@@ -221,7 +239,7 @@ const addPhotoSchema = {
       .string()
       .regex(/^#[0-9a-f]{6}$/i, 'Colour must be a hex code')
       .optional(),
-    imageUrl: z.string().url().max(2000).optional(),
+    imageUrl: z.undefined({ invalid_type_error: 'Upload the picture instead of sending its address' }),
     caption: z.string().max(200).optional(),
     taggedMembers: z.array(objectId).optional(),
   }),

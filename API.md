@@ -311,7 +311,7 @@ All group routes require auth, and all `/:groupId/...` routes require the caller
 
 ### `POST /groups`
 
-Create a group. The creator becomes `createdBy` (the group admin) and the first member. An 8-char `inviteCode` is generated automatically.
+Create a group. The creator becomes `createdBy` (the group admin) and the first member. A 13-character `inviteCode` (digits and capital letters without I, L, O, U; 65 bits) is generated automatically. Groups made before November 2026 keep their 8-character code, which still works.
 
 | Body field | Type | Rules |
 | --- | --- | --- |
@@ -341,7 +341,7 @@ Only unsettled splits count, the same rule as the `balance` on `GET /home` and t
 
 | Body field | Type | Rules |
 | --- | --- | --- |
-| `inviteCode` | string | required, 4–16 chars |
+| `inviteCode` | string | required, 8–16 letters or digits (surrounding spaces are trimmed); `400` otherwise, `404` when no group has it |
 
 Adds the caller to the matching group and returns it.
 
@@ -521,11 +521,11 @@ List the group's expenses (`paidBy` and `splits[].user` populated). Response: `{
 | Body field | Type | Rules |
 | --- | --- | --- |
 | `description` | string | required, ≤200 chars |
-| `amount` | number | required, > 0 |
+| `amount` | number | required, > 0 and ≤ 10,000,000 |
 | `paidBy` | ObjectId | required, must be a group member |
 | `splitType` | enum | `equal` (default) \| `exact` |
 | `participants` | ObjectId[] | for `equal`: who shares the cost (defaults to all members) |
-| `splits` | `[{ user, amount }]` | for `exact`: per-member amounts (must sum to `amount`) |
+| `splits` | `[{ user, amount }]` | for `exact`: per-member amounts, each 0 to 10,000,000 (must sum to `amount`) |
 | `category` | enum | `general` \| `food` \| `stay` \| `travel` \| `fun` \| `shopping` \| `transport` \| `housing` \| `entertainment` \| `utilities` \| `other` |
 | `date` | date | optional |
 
@@ -625,7 +625,7 @@ A conversation is between exactly two people. A new one can only be started with
 
 ### `POST /conversations`
 
-Body: `{ "userId": "<the other person>" }`. Returns the existing conversation with that person, or creates it on first contact. Response: `{ "data": { "conversation": { "_id", "participants": [{ "_id", "name", "email", "lastSeenAt" }], "lastMessageText", "lastMessageAt" } } }`
+Body: `{ "userId": "<the other person>" }`. Returns the existing conversation with that person, or creates it on first contact. A new conversation with someone you share no group with, or with an id that is no account, gets the same `403` ("You can only message people you share a group with"), so the answer never tells whether an id exists. Response: `{ "data": { "conversation": { "_id", "participants": [{ "_id", "name", "email", "lastSeenAt" }], "lastMessageText", "lastMessageAt" } } }`
 
 ### `GET /conversations`
 
@@ -987,11 +987,10 @@ Response: `{ "data": { "photos": [ ... ] } }`, newest first. Each row is a photo
 
 ### `POST /groups/:groupId/photos`
 
-Add a photo entry by URL or as an emoji/colour placeholder tile.
+Add an emoji/colour placeholder tile. Pictures are added with the upload below; an `imageUrl` in this body gets a `400` (it used to accept any address, which loaded on every member's phone).
 
 | Body field | Type | Rules |
 | --- | --- | --- |
-| `imageUrl` | string (URL) | optional |
 | `emoji` | string | optional, ≤8 |
 | `color` | string | optional, hex `#rrggbb` |
 | `caption` | string | optional, ≤200 |

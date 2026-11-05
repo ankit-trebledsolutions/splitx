@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const crypto = require('crypto');
+const { newInviteCode } = require('../utils/inviteCode');
 
 // Where a trip is going, as picked from the app's country and state lists
 // (services/regions.service.js). The state is optional: a country alone is a
@@ -57,9 +57,10 @@ groupSchema.set('toJSON', {
   },
 });
 
+// New groups get a 65-bit code; existing groups keep the code they have.
 groupSchema.pre('validate', function ensureInviteCode(next) {
   if (!this.inviteCode) {
-    this.inviteCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+    this.inviteCode = newInviteCode();
   }
   next();
 });

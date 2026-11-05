@@ -35,10 +35,15 @@ const openConversation = async (userId, otherUserId) => {
   const existing = await Conversation.findOne({ pairKey }).populate('participants', PERSON_FIELDS);
   if (existing) return existing;
 
-  const other = await User.exists({ _id: otherUserId });
-  if (!other) throw ApiError.notFound('That person no longer exists');
-  const shareGroup = await Group.exists({ members: { $all: [userId, otherUserId] } });
-  if (!shareGroup) throw ApiError.forbidden('You can only message people you share a group with');
+  // One answer for "no such person" and "no group in common", and both
+  // lookups always run, so this cannot be used to test whether an id exists.
+  const [other, shareGroup] = await Promise.all([
+    User.exists({ _id: otherUserId }),
+    Group.exists({ members: { $all: [userId, otherUserId] } }),
+  ]);
+  if (!other || !shareGroup) {
+    throw ApiError.forbidden('You can only message people you share a group with');
+  }
 
   // Both people can open the chat at the same moment; the unique pairKey lets
   // only one insert win, and the loser simply reads the winner's conversation.

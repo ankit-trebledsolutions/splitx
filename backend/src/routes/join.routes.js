@@ -7,6 +7,7 @@ const groupService = require('../services/group.service');
 const appRelease = require('../services/appRelease.service');
 const branding = require('../services/branding.service');
 const { absoluteUrl, inviteLinkFor } = require('../utils/publicUrl');
+const { INVITE_CODE_PATTERN } = require('../utils/inviteCode');
 const { renderJoinPage } = require('../views/joinPage');
 
 /**
@@ -21,8 +22,9 @@ const { renderJoinPage } = require('../views/joinPage');
  */
 const router = Router();
 
-// Codes are 8 hex characters (models/Group.js); anything else is not looked up.
-const CODE = /^[a-z0-9]{4,16}$/i;
+// Codes are 13 characters, or 8 for older groups (utils/inviteCode.js);
+// anything else is not looked up.
+const CODE = INVITE_CODE_PATTERN;
 
 // A browser page, so per address rather than per person. Generous for a
 // group link passed round a chat, tight enough that codes cannot be guessed
