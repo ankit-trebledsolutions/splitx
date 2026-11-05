@@ -47,6 +47,11 @@ MAX_UPLOAD_BYTES = int(os.environ.get("FACE_MAX_UPLOAD_BYTES", str(15 * 1024 * 1
 # Photos larger than this on their long side are shrunk first: the detector
 # works at `det` anyway, and a 50-megapixel file should not cost 150 MB of RAM.
 MAX_SIDE = int(os.environ.get("FACE_MAX_SIDE", "3000"))
+# A few hundred KB of PNG can claim a hundred-million-plus pixels, and decoding
+# that (then copying it twice below) takes gigabytes: enough to kill this
+# container on every retry. Checked from the header, before any pixel is
+# decoded. 64 MP is above every phone camera's normal output (50 MP).
+MAX_PIXELS = int(os.environ.get("FACE_MAX_PIXELS", "64000000"))
 # Faces smaller than this in the detector's working frame are ignored: too
 # little to fingerprint reliably, and mostly the crowd in the background.
 MIN_FACE_PX = float(os.environ.get("FACE_MIN_FACE_PX", "20"))
@@ -66,9 +71,15 @@ def decode(data):
     """The upload as a BGR array, turned the way the phone meant it."""
     try:
         image = Image.open(io.BytesIO(data))
+        # Image.open reads only the header, so the size is known before decoding.
+        width, height = image.size
+        if width * height > MAX_PIXELS:
+            raise HTTPException(status_code=413, detail="photo has too many pixels")
         # Phones record which way up a photo is instead of turning the pixels.
         image = ImageOps.exif_transpose(image)
         image = image.convert("RGB")
+    except Image.DecompressionBombError as err:
+        raise HTTPException(status_code=413, detail="photo has too many pixels") from err
     except (UnidentifiedImageError, OSError, ValueError) as err:
         raise HTTPException(status_code=415, detail="not an image this service can read") from err
     if max(image.size) > MAX_SIDE:

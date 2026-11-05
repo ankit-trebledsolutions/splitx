@@ -273,7 +273,12 @@ const TaskDetailScreen = ({ route, navigation }) => {
                 key={link._id ?? index}
                 style={styles.linkRow}
                 activeOpacity={0.8}
-                onPress={() => Linking.openURL(link.url).catch(() => {})}
+                // Web links only: a link any group member can add must not be
+                // able to open a payment app (upi://), dial (tel:) or deep-link
+                // into another app.
+                onPress={() => {
+                  if (/^https?:\/\//i.test(link.url ?? '')) Linking.openURL(link.url).catch(() => {});
+                }}
               >
                 <View style={styles.linkIcon}>
                   <Ionicons name="link-outline" size={15} color={theme.accentBlue} />

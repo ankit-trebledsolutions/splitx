@@ -9,6 +9,7 @@ const mediaRoutes = require('./routes/media.routes');
 const joinRoutes = require('./routes/join.routes');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const env = require('./config/env');
+const { setLocalHeaders } = require('./storage/servePolicy');
 
 const app = express();
 
@@ -36,8 +37,10 @@ app.use(
   })
 );
 
-// Uploaded gallery photos are served as static files.
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Uploaded gallery photos are served as static files (only when R2 is not
+// set up). This is the API's own origin, so anything that is not a picture,
+// video, audio or PDF is sent as a sandboxed download (storage/servePolicy.js).
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), { setHeaders: setLocalHeaders }));
 // Files in Cloudflare R2: answered with a short-lived link (routes/media.routes.js).
 app.use('/media', mediaRoutes);
 // Group invite links: the page behind https://<host>/join/<code>, and the

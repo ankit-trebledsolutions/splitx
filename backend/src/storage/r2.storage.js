@@ -10,6 +10,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const sharp = require('sharp');
 const env = require('../config/env');
 const integrations = require('../integrations/store');
+const { dispositionFor } = require('./servePolicy');
 
 /**
  * Cloudflare R2, spoken to through its S3-compatible API.
@@ -77,9 +78,15 @@ const addressOf = (key) => `${env.mediaBaseUrl || '/media'}/${encodeKey(key)}`;
 
 // A format sharp cannot read (HEIC from some phones) gets no square; the grid
 // then shows the full image, as it does for local storage.
+// A picture bigger than this gets no square either. A few hundred bytes of
+// PNG can claim a quarter-billion pixels (sharp's own default ceiling), and
+// decoding that to crop it would take gigabytes of this server's memory. Real
+// phone photos, even 50-megapixel ones, are under it.
+const MAX_SQUARE_INPUT_PIXELS = 52_000_000;
+
 const squareOf = async (buffer) => {
   try {
-    return await sharp(buffer, { failOn: 'none' })
+    return await sharp(buffer, { failOn: 'none', limitInputPixels: MAX_SQUARE_INPUT_PIXELS })
       // Phones record which way up a photo is instead of turning the pixels;
       // without this the square comes out on its side.
       .rotate()
@@ -102,7 +109,10 @@ const put = (client, bucket, key, body, contentType, name, length) =>
       ContentType: contentType || 'application/octet-stream',
       CacheControl: CACHE_FOREVER,
       // Keeps the original name when a document is saved from the link.
-      ContentDisposition: `inline; filename="${name}"`,
+      // Pictures, video, audio and PDF open in place; any other type is a
+      // download, so an HTML or SVG file sent in the chat never runs as a page
+      // (storage/servePolicy.js).
+      ContentDisposition: dispositionFor(contentType, name),
     })
   );
 

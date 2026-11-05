@@ -3,6 +3,7 @@ const { z } = require('zod');
 const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
 const controller = require('../controllers/auth.controller');
+const { loginLimiter } = require('../middleware/guessLimiter');
 
 const router = Router();
 
@@ -87,7 +88,7 @@ const resetPasswordSchema = {
 router.post('/register', validate(registerSchema), controller.register);
 router.post('/verify-email', validate(verifyOtpSchema), controller.verifyEmail);
 router.post('/resend-code', validate(resendCodeSchema), controller.resendCode);
-router.post('/login', validate(loginSchema), controller.login);
+router.post('/login', loginLimiter, validate(loginSchema), controller.login);
 router.post('/google', validate(googleSchema), controller.googleLogin);
 router.get('/me', protect, controller.me);
 router.patch('/me', protect, validate(updateMeSchema), controller.updateMe);

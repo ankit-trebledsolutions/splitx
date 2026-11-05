@@ -143,7 +143,29 @@ test('a file name cannot climb out of its folder or break the header', async (t)
 
   assert.equal(stored.key.split('/').length, FOLDER.split('/').length + 1);
   assert.ok(stored.key.startsWith(`${FOLDER}/`));
-  assert.match(sent[0].input.ContentDisposition, /^inline; filename="[A-Za-z0-9._-]+"$/);
+  // A text file is a download (storage/servePolicy.js); the name is what is tested here.
+  assert.match(sent[0].input.ContentDisposition, /^attachment; filename="[A-Za-z0-9._-]+"$/);
+});
+
+test('pictures, video, audio and PDF open in place; a page-like file is only ever a download', async (t) => {
+  useBucket(t);
+  const sent = fakeClient(t);
+  const upload = (mimetype, originalname) => r2.upload({ buffer: Buffer.from('x'), mimetype, originalname }, { folder: FOLDER });
+
+  await upload('video/mp4', 'clip.mp4');
+  await upload('audio/m4a', 'voice.m4a');
+  await upload('application/pdf', 'ticket.pdf');
+  await upload('text/html', 'page.html');
+  await upload('image/svg+xml', 'logo.svg');
+  await upload('application/xhtml+xml', 'page.xhtml');
+
+  const disposition = (name) => sent.find((c) => c.input.Key.endsWith(name)).input.ContentDisposition;
+  assert.match(disposition('clip.mp4'), /^inline;/);
+  assert.match(disposition('voice.m4a'), /^inline;/);
+  assert.match(disposition('ticket.pdf'), /^inline;/);
+  assert.match(disposition('page.html'), /^attachment;/);
+  assert.match(disposition('logo.svg'), /^attachment;/);
+  assert.match(disposition('page.xhtml'), /^attachment;/);
 });
 
 test('two uploads of the same file never share a key', async (t) => {

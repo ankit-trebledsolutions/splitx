@@ -34,6 +34,9 @@ import { coAdminsApi } from '@/features/co-admins/coAdminsApi';
 import { emailTemplateApi } from '@/features/email-template/emailTemplateApi';
 import { integrationsApi } from '@/features/integrations/integrationsApi';
 import { dashboardApi } from '@/features/dashboard/dashboardApi';
+import { supportApi } from '@/features/support/supportApi';
+import { walletApi } from '@/features/wallet/walletApi';
+import { appReleaseApi } from '@/features/app-release/appReleaseApi';
 import { useAppDispatch } from '@/app/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 import { useBranding } from '@/hooks/use-branding';
@@ -69,6 +72,9 @@ const LoginForm = () => {
       dispatch(coAdminsApi.util.resetApiState());
       dispatch(emailTemplateApi.util.resetApiState());
       dispatch(integrationsApi.util.resetApiState());
+      dispatch(supportApi.util.resetApiState());
+      dispatch(walletApi.util.resetApiState());
+      dispatch(appReleaseApi.util.resetApiState());
 
       dispatch(setCredentials(result.user));
       toast.success('Login successful!');
@@ -78,7 +84,6 @@ const LoginForm = () => {
       navigate('/', { replace: true });
       form.reset();
     } catch (error) {
-      console.log('Login error:', error);
       toast.error(error.data?.message || 'Login failed');
     }
   };

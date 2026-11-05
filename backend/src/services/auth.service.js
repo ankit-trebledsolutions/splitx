@@ -7,6 +7,7 @@ const ApiError = require('../utils/ApiError');
 const emailService = require('./email.service');
 const integrations = require('../integrations/store');
 const { assertUsableEmail } = require('../utils/emailCheck');
+const realtime = require('../realtime/socket');
 
 // ---- One-time codes ---------------------------------------------------------
 const OTP_TTL_MINUTES = 10;
@@ -52,6 +53,9 @@ const issueOtp = async (user, purpose) => {
 
   const previous = user.otp?.toObject();
   const code = String(crypto.randomInt(100000, 1000000));
+  // Test mode, until a domain is set up (see below): a sign-up code is shown
+  // in the app instead of emailed, so entering it proves nothing about the inbox.
+  const shownInApp = purpose === PURPOSE.VERIFY && emailService.usesTestSender();
   user.otp = {
     hash: hashOtp(code),
     purpose,
@@ -60,6 +64,7 @@ const issueOtp = async (user, purpose) => {
     lastSentAt: new Date(now),
     windowStart: windowOpen ? user.otp.windowStart : new Date(now),
     sentInWindow: sentInWindow + 1,
+    shown: shownInApp || undefined,
   };
   await user.save({ validateBeforeSave: false });
 
@@ -69,7 +74,7 @@ const issueOtp = async (user, purpose) => {
   // so a sign-up code goes back to the app, which shows it on the code screen.
   // Never a reset code: shown on screen, it would let anyone set a new
   // password on any account just by typing its email.
-  if (purpose === PURPOSE.VERIFY && emailService.usesTestSender()) {
+  if (shownInApp) {
     console.warn('[email] test mode: the sender is on resend.dev, so a sign-up code was shown in the app instead of emailed');
     return { ...result, devOtp: code };
   }
@@ -92,8 +97,13 @@ const issueOtp = async (user, purpose) => {
   }
 
   // With no mail provider configured nothing reaches an inbox, so development
-  // builds get the code back to show on screen. Never in production.
-  if (!emailService.isConfigured() && env.nodeEnv !== 'production') result.devOtp = code;
+  // builds get a sign-up code back to show on screen. Never in production, and
+  // never a reset code: a server started without NODE_ENV=production would
+  // otherwise hand anyone a new password for any account. Locally the reset
+  // email, code included, is printed to the server console instead.
+  if (!emailService.isConfigured() && env.nodeEnv !== 'production' && purpose === PURPOSE.VERIFY) {
+    result.devOtp = code;
+  }
   return result;
 };
 
@@ -192,8 +202,11 @@ const register = async ({ name, email: rawEmail, password, phone }) => {
 // Step 2 of sign-up: the emailed code. Success logs the person in.
 const verifyEmail = async (email, code) => {
   const user = await consumeOtp(email, code, PURPOSE.VERIFY);
+  const shownInApp = Boolean(user.otp?.shown);
   burnOtp(user);
   user.emailVerified = true;
+  // Signed in, but nobody has shown they can read this inbox (models/User.js).
+  if (shownInApp) user.emailUnproven = true;
   await user.save({ validateBeforeSave: false });
 
   emailService.sendWelcome(user);
@@ -278,13 +291,28 @@ const loginWithGoogle = async (idToken) => {
   // 2. Same email already registered with a password — link Google to it so
   //    the person ends up with one account, not two.
   if (!user) {
-    user = await User.findOne({ email: email.toLowerCase() });
+    // Loaded with the hidden fields so that removing them below is saved.
+    user = await User.findOne({ email: email.toLowerCase() }).select('+password +otp');
     if (user) {
+      // If nobody ever proved they own this inbox (the code was never entered,
+      // or was only shown in the app in test mode), whoever chose the password
+      // may not be the person Google has just vouched for. Linking as-is would
+      // let them keep signing in to this person's account with it. So the
+      // password goes, and with it every session made before now (the model
+      // records the reset); Google is the proof from here on, and a password
+      // can be set again through "Forgot password".
+      const unproven = user.emailVerified === false || user.emailUnproven === true;
+      if (unproven) {
+        user.password = undefined;
+        user.otp = undefined;
+      }
       user.googleId = googleId;
       // Google has verified this address, which settles it for us too.
       user.emailVerified = true;
+      user.emailUnproven = undefined;
       if (!user.avatar && picture) user.avatar = picture;
       await user.save({ validateBeforeSave: false });
+      if (unproven) realtime.disconnectUser(user._id);
     }
   }
 
@@ -339,7 +367,11 @@ const resetPassword = async (resetToken, password) => {
   burnOtp(user);
   // They just read a code from this inbox, so the address is proven too.
   user.emailVerified = true;
+  user.emailUnproven = undefined;
+  // Saving the new password also ends every session signed in before now
+  // (models/User.js): whoever knew the old one is signed out everywhere.
   await user.save();
+  realtime.disconnectUser(user._id);
 
   emailService.sendPasswordChanged(user);
   return { changed: true };

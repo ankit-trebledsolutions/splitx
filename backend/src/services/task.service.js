@@ -1,4 +1,5 @@
 const Task = require('../models/Task');
+const Message = require('../models/Message');
 const ApiError = require('../utils/ApiError');
 const groupService = require('./group.service');
 const messageService = require('./message.service');
@@ -15,6 +16,35 @@ const POPULATE = [
 
 const idsOf = (users) => users.map((user) => user?._id ?? user);
 
+// Assignees are shown to the whole group with their name and email, so each
+// must already be in it: anyone else would be a stranger's details handed out.
+const assertMembers = (group, userIds) => {
+  const memberIds = new Set(group.members.map((m) => m._id.toString()));
+  for (const id of userIds) {
+    if (!memberIds.has(id.toString())) throw ApiError.badRequest('Assignees must be group members');
+  }
+};
+
+/**
+ * Where a task made from a chat message came from. The quoted person is
+ * whoever sent that message in this group, read from the message itself
+ * rather than taken from the request, so a request cannot put an outsider's
+ * name and email on the card. Without a message, only a member may be named.
+ */
+const sourceFor = async (group, source) => {
+  if (!source) return {};
+  const { message: messageId, user, text, at } = source;
+  if (messageId) {
+    const message = await Message.findOne({ _id: messageId, group: group._id }).select('sender createdAt').lean();
+    if (!message) throw ApiError.badRequest('The quoted message is not in this group');
+    return { message: message._id, user: message.sender ?? undefined, text, at: at ?? message.createdAt };
+  }
+  if (user && !group.members.some((m) => m._id.equals(user))) {
+    throw ApiError.badRequest('The quoted person must be a group member');
+  }
+  return { user, text, at };
+};
+
 const listTasks = async (groupId, userId) => {
   await groupService.getGroupForMember(groupId, userId);
   return Task.find({ group: groupId }).populate(POPULATE).sort({ status: 1, dueAt: 1, createdAt: -1 });
@@ -22,14 +52,10 @@ const listTasks = async (groupId, userId) => {
 
 const createTask = async (userId, groupId, payload) => {
   const group = await groupService.getGroupForMember(groupId, userId);
-  const memberIds = new Set(group.members.map((m) => m._id.toString()));
 
   const assignees = payload.assignees ?? [];
-  for (const assignee of assignees) {
-    if (!memberIds.has(assignee.toString())) {
-      throw ApiError.badRequest('Assignees must be group members');
-    }
-  }
+  assertMembers(group, assignees);
+  const source = await sourceFor(group, payload.source);
 
   const task = await Task.create({
     group: groupId,
@@ -40,7 +66,7 @@ const createTask = async (userId, groupId, payload) => {
     dueAt: payload.dueAt ?? null,
     subtasks: payload.subtasks ?? [],
     links: payload.links ?? [],
-    source: payload.source ?? {},
+    source,
     createdBy: userId,
   });
 
@@ -77,6 +103,10 @@ const getTaskForMember = async (taskId, userId) => {
 const updateTask = async (taskId, userId, payload) => {
   const task = await getTaskForMember(taskId, userId);
   const wasDone = task.status === 'done';
+  // The same rule as createTask: nobody outside the group can be assigned.
+  if (payload.assignees !== undefined) {
+    assertMembers(await groupService.getGroupForMember(task.group, userId), payload.assignees);
+  }
 
   const fields = ['title', 'notes', 'priority', 'assignees', 'dueAt', 'subtasks', 'links'];
   for (const field of fields) {

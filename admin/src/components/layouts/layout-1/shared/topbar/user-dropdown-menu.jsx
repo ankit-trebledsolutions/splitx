@@ -26,6 +26,10 @@ import { dashboardApi } from '@/features/dashboard/dashboardApi';
 import { emailTemplateApi } from '@/features/email-template/emailTemplateApi';
 import { integrationsApi } from '@/features/integrations/integrationsApi';
 import { usersApi } from '@/features/users/usersApi';
+import { supportApi } from '@/features/support/supportApi';
+import { walletApi } from '@/features/wallet/walletApi';
+import { appReleaseApi } from '@/features/app-release/appReleaseApi';
+import { brandingApi } from '@/features/branding/brandingApi';
 
 const ROLE_LABELS = {
   [ROLES.SUPER_ADMIN]: 'Owner',
@@ -85,6 +89,10 @@ export function UserDropdownMenu({ trigger }) {
     dispatch(emailTemplateApi.util.resetApiState());
     dispatch(integrationsApi.util.resetApiState());
     dispatch(dashboardApi.util.resetApiState());
+    dispatch(supportApi.util.resetApiState());
+    dispatch(walletApi.util.resetApiState());
+    dispatch(appReleaseApi.util.resetApiState());
+    dispatch(brandingApi.util.resetApiState());
 
     toast.success('Logged out successfully');
     navigate('/login', { replace: true });

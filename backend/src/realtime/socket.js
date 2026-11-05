@@ -4,6 +4,7 @@ const env = require('../config/env');
 const User = require('../models/User');
 const Group = require('../models/Group');
 const Conversation = require('../models/Conversation');
+const { isAppSession, issuedBeforeReset } = require('../utils/sessionToken');
 
 /**
  * The app's live connection: one authenticated socket per open app, joined to
@@ -62,8 +63,14 @@ const authenticate = async (socket, next) => {
     const token = socket.handshake.auth && socket.handshake.auth.token;
     if (!token) return next(new Error('Missing access token'));
     const payload = jwt.verify(token, env.jwtSecret);
-    const user = await User.findById(payload.sub).select('name').lean();
+    // The same three rules as the HTTP API (middleware/auth.js): an app
+    // session token, signed after the last password change, for an account
+    // that is not blocked.
+    if (!isAppSession(payload)) return next(new Error('Invalid or expired token'));
+    const user = await User.findById(payload.sub).select('name isActive sessionsResetAt').lean();
     if (!user) return next(new Error('User no longer exists'));
+    if (issuedBeforeReset(payload, user)) return next(new Error('Invalid or expired token'));
+    if (user.isActive === false) return next(new Error('ACCOUNT_SUSPENDED'));
     socket.data.user = { id: user._id.toString(), name: user.name };
     return next();
   } catch (err) {
@@ -297,6 +304,16 @@ const closeGroup = (groupId, { name, deletedBy }) => {
   }
 };
 
+/**
+ * Ends every live connection a person has, on every server instance (the
+ * user room is adapter-aware). For when their account is blocked or deleted,
+ * or their password changes: the handshake then refuses the reconnect.
+ */
+const disconnectUser = (userId) => {
+  if (!io) return;
+  io.in(userRoom(String(userId))).disconnectSockets(true);
+};
+
 const close = () => new Promise((resolve) => (io ? io.close(() => resolve()) : resolve()));
 
 module.exports = {
@@ -306,5 +323,6 @@ module.exports = {
   isViewingConversation,
   removeFromGroup,
   closeGroup,
+  disconnectUser,
   close,
 };

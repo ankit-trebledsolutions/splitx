@@ -4,6 +4,7 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const { ROLES, MODULE_LIST } = require('../config/permissions');
 const userDeletion = require('./userDeletion.service');
+const realtime = require('../realtime/socket');
 
 const STAFF_ROLES = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
 
@@ -234,13 +235,15 @@ const updateUser = async (id, data, actor) => {
     }
   }
 
-  // Plain text again: the pre('save') hook does the hashing.
+  // Plain text again: the pre('save') hook does the hashing, and also ends
+  // every session the account signed in before now (models/User.js).
   if (data.password) user.password = data.password;
 
   // Permissions are not edited here: see setPermissions, which only an owner
   // can reach.
 
   await user.save();
+  if (data.password) realtime.disconnectUser(user._id);
   return user;
 };
 
@@ -271,6 +274,9 @@ const setActive = async (id, isActive, actor) => {
 
   user.isActive = isActive;
   await user.save();
+  // The HTTP API refuses a blocked account on its next request; its live
+  // connection has to be cut as well, or chat and presence keep flowing.
+  if (isActive === false) realtime.disconnectUser(user._id);
   return user;
 };
 
@@ -286,6 +292,7 @@ const deleteUser = async (id, actor) => {
   // somebody who no longer exists. userDeletion cleans those up, and refuses
   // when the removal would rewrite what other members owe each other.
   await userDeletion.deleteUser(id);
+  realtime.disconnectUser(id);
   return user;
 };
 

@@ -15,6 +15,9 @@ const otpSchema = new mongoose.Schema(
     // Codes sent in the current hour, to stop the app being used to flood an inbox.
     windowStart: Date,
     sentInWindow: { type: Number, default: 0 },
+    // True when this code was shown in the app (test mode, see auth.service)
+    // rather than emailed: entering it proves nothing about the inbox.
+    shown: Boolean,
   },
   { _id: false }
 );
@@ -72,6 +75,17 @@ const userSchema = new mongoose.Schema(
     // on purpose: Mongoose applies defaults when loading old documents, which
     // would turn every existing account into an unverified one.
     emailVerified: { type: Boolean },
+    // True when the address was "verified" with a code the app showed on
+    // screen (test mode) instead of one read from the inbox. Such an account
+    // counts as verified for signing in, but not as proof of who owns the
+    // address: Google sign-in treats it like an unverified one (auth.service).
+    // Cleared once the inbox is proven (an emailed reset code, or Google).
+    emailUnproven: { type: Boolean },
+    // Sign-in tokens issued before this moment no longer open a session
+    // (middleware/auth.js, middleware/adminAuth.js, realtime/socket.js). Set
+    // whenever the password changes or is removed, so a reset or an admin's
+    // password change signs out every other device.
+    sessionsResetAt: { type: Date },
     // The one-time code currently emailed to this person, if any. Only its hash
     // is kept. One slot serves both purposes: asking for a new code of either
     // kind replaces the old one.
@@ -103,7 +117,11 @@ const userSchema = new mongoose.Schema(
 
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  // An existing account whose password changed, or was removed: every session
+  // signed in before now ends. A brand-new account has none to end.
+  if (!this.isNew) this.sessionsResetAt = new Date();
+  // Removed (an unproven account taken over by Google sign-in): nothing to hash.
+  if (this.password) this.password = await bcrypt.hash(this.password, 12);
   return next();
 });
 
@@ -117,6 +135,8 @@ userSchema.methods.toJSON = function toJSON() {
   const obj = this.toObject({ flattenMaps: true });
   delete obj.password;
   delete obj.otp;
+  delete obj.emailUnproven;
+  delete obj.sessionsResetAt;
   // Older accounts have no flag and are treated as verified everywhere.
   obj.emailVerified = obj.emailVerified !== false;
   // The app holds new accounts on the Complete Profile screen until this is true.

@@ -16,6 +16,7 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { ROLES, satisfies } = require('../config/permissions');
+const { issuedBeforeReset } = require('../utils/sessionToken');
 
 const ADMIN_COOKIE = 'splitx_admin_token';
 
@@ -67,6 +68,8 @@ const adminProtect = asyncHandler(async (req, _res, next) => {
 
   const user = await User.findById(payload.sub);
   if (!user) throw ApiError.unauthorized('Account no longer exists');
+  // Signed in before this account's password last changed (models/User.js).
+  if (issuedBeforeReset(payload, user)) throw ApiError.unauthorized('Your session has ended. Please sign in again.');
   // Suspended accounts lose the panel immediately, mid-session.
   if (user.isActive === false) throw ApiError.forbidden('This account is suspended');
   if (user.role !== ROLES.ADMIN && user.role !== ROLES.SUPER_ADMIN) {

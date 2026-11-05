@@ -8,6 +8,7 @@ const router = Router();
 router.use(protect);
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
+const webLink = z.string().max(500).regex(/^https?:\/\//i, 'Links must start with http:// or https://');
 const taskParams = { params: z.object({ taskId: objectId }) };
 
 const updateTaskSchema = {
@@ -24,7 +25,8 @@ const updateTaskSchema = {
       .max(20)
       .optional(),
     links: z
-      .array(z.object({ title: z.string().max(120).optional(), url: z.string().max(500) }))
+      // Web links only: every member's phone opens these with one tap.
+      .array(z.object({ title: z.string().max(120).optional(), url: webLink }))
       .max(10)
       .optional(),
   }),

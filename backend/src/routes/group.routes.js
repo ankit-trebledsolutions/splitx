@@ -6,6 +6,7 @@ const { photoUpload, chatUpload, videoUpload } = require('../middleware/upload')
 const aiLimiter = require('../middleware/aiLimiter');
 const placesLimiter = require('../middleware/placesLimiter');
 const faceScanLimiter = require('../middleware/faceScanLimiter');
+const { inviteLimiter } = require('../middleware/guessLimiter');
 const { TIME_12H } = require('../utils/itineraryTime');
 const groupController = require('../controllers/group.controller');
 const expenseController = require('../controllers/expense.controller');
@@ -22,6 +23,7 @@ const router = Router();
 router.use(protect);
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
+const webLink = z.string().max(500).regex(/^https?:\/\//i, 'Links must start with http:// or https://');
 
 // A trip's destination as picked from the country and state lists (GET
 // /places/countries). The codes are checked against the lists by the service;
@@ -120,7 +122,8 @@ const createTaskSchema = {
       .max(20)
       .optional(),
     links: z
-      .array(z.object({ title: z.string().max(120).optional(), url: z.string().max(500) }))
+      // Web links only: every member's phone opens these with one tap.
+      .array(z.object({ title: z.string().max(120).optional(), url: webLink }))
       .max(10)
       .optional(),
     source: z
@@ -285,9 +288,9 @@ const placeSearchSchema = {
 
 router.post('/', validate(createGroupSchema), groupController.createGroup);
 router.get('/', groupController.listGroups);
-router.post('/join', validate(joinGroupSchema), groupController.joinGroup);
+router.post('/join', inviteLimiter, validate(joinGroupSchema), groupController.joinGroup);
 // Ahead of /:groupId so "invites" is never read as a group id.
-router.get('/invites/:code', validate(invitePreviewSchema), groupController.previewInvite);
+router.get('/invites/:code', inviteLimiter, validate(invitePreviewSchema), groupController.previewInvite);
 router.get('/:groupId', validate(groupParams), groupController.getGroup);
 router.delete('/:groupId', validate(groupParams), groupController.deleteGroup);
 router.post('/:groupId/leave', validate(leaveGroupSchema), groupController.leaveGroup);

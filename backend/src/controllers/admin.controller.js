@@ -25,8 +25,11 @@ const login = asyncHandler(async (req, res) => {
   const { user, token, rememberMe } = await adminService.login(req.body);
   res.cookie(ADMIN_COOKIE, token, cookieOptions(rememberMe));
   // The token is returned as well so non-browser callers (tests, curl) can use
-  // the Bearer path. Browsers should ignore it and rely on the cookie.
-  res.json({ success: true, data: { user, token } });
+  // the Bearer path. Never to a browser page (one that sends an Origin): any
+  // script running on the panel could read it from here, which would undo the
+  // cookie being httpOnly. The panel itself relies on the cookie only.
+  const fromBrowser = Boolean(req.get('Origin'));
+  res.json({ success: true, data: fromBrowser ? { user } : { user, token } });
 });
 
 const logout = asyncHandler(async (_req, res) => {

@@ -13,8 +13,21 @@ const round2 = (n) => Math.round(n * 100) / 100;
  *  - "equal": amount divided across participants (remainder cents go to the first).
  *  - "exact": caller provides [{ user, amount }] summing to the total.
  */
+const assertNoRepeats = (userIds) => {
+  const seen = new Set();
+  for (const id of userIds) {
+    const key = String(id);
+    // Settling finds a person's share by their id, so a second share for the
+    // same person could never be settled, and would keep them from leaving the
+    // group or deleting their account.
+    if (seen.has(key)) throw ApiError.badRequest('Each person can appear in an expense only once');
+    seen.add(key);
+  }
+};
+
 const buildSplits = (amount, splitType, participants, exactSplits) => {
   if (splitType === 'exact') {
+    assertNoRepeats((exactSplits ?? []).map((s) => s.user));
     if (!exactSplits?.length) throw ApiError.badRequest('Exact splits are required');
     const total = exactSplits.reduce((sum, s) => sum + s.amount, 0);
     if (Math.abs(total - amount) >= 0.01) {
@@ -24,6 +37,7 @@ const buildSplits = (amount, splitType, participants, exactSplits) => {
   }
 
   if (!participants?.length) throw ApiError.badRequest('Participants are required');
+  assertNoRepeats(participants);
   const share = Math.floor((amount / participants.length) * 100) / 100;
   const splits = participants.map((user) => ({ user, amount: share }));
   splits[0].amount = round2(splits[0].amount + (amount - share * participants.length));

@@ -40,11 +40,9 @@ const adminsSlice = createSlice({
       state.dialogType = null;
     },
     openPermissions: (state, action) => {
-      console.log(action.payload)
       state.activePermission = action.payload;
     },
     openPermissionsDialog: (state, action) => {
-      console.log(action.payload)
       state.selectedAdmin = action.payload;
       state.dialogType = 'viewPermissions';
     },
