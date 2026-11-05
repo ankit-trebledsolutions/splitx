@@ -1,20 +1,42 @@
 # Rendered at container start: ${API_DOMAIN} and ${ADMIN_DOMAIN} come from the
 # project's .env (see docker-compose.yml). Nginx's own $variables are left alone,
 # because the image only substitutes variables that are set in the environment.
+#
+# Both names are proxied by Cloudflare. cloudflare.conf.template (next to this
+# file) gives every request its visitor's real address and sets
+# $from_cloudflare; anything that did not come through Cloudflare is dropped
+# below, so nobody can reach the server by its IP and pick their own address
+# for the API's per-IP limits. See deploy/README.md.
 
 # Docker's internal DNS, asked again every 10s so a recreated api container
 # (new IP) is found without restarting Nginx.
 resolver 127.0.0.11 valid=10s;
 
+# No version number in the Server header or on error pages.
+server_tokens off;
+
+# Anything not addressed to one of the two names below (the bare IP, a
+# scanner's made-up Host): the TLS handshake is refused, so no certificate is
+# shown, and plain HTTP gets the connection closed without an answer.
+server {
+  listen 80 default_server;
+  listen 443 ssl default_server;
+  server_name _;
+  ssl_reject_handshake on;
+  return 444;
+}
+
 server {
   listen 80;
   server_name ${API_DOMAIN} ${ADMIN_DOMAIN};
+  if ($from_cloudflare = 0) { return 444; }
   return 301 https://$host$request_uri;
 }
 
 # API and socket.io (chat, calls). Everything on this name goes to the API,
 # including the group invite links (/join/<code>) and the file Android reads
-# to open them in the app (/.well-known/assetlinks.json).
+# to open them in the app (/.well-known/assetlinks.json). Its security headers
+# are the API's own (Helmet, backend/src/app.js).
 server {
   listen 443 ssl;
   http2 on;
@@ -22,6 +44,8 @@ server {
 
   ssl_certificate     /etc/nginx/certs/origin.pem;
   ssl_certificate_key /etc/nginx/certs/origin.key;
+
+  if ($from_cloudflare = 0) { return 444; }
 
   # Uploads are capped by the API (middleware/upload.js): 10 MB for photos and
   # chat files, 90 MB for gallery videos. A little more is let through here so
@@ -35,7 +59,9 @@ server {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # Replaced, not appended to: the API trusts exactly one hop (TRUST_PROXY=1
+    # in docker-compose.yml), and this is the visitor's address from above.
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto https;
     proxy_read_timeout 120s;
   }
@@ -49,23 +75,57 @@ server {
 
   ssl_certificate     /etc/nginx/certs/origin.pem;
   ssl_certificate_key /etc/nginx/certs/origin.key;
+
+  if ($from_cloudflare = 0) { return 444; }
+
   client_max_body_size 12m;
 
   root /usr/share/nginx/html;
 
   # The panel calls /api on its own origin so its session cookie stays
   # same-site (admin/src/lib/api.js); pass those on to the API, along with
-  # the stored files it shows (/media).
+  # the stored files it shows (/media). These keep the API's own headers.
   location ~ ^/(api|uploads|media)/ {
     set $api http://api:4000;
     proxy_pass $api;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto https;
   }
 
+  # The panel itself. Same headers as in deploy/nginx/no-domain; change both.
+  #
+  # Content-Security-Policy, built from admin/index.html and what the panel
+  # loads at run time:
+  #   script-src  the bundle, plus the inline theme script in index.html by its
+  #               hash. Editing that script changes the hash: recompute it
+  #               (deploy/README.md), or the browser blocks it and the panel
+  #               flashes light for dark-mode users while it loads.
+  #   style-src   'unsafe-inline' for React, Radix, ApexCharts and TinyMCE,
+  #               which all set inline styles, and for the email preview,
+  #               which is inline styles only; Google Fonts' stylesheets.
+  #   font-src    Google Fonts (Inter, Poppins).
+  #   img-src     https: for stored files (/media sends the browser on to a
+  #               signed R2 link), Google profile pictures and pictures put in
+  #               an email by address; data: and blob: for TinyMCE and the
+  #               logo picked on the Branding page before it is uploaded.
+  #   connect-src the API on this same origin, nothing else.
+  # TinyMCE's editing area and the email preview are iframes without a
+  # src (written in place, and srcdoc), so they inherit this policy and need
+  # no frame-src. The preview's sandbox="" already stops any script in it.
   location / {
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-3HiR+LjUdT6vr6N7U56xj3aHcchaRhqp4FpFO2uvdo0='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    # Not to be shown inside another site's frame (clickjacking of one-click
+    # admin actions); frame-ancestors above says the same to newer browsers.
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    # Full address to this origin only. Not no-referrer: that also turns the
+    # Origin header of the panel's own POSTs into "null".
+    add_header Referrer-Policy same-origin always;
+    # Same value the API's Helmet sends.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     try_files $uri /index.html;
   }
 }

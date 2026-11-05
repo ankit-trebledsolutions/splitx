@@ -334,6 +334,14 @@ they are part of the installed build: the name under the app icon
 Checks: `npm test` in `backend/` (`test/branding.test.js`); `npm run build` in
 `admin/`.
 
+## Deploying
+
+Production is Docker Compose on a Hostinger VPS: `web` (Nginx, which also
+serves the admin panel), `api` and `face`. Setup is `deploy/setup-vps.sh`.
+How the Nginx config works, how to roll a change to it out and back, and its
+upkeep (Cloudflare's address list, the admin panel's Content-Security-Policy)
+are in **[deploy/README.md](deploy/README.md)**.
+
 ## API
 
 Full endpoint documentation lives in **[API.md](API.md)**.

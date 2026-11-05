@@ -7,10 +7,28 @@
 #   everything else                     -> admin panel
 # The panel already calls /api on its own origin, and the mobile app calls
 # <origin>/api/v1 and <origin>/socket.io, so one name serves both.
+#
+# No Cloudflare in this mode: visitors connect to Nginx directly, so their
+# address is the one the connection comes from, and there is no proxy range to
+# lock the server to.
 
 # Docker's internal DNS, asked again every 10s so a recreated api container
 # (new IP) is found without restarting Nginx.
 resolver 127.0.0.11 valid=10s;
+
+# No version number in the Server header or on error pages.
+server_tokens off;
+
+# Anything not addressed to ${API_DOMAIN} (the bare IP, a scanner's made-up
+# Host): the TLS handshake is refused, so no certificate is shown, and plain
+# HTTP gets the connection closed without an answer.
+server {
+  listen 80 default_server;
+  listen 443 ssl default_server;
+  server_name _;
+  ssl_reject_handshake on;
+  return 444;
+}
 
 server {
   listen 80;
@@ -34,7 +52,8 @@ server {
   root /usr/share/nginx/html;
 
   # /join and /.well-known are the group invite links and the file Android
-  # reads to open them in the app (backend/src/routes/join.routes.js).
+  # reads to open them in the app (backend/src/routes/join.routes.js). These
+  # keep the API's own security headers (Helmet, backend/src/app.js).
   location ~ ^/(api|uploads|media|socket\.io|join|\.well-known)/ {
     set $api http://api:4000;
     proxy_pass $api;
@@ -42,12 +61,22 @@ server {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # Replaced, not appended to: the API trusts exactly one hop
+    # (TRUST_PROXY=1), and this is the address the visitor connected from.
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto https;
     proxy_read_timeout 120s;
   }
 
+  # The admin panel. Same headers as in deploy/nginx/templates, where each
+  # part of the Content-Security-Policy is explained; change both.
   location / {
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-3HiR+LjUdT6vr6N7U56xj3aHcchaRhqp4FpFO2uvdo0='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     try_files $uri /index.html;
   }
 }

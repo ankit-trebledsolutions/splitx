@@ -9,8 +9,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      # Cloudflare + Nginx sit in front; see backend/src/config/env.js.
-      TRUST_PROXY: 2
+      # One hop: Nginx. Cloudflare sits in front of it, but Nginx itself takes
+      # the visitor's address from Cloudflare and sends the API only that
+      # (deploy/nginx/templates), so there is nothing further back to trust.
+      # 2 would let anyone who reaches Nginx directly choose their own address.
+      TRUST_PROXY: 1
       # The face service below, on the compose network. Remove this line to
       # switch Face Scan off without stopping the container.
       FACE_SERVICE_URL: http://face:8000

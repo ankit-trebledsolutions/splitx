@@ -6,7 +6,8 @@
 services:
   api:
     environment:
-      # No Cloudflare in this mode: Nginx is the only proxy.
+      # No Cloudflare in this mode: Nginx is the only proxy. Same as the base
+      # file now; kept so this mode does not depend on it.
       TRUST_PROXY: 1
 
   web:
