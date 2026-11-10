@@ -14,7 +14,12 @@ const pagingSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+const historySchema = pagingSchema.extend({
+  // Only the credits that came in, or only those that went out. Left out: both.
+  direction: z.enum(['in', 'out'], { message: 'direction is "in" or "out"' }).optional(),
+});
+
 router.get('/', controller.get);
-router.get('/transactions', validate({ query: pagingSchema }), controller.transactions);
+router.get('/transactions', validate({ query: historySchema }), controller.transactions);
 
 module.exports = router;

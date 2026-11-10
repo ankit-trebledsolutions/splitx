@@ -20,6 +20,8 @@ import { useAuth } from '../context/AuthContext';
 import { profileDefaults } from '../data/profile';
 import { fetchHome } from '../api/home.api';
 import { quickActions } from '../data/dashboard';
+import { compactCredits, creditsLabel } from '../data/wallet';
+import useWallet from '../hooks/useWallet';
 import { usd } from '../utils/format';
 import { tripFlag } from '../utils/tripFlag';
 import { categoryIcon } from '../utils/expenseCategory';
@@ -101,6 +103,9 @@ const HomeScreen = ({ navigation }) => {
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const { ready: tourReady, isDone: tourDone, start: startTour } = useTour();
+  // The credits in the top row: read on every visit and kept current live.
+  // Nothing is drawn until they are known (offline, or a server without wallets).
+  const { wallet } = useWallet();
 
   const loadHome = useCallback(async () => {
     try {
@@ -196,9 +201,25 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.topRow}>
           <Avatar name={name} size={44} />
           <View style={styles.topText}>
-            <Text style={styles.greeting}>{greeting()} 👋</Text>
-            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.greeting} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {greeting()} 👋
+            </Text>
+            <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {name}
+            </Text>
           </View>
+          {wallet ? (
+            <TouchableOpacity
+              style={styles.credits}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Wallet')}
+              accessibilityRole="button"
+              accessibilityLabel={`${creditsLabel(wallet.balance)}. Open your wallet`}
+            >
+              <Ionicons name="wallet-outline" size={17} color={theme.accentGreen} />
+              <Text style={styles.creditsText}>{compactCredits(wallet.balance)}</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             style={[styles.bell, styles.alarm]}
             activeOpacity={0.8}
@@ -447,6 +468,20 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   // The reminders button, drawn like the bell and sitting just before it.
   alarm: { marginRight: spacing.sm },
+  // The credit balance, a pill as tall as the buttons beside it. Opens the wallet.
+  credits: {
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    marginRight: spacing.sm,
+  },
+  creditsText: { color: theme.text, fontSize: 14, fontWeight: '800' },
   bellDot: {
     position: 'absolute',
     top: 7,

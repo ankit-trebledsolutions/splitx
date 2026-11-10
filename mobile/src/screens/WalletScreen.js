@@ -36,6 +36,14 @@ const formatNumber = (value) => (Number(value) || 0).toLocaleString();
 // "+20" / "-5"
 const signed = (amount) => `${amount > 0 ? '+' : amount < 0 ? '-' : ''}${formatNumber(Math.abs(amount))}`;
 
+// The sides of the history, as GET /wallet/transactions names them, and what
+// each says when it has no rows.
+const FILTERS = [
+  { key: 'all', label: 'All', empty: 'Nothing yet. Credits you get and use will show here.' },
+  { key: 'in', label: 'Credited', direction: 'in', empty: 'No credits have been added yet.' },
+  { key: 'out', label: 'Debited', direction: 'out', empty: 'No credits have been used yet.' },
+];
+
 // New rows can push older ones onto the next page while the list is open, so
 // a page may repeat a row already shown.
 const appendRows = (list, rows) => {
@@ -44,39 +52,64 @@ const appendRows = (list, rows) => {
 };
 
 /**
- * Profile > Wallet: the person's credits as one total, the two pots it is made
- * of (this month's free credits, used first, and their own, which never
- * expire), what the paid features cost today, and every change, newest first.
+ * The wallet, opened from the credits in Home's top row and from Profile: the
+ * person's credits as one total, the two pots it is made of (this month's free
+ * credits, used first, and their own, which never expire), everything ever
+ * credited and debited, what the paid features cost today, and every change,
+ * newest first, as one list or one side at a time.
  * Credits cannot be bought yet: getting more means asking the team.
  */
 const WalletScreen = ({ navigation }) => {
   const theme = useTheme();
   const styles = useStyles(makeStyles);
+  // Which side of the history is listed: a key of FILTERS.
+  const [filter, setFilter] = useState('all');
   // The history a page at a time; null until the first page has come.
   const [rows, setRows] = useState(null);
   const [page, setPage] = useState(0);
   const [pages, setPages] = useState(0);
+  // Everything that ever came in and went out; null until the first page has
+  // come, and for good on a server from before totals.
+  const [totals, setTotals] = useState(null);
   const [historyError, setHistoryError] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Bumped by every fresh first page, so a later page asked for before it
-  // is not added to the new list.
+  // Bumped by every fresh first page, so an answer to an earlier question (a
+  // later page, or the first page of the side shown before) is dropped.
   const listVersion = useRef(0);
+
+  const direction = FILTERS.find((option) => option.key === filter)?.direction;
 
   const loadFirstPage = useCallback(async () => {
     listVersion.current += 1;
+    const version = listVersion.current;
     try {
-      const data = await getWalletTransactions({ page: 1, limit: PAGE_SIZE });
+      const data = await getWalletTransactions({ page: 1, limit: PAGE_SIZE, direction });
+      if (version !== listVersion.current) return;
       setRows(data.items);
       setPage(data.page);
       setPages(data.pages);
+      setTotals(data.totals ?? null);
       setHistoryError(null);
     } catch (err) {
+      if (version !== listVersion.current) return;
       setHistoryError(err);
       setRows((prev) => prev ?? []);
     }
-  }, []);
+  }, [direction]);
+
+  // The other side is a different list: empty it until its first page comes
+  // (the focus effect below asks for it, since loadFirstPage changes with it).
+  const chooseFilter = (key) => {
+    if (key === filter) return;
+    listVersion.current += 1;
+    setRows(null);
+    setPage(0);
+    setPages(0);
+    setHistoryError(null);
+    setFilter(key);
+  };
 
   // Every change to the credits is also a new row at the top of the history.
   const { wallet, error, refresh } = useWallet({ onChange: loadFirstPage });
@@ -98,7 +131,7 @@ const WalletScreen = ({ navigation }) => {
     const version = listVersion.current;
     setLoadingMore(true);
     try {
-      const data = await getWalletTransactions({ page: page + 1, limit: PAGE_SIZE });
+      const data = await getWalletTransactions({ page: page + 1, limit: PAGE_SIZE, direction });
       if (version !== listVersion.current) return;
       setRows((list) => appendRows(list, data.items));
       setPage(data.page);
@@ -196,6 +229,11 @@ const WalletScreen = ({ navigation }) => {
     },
   ];
 
+  // The all-time totals keep their place while the first page is on its way,
+  // so the rest does not jump when they come. A server from before totals
+  // never sends them: no tiles, and no sides to pick from.
+  const showTotals = totals !== null || rows === null;
+
   const listHeader = (
     <View>
       <View style={styles.balanceCard}>
@@ -233,6 +271,36 @@ const WalletScreen = ({ navigation }) => {
       </View>
       <Text style={styles.note}>{potsNote}</Text>
 
+      {showTotals ? (
+        <>
+          <Text style={styles.sectionLabel}>All time</Text>
+          <View style={styles.totalRow}>
+            <View style={[styles.card, styles.total]}>
+              <View style={[styles.rowIcon, styles.totalIconIn]}>
+                <Ionicons name="arrow-down" size={17} color={theme.success} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={styles.totalLabel}>CREDITED</Text>
+                <Text style={[styles.totalValue, { color: theme.success }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {totals ? signed(totals.credited) : '–'}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.card, styles.total]}>
+              <View style={[styles.rowIcon, styles.totalIconOut]}>
+                <Ionicons name="arrow-up" size={17} color={theme.danger} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={styles.totalLabel}>DEBITED</Text>
+                <Text style={[styles.totalValue, { color: theme.danger }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {totals ? signed(-totals.debited) : '–'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Prices</Text>
       <View style={styles.card}>
         {priceRows.map((row, index) => (
@@ -263,6 +331,23 @@ const WalletScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>History</Text>
+      {totals ? (
+        <View style={styles.chipRow}>
+          {FILTERS.map((option) => {
+            const active = filter === option.key;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.chip, active && styles.chipActive]}
+                activeOpacity={0.8}
+                onPress={() => chooseFilter(option.key)}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
       {historyError && rows?.length ? (
         <Text style={styles.historyError}>Could not refresh the history. Pull down to try again.</Text>
       ) : null}
@@ -325,7 +410,7 @@ const WalletScreen = ({ navigation }) => {
             <Text style={styles.historyEmpty}>
               {historyError
                 ? 'Could not load the history. Pull down to try again.'
-                : 'Nothing yet. Credits you get and use will show here.'}
+                : FILTERS.find((option) => option.key === filter)?.empty}
             </Text>
           )
         }
@@ -474,6 +559,35 @@ const makeStyles = (theme) => StyleSheet.create({
   rowDetail: { color: theme.textMuted, fontSize: 11, lineHeight: 15, marginTop: 2 },
   price: { color: theme.text, fontSize: 13, fontWeight: '700', marginLeft: spacing.sm },
   priceFree: { color: theme.success },
+
+  // Everything that ever came in and went out, side by side.
+  totalRow: { flexDirection: 'row', gap: spacing.sm + 2 },
+  total: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md - 2,
+    paddingVertical: spacing.md - 2,
+  },
+  totalIconIn: { backgroundColor: theme.successTint, marginRight: spacing.sm + 2 },
+  // A wash of red that reads on both the dark and the light card.
+  totalIconOut: { backgroundColor: 'rgba(248,113,113,0.14)', marginRight: spacing.sm + 2 },
+  totalLabel: { color: theme.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
+  totalValue: { fontSize: 18, fontWeight: '800', marginTop: 1 },
+
+  // Notifications' filter chips.
+  chipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md - 4 },
+  chip: {
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 1,
+  },
+  chipActive: { backgroundColor: theme.accentFill, borderColor: theme.accentFill },
+  chipText: { color: theme.textMuted, fontSize: 12, fontWeight: '600' },
+  chipTextActive: { color: '#04121C', fontWeight: '800' },
 
   txRow: {
     flexDirection: 'row',

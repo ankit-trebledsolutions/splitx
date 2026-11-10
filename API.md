@@ -1254,9 +1254,11 @@ When someone cannot pay, the request is `402` with `code: "NO_CREDITS"`, `needed
 
 ### `GET /wallet/transactions`
 
-The caller's history, newest first. Query `page` (default 1) and `limit` (1–50, default 20).
+The caller's history, newest first. Query `page` (default 1), `limit` (1–50, default 20) and `direction`: `in` for only the credits that came in, `out` for only those that went out, left out for both.
 
-`{ "data": { "items": [{ "id", "type", "amount", "feature", "balanceAfter", "freeAfter", "createdAt" }], "total", "page", "pages" } }`
+`{ "data": { "items": [{ "id", "type", "amount", "feature", "balanceAfter", "freeAfter", "createdAt" }], "total", "page", "pages", "totals": { "credited", "debited" } } }`
+
+`totals` are all-time and cover the whole history, whichever `direction` and page was asked for: everything that came in and everything that went out, both as positive numbers, so `credited - debited` is the balance. A refund counts in `credited`; the charge it gives back stays in `debited`.
 
 `type` is one of `bonus` (signup), `monthly` (free credits topped up; `amount` is the change, `freeAfter` what the pot now holds), `spend`, `refund`, `grant` and `deduct` (by an admin). `amount` is signed. An admin's reason, and who they are, never reach the app.
 

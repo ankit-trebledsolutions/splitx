@@ -10,8 +10,14 @@ export const getWallet = async () => {
 };
 
 // One page of the credit history, newest first:
-// { items: [{ id, type, amount, feature, balanceAfter, freeAfter, createdAt }], total, page, pages }
-export const getWalletTransactions = async ({ page = 1, limit = 20 } = {}) => {
-  const { data } = await client.get('/wallet/transactions', { params: { page, limit } });
+// { items: [{ id, type, amount, feature, balanceAfter, freeAfter, createdAt }], total, page, pages,
+//   totals: { credited, debited } }
+// `direction` keeps one side: 'in' (credits that came in) or 'out' (went out).
+// `totals` are all-time and always cover both sides. A server from before them
+// sends no `totals` and ignores `direction`.
+export const getWalletTransactions = async ({ page = 1, limit = 20, direction } = {}) => {
+  const params = { page, limit };
+  if (direction) params.direction = direction;
+  const { data } = await client.get('/wallet/transactions', { params });
   return data.data;
 };

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Wallet = require('../models/Wallet');
 const CreditTransaction = require('../models/CreditTransaction');
 const WalletSettings = require('../models/WalletSettings');
@@ -361,9 +362,37 @@ const pageOf = async (filter, { page, limit }, shape, populate = []) => {
   return { items: rows.map(shape), total, page, pages: Math.max(1, Math.ceil(total / limit)) };
 };
 
-const listForUser = async (userId, paging) => {
+// The history's two sides: credits that came in, and credits that went out.
+const DIRECTIONS = { in: { $gt: 0 }, out: { $lt: 0 } };
+
+/**
+ * Everything that ever came in and everything that ever went out, each as a
+ * positive number. Every change is a row, so `credited - debited` is the
+ * balance. A refund is a row of its own: the charge it gives back stays in
+ * `debited` and the refund counts in `credited`, as on a bank statement.
+ */
+const totalsFor = async (userId) => {
+  const [sum] = await CreditTransaction.aggregate([
+    // An aggregate does not cast ids the way a query does.
+    { $match: { user: new mongoose.Types.ObjectId(String(userId)) } },
+    {
+      $group: {
+        _id: null,
+        credited: { $sum: { $max: ['$amount', 0] } },
+        debited: { $sum: { $max: [{ $multiply: ['$amount', -1] }, 0] } },
+      },
+    },
+  ]);
+  return { credited: sum?.credited ?? 0, debited: sum?.debited ?? 0 };
+};
+
+// `totals` cover the whole history, whichever side and page was asked for.
+const listForUser = async (userId, { direction, ...paging }) => {
   await ensureWallet(userId);
-  return pageOf({ user: userId }, paging, rowForApp);
+  const filter = { user: userId };
+  if (direction) filter.amount = DIRECTIONS[direction];
+  const [history, totals] = await Promise.all([pageOf(filter, paging, rowForApp), totalsFor(userId)]);
+  return { ...history, totals };
 };
 
 // ---- The admin panel -------------------------------------------------------------

@@ -15,6 +15,17 @@ export const creditsLabel = (amount) => {
   return `${value.toLocaleString()} ${Math.abs(value) === 1 ? 'credit' : 'credits'}`;
 };
 
+// The balance where there is only room for a few characters (Home's top row):
+// "1,240", then "12.4k" and "1.2M". Rounded down, never up: it must not show
+// more than the person has.
+export const compactCredits = (amount) => {
+  const value = Math.max(Math.floor(Number(amount) || 0), 0);
+  if (value < 10000) return value.toLocaleString();
+  const [unit, letter] = value < 1000000 ? [1000, 'k'] : [1000000, 'M'];
+  const tenths = Math.floor((value / unit) * 10) / 10;
+  return `${tenths >= 100 ? Math.floor(tenths) : tenths}${letter}`;
+};
+
 // A price of 0 means the feature is free right now: no cost is shown anywhere.
 export const isPaid = (price) => Number(price) > 0;
 

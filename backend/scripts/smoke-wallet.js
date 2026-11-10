@@ -427,6 +427,42 @@ const main = async () => {
     assert.deepEqual([wallet.free, wallet.paid], [DEFAULTS.monthlyFree, DEFAULTS.signupBonus - 30]);
   });
 
+  await check('the history can be read one side at a time, and its totals explain the balance', async () => {
+    const user = await makeUser('Counted');
+    expectStatus(await adminCall(owner, 'POST', `/wallet/users/${user._id}/adjust`, adjustBody('grant', 200)), 200);
+    expectStatus(await adminCall(owner, 'POST', `/wallet/users/${user._id}/adjust`, adjustBody('deduct', 70)), 200);
+    expectStatus(await adminCall(owner, 'POST', `/wallet/users/${user._id}/adjust`, adjustBody('deduct', 5)), 200);
+    const credited = DEFAULTS.signupBonus + DEFAULTS.monthlyFree + 200;
+
+    const all = await call(user, 'GET', '/wallet/transactions');
+    expectStatus(all, 200);
+    assert.deepEqual(all.body.data.totals, { credited, debited: 75 });
+    assert.equal(all.body.data.total, 5);
+    assert.equal(credited - 75, await balanceOf(user));
+
+    const cameIn = await call(user, 'GET', '/wallet/transactions?direction=in');
+    expectStatus(cameIn, 200);
+    assert.deepEqual(cameIn.body.data.items.map((row) => row.type).sort(), ['bonus', 'grant', 'monthly']);
+    assert.equal(cameIn.body.data.total, 3);
+
+    // The totals stay the whole history's, whichever side and page is asked for.
+    const wentOut = await call(user, 'GET', '/wallet/transactions?direction=out&limit=1&page=2');
+    expectStatus(wentOut, 200);
+    assert.deepEqual(wentOut.body.data.items.map((row) => row.amount), [-70]);
+    assert.deepEqual([wentOut.body.data.total, wentOut.body.data.pages], [2, 2]);
+    assert.deepEqual(wentOut.body.data.totals, { credited, debited: 75 });
+
+    expectError(await call(user, 'GET', '/wallet/transactions?direction=sideways'), 400);
+
+    // Somebody else's rows are never counted.
+    const other = await makeUser('Uncounted');
+    const theirs = await call(other, 'GET', '/wallet/transactions');
+    assert.deepEqual(theirs.body.data.totals, {
+      credited: DEFAULTS.signupBonus + DEFAULTS.monthlyFree,
+      debited: 0,
+    });
+  });
+
   await check('nobody adjusts their own credits; read-only and module-less admins are refused', async () => {
     const user = await makeUser('Bystander');
     expectError(await adminCall(walletAdmin, 'POST', `/wallet/users/${walletAdmin._id}/adjust`, adjustBody('grant', 10)), 400);
@@ -531,7 +567,8 @@ const main = async () => {
   const liveCall = (group, firstUser, startedAt = new Date()) => ({
     groupId: String(group._id),
     startedAt,
-    firstUserId: String(firstUser._id),
+    // What stream.service ongoingCalls reports: the people in it, longest first.
+    participantIds: [String(firstUser._id)],
   });
 
   await check('while calls are free, starting one bills nothing and opens nothing', async () => {
@@ -610,8 +647,10 @@ const main = async () => {
     await callBilling.sweep(now);
     const session = await sessionOf(group);
     assert.equal(String(session.startedBy), String(first._id));
-    assert.equal(session.blocksCharged, 3, '25 minutes is three started blocks');
-    assert.equal(await balanceOf(first), 85);
+    // Billed from no further back than one sweep could have missed it, not
+    // for the 25 minutes Stream says the call has run.
+    assert.equal(session.blocksCharged, 1, 'only the block the sweep found it in');
+    assert.equal(await balanceOf(first), 95);
     assert.equal(await balanceOf(second), 100);
 
     // Someone outside the group in a call with the group's id pays nothing.
