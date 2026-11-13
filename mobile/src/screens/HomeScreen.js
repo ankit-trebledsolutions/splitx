@@ -169,9 +169,8 @@ const HomeScreen = ({ navigation }) => {
   );
 
   const runQuickAction = (key) => {
-    if (key === 'create-group' || key === 'create-trip') navigation.navigate('CreateGroup');
-    else if (key === 'invite-friend') navigation.navigate('InviteFriends');
-    else navigation.navigate('Groups');
+    if (key === 'invite-friend') navigation.navigate('InviteFriends');
+    else navigation.navigate('CreateGroup');
   };
 
   // Opens the contribution dashboard for the most recently active group.
